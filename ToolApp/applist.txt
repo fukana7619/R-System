@@ -3,3 +3,4 @@ R-System/ToolApp が保有するコード一覧
 
 Test clock.html
 Test clock.png
+net test page.html
