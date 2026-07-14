@@ -46,7 +46,7 @@
       cursor: pointer;
       user-select: none;
       background-color: #f6f8fa;
-      border-radius: 6px; /* 初期状態が閉じているので全体を角丸に */
+      border-radius: 6px;
       transition: background-color 0.2s;
     }
     .category-title:hover {
@@ -75,22 +75,20 @@
       margin-bottom: 20px;
     }
 
-    /* 🌟 【ここを変更】最初から閉じている（is-closed）状態をデフォルトに設定 */
     .category-section.is-closed .category-content {
-      display: none; /* 中身を非表示 */
+      display: none;
     }
     .category-section.is-closed .category-arrow {
-      transform: rotate(-90deg); /* 矢印を横向きにする */
+      transform: rotate(-90deg);
     }
-    /* 開いているときだけ見出しの下の角丸を削る */
     .category-section:not(.is-closed) .category-title {
       border-radius: 6px 6px 0 0;
     }
 
-    /* 未分類用 */
+    /* 未分類用エリア */
     .uncategorized-section {
-      margin-top: 20px;
-      margin-bottom: 20px;
+      margin-top: 10px;
+      margin-bottom: 25px;
     }
 
     .url-card {
@@ -191,7 +189,6 @@
   </div>
 
   <script>
-    // ※GASのURLは現在のものがそのまま入っています
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
@@ -266,6 +263,7 @@
       displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
     }
 
+    // 📁 データをカテゴリ別に整理して描画
     function renderList(dataList) {
       const urlListContainer = document.getElementById('url-list');
       
@@ -285,11 +283,19 @@
 
       let htmlString = '';
 
-      // 2. フォルダ分けされたグループを描画（デフォルトで閉じさせる）
+      // 1. ★【順番入替】まず「未分類」を一番上にむき出しで描画する
+      if (groups["未分類"] && groups["未分類"].length > 0) {
+        htmlString += `<div class="uncategorized-section">`;
+        groups["未分類"].forEach(item => {
+          htmlString += createCardHtml(item);
+        });
+        htmlString += `</div>`;
+      }
+
+      // 2. その後に、畳まれたフォルダを描画する
       for (const category in groups) {
         if (category === "未分類") continue;
 
-        // ★ class に「is-closed」を最初から付与して、最初から閉じた状態にしています
         htmlString += `
           <div class="category-section is-closed">
             <div class="category-title" onclick="toggleCategory(this)">
@@ -307,15 +313,6 @@
             </div>
           </div>
         `;
-      }
-
-      // 3. 「未分類」のURLカード（最初からむき出しのまま一番下へ）
-      if (groups["未分類"] && groups["未分類"].length > 0) {
-        htmlString += `<div class="uncategorized-section">`;
-        groups["未分類"].forEach(item => {
-          htmlString += createCardHtml(item);
-        });
-        htmlString += `</div>`;
       }
       
       urlListContainer.innerHTML = htmlString;
