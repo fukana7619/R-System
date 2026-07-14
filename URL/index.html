@@ -70,7 +70,7 @@
       padding: 40px;
     }
 
-    /* 🔄 再読み込みボタンエリアのスタイル */
+    /* 🔄 再読み込みボタンエリア */
     .button-area {
       text-align: center;
       margin-top: 30px;
@@ -116,45 +116,54 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
+    const TIME_KEY = "shared_urls_time"; // 前回取得した時刻を記録するキー
+    const CACHE_LIMIT_MS = 60 * 60 * 1000; // キャッシュ有効期限：1時間（ミリ秒換算）
 
-    // 【初回読み込み】キャッシュがあればすぐ表示、裏で最新データを取得
+    // 【初回読み込み】
     async function loadUrls() {
       const container = document.getElementById('container');
       const cachedData = localStorage.getItem(CACHE_KEY);
+      const lastFetchTime = localStorage.getItem(TIME_KEY);
       
+      const now = Date.now();
+      
+      // 1. キャッシュが存在する場合、一旦すぐに表示
       if (cachedData) {
         console.log("キャッシュからデータを即時表示します");
         const dataList = JSON.parse(cachedData);
         renderList(dataList);
+        
+        // 2. 前回読み込みから1時間以上経過しているかチェック
+        if (lastFetchTime && (now - parseInt(lastFetchTime, 10) > CACHE_LIMIT_MS)) {
+          console.log("前回取得から1時間以上経過したため、自動更新します");
+          await fetchAndSaveData();
+        } else {
+          console.log("キャッシュの有効期限内（1時間未満）のため、自動更新はスキップします");
+        }
+      } else {
+        // キャッシュが全くない場合は、経過時間に関わらず強制取得
+        console.log("キャッシュが存在しないため、データを取得します");
+        await fetchAndSaveData();
       }
-
-      // 裏でこっそりGASに通信してデータを同期
-      await fetchAndSaveData();
     }
 
-    // 【新機能】ボタンを押したときの強制リロード（キャッシュを介さず最新化）
+    // 【手動リロード】ボタンを押したときは、1時間ルールを無視して強制取得
     async function forceReloadUrls() {
       const reloadBtn = document.getElementById('reloadBtn');
       
-      // ボタンを一時的に「更新中...」にしてクリック連打を防ぐ
+      // 連打防止
       reloadBtn.disabled = true;
       reloadBtn.innerHTML = "⌛ 更新中...";
 
-      console.log("手動リロードを開始します...");
-      const success = await fetchAndSaveData();
+      console.log("手動リロード（強制）を開始します...");
+      await fetchAndSaveData();
 
       // 元のボタンに戻す
       reloadBtn.disabled = false;
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
-
-      if (success) {
-        alert("最新のデータを取得しました！");
-      } else {
-        alert("最新データの取得に失敗しました。電波の良い場所で再度お試しください。");
-      }
     }
 
-    // GASからデータを取得して画面を更新＆キャッシュに保存する共通関数
+    // GASからデータを取得して画面を更新＆キャッシュと時刻を保存する共通関数
     async function fetchAndSaveData() {
       const container = document.getElementById('container');
       const cachedData = localStorage.getItem(CACHE_KEY);
@@ -165,9 +174,12 @@
         
         const newDataList = await response.json();
         
-        // キャッシュを更新
+        // データをキャッシュ
         localStorage.setItem(CACHE_KEY, JSON.stringify(newDataList));
-        console.log("最新データをキャッシュに保存しました");
+        // 取得成功時のタイムスタンプを保存
+        localStorage.setItem(TIME_KEY, Date.now().toString());
+        
+        console.log("最新データをキャッシュに保存しました。タイムスタンプ更新。");
 
         // 画面を最新化
         renderList(newDataList);
