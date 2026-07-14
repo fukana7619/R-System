@@ -32,7 +32,7 @@
       margin-bottom: 15px;
     }
     
-    /* 📁 フォルダの見出し（クリック可能に変更） */
+    /* 📁 フォルダの見出し */
     .category-title {
       font-size: 16px;
       font-weight: bold;
@@ -40,30 +40,29 @@
       margin-bottom: 0;
       display: flex;
       align-items: center;
-      justify-content: space-between; /* 矢印を右端に寄せる */
+      justify-content: space-between;
       border-bottom: 2px solid #e1e4e8;
       padding: 10px 6px;
-      cursor: pointer; /* マウスを乗せたらポインタにする */
-      user-select: none; /* 文字の選択を防ぐ */
+      cursor: pointer;
+      user-select: none;
       background-color: #f6f8fa;
-      border-radius: 6px 6px 0 0;
+      border-radius: 6px; /* 初期状態が閉じているので全体を角丸に */
+      transition: background-color 0.2s;
     }
     .category-title:hover {
       background-color: #eaeef2;
     }
 
-    /* 📁 フォルダ名の左側のアイコンとテキスト用 */
     .category-title-text {
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    /* 📁 開閉状態を示す矢印 */
     .category-arrow {
       font-size: 12px;
       color: #57606a;
-      transition: transform 0.2s ease; /* 矢印が回るアニメーション */
+      transition: transform 0.2s ease;
     }
 
     /* 📦 フォルダの中身（URLカードの入れ物） */
@@ -76,15 +75,19 @@
       margin-bottom: 20px;
     }
 
-    /* 🌟 閉じているときのスタイル */
+    /* 🌟 【ここを変更】最初から閉じている（is-closed）状態をデフォルトに設定 */
     .category-section.is-closed .category-content {
-      display: none; /* 中身を非表示にする */
+      display: none; /* 中身を非表示 */
     }
     .category-section.is-closed .category-arrow {
-      transform: rotate(-90deg); /* 矢印を横に向ける */
+      transform: rotate(-90deg); /* 矢印を横向きにする */
+    }
+    /* 開いているときだけ見出しの下の角丸を削る */
+    .category-section:not(.is-closed) .category-title {
+      border-radius: 6px 6px 0 0;
     }
 
-    /* 未分類用（フォルダ枠なしで直接カードを並べる） */
+    /* 未分類用 */
     .uncategorized-section {
       margin-top: 20px;
       margin-bottom: 20px;
@@ -188,6 +191,7 @@
   </div>
 
   <script>
+    // ※GASのURLは現在のものがそのまま入っています
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
@@ -262,7 +266,6 @@
       displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
     }
 
-    // 📁 【アップデート】データをカテゴリ別に整理して描画する関数
     function renderList(dataList) {
       const urlListContainer = document.getElementById('url-list');
       
@@ -271,7 +274,6 @@
         return;
       }
 
-      // 1. データをカテゴリ（フォルダ）ごとにグループ化する
       const groups = {};
       dataList.forEach(item => {
         const cat = item.category || "未分類";
@@ -283,12 +285,13 @@
 
       let htmlString = '';
 
-      // 2. フォルダ分けされたグループを描画（「未分類」以外）
+      // 2. フォルダ分けされたグループを描画（デフォルトで閉じさせる）
       for (const category in groups) {
-        if (category === "未分類") continue; // ★「未分類」フォルダはここではスキップ
+        if (category === "未分類") continue;
 
+        // ★ class に「is-closed」を最初から付与して、最初から閉じた状態にしています
         htmlString += `
-          <div class="category-section">
+          <div class="category-section is-closed">
             <div class="category-title" onclick="toggleCategory(this)">
               <div class="category-title-text">📁 ${escapeHtml(category)}</div>
               <div class="category-arrow">▼</div>
@@ -306,7 +309,7 @@
         `;
       }
 
-      // 3. ★「未分類」のURLカードを、フォルダ枠なしで一番下に直に並べる
+      // 3. 「未分類」のURLカード（最初からむき出しのまま一番下へ）
       if (groups["未分類"] && groups["未分類"].length > 0) {
         htmlString += `<div class="uncategorized-section">`;
         groups["未分類"].forEach(item => {
@@ -318,7 +321,6 @@
       urlListContainer.innerHTML = htmlString;
     }
 
-    // 1件分のカードHTMLを作る共通関数
     function createCardHtml(item) {
       let domain = "";
       try {
@@ -340,11 +342,8 @@
       `;
     }
 
-    // 🔄 【新機能】フォルダをクリックしたときに開閉させる関数
     function toggleCategory(titleElement) {
-      // クリックされたタイトル要素の親（.category-section）を取得
       const section = titleElement.parentElement;
-      // 「is-closed」というクラスがついているかどうかを切り替える
       section.classList.toggle('is-closed');
     }
 
