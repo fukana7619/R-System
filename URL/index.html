@@ -28,6 +28,11 @@
       margin-bottom: 15px;
     }
 
+    /* URLカードを囲むエリア */
+    #url-list {
+      min-height: 100px;
+    }
+
     .url-card {
       background: white;
       padding: 15px;
@@ -115,7 +120,9 @@
   <div id="container">
     <div id="lastUpdated" class="last-updated"></div>
     
-    <div id="loading" class="loading">データを読み込み中...</div>
+    <div id="url-list">
+      <div id="loading" class="loading">データを読み込み中...</div>
+    </div>
   </div>
 
   <div class="button-area">
@@ -132,7 +139,7 @@
 
     // 【初回読み込み】
     async function loadUrls() {
-      const container = document.getElementById('container');
+      const urlListContainer = document.getElementById('url-list');
       const cachedData = localStorage.getItem(CACHE_KEY);
       const lastFetchTime = localStorage.getItem(TIME_KEY);
       
@@ -144,7 +151,7 @@
         const dataList = JSON.parse(cachedData);
         renderList(dataList);
         
-        // 最終更新日時を画面に表示
+        // 最終更新日時を画面に表示（秒数入り）
         updateTimeDisplay(lastFetchTime);
         
         // 2. 前回読み込みから1時間以上経過しているかチェック
@@ -179,7 +186,7 @@
 
     // GASからデータを取得して画面を更新＆キャッシュと時刻を保存する共通関数
     async function fetchAndSaveData() {
-      const container = document.getElementById('container');
+      const urlListContainer = document.getElementById('url-list');
       const cachedData = localStorage.getItem(CACHE_KEY);
 
       try {
@@ -205,13 +212,13 @@
         
         // キャッシュすら無い場合はエラー表示
         if (!cachedData) {
-          container.innerHTML = '<div class="loading">データの取得に失敗しました。</div>';
+          urlListContainer.innerHTML = '<div class="loading">データの取得に失敗しました。</div>';
         }
         return false;
       }
     }
 
-    // 🕒 【新機能】ミリ秒のタイムスタンプを分かりやすい日付形式に変換して表示する関数
+    // 🕒 【アップデート】「秒数」まで表示する時間変換関数
     function updateTimeDisplay(timestamp) {
       const displayElem = document.getElementById('lastUpdated');
       if (!displayElem || !timestamp) return;
@@ -222,19 +229,18 @@
       const dd = String(date.getDate()).padStart(2, '0');
       const hh = String(date.getHours()).padStart(2, '0');
       const min = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0'); // 秒数を取得
 
-      displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}`;
+      // 「秒」まで追加！
+      displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
     }
 
     // リストを画面に描画する関数
     function renderList(dataList) {
-      const container = document.getElementById('container');
-      
-      // 描画する際、最初期化するが「最終更新日時エリア」は残しておきたいので再定義する
-      container.innerHTML = '<div id="lastUpdated" class="last-updated"></div>';
+      const urlListContainer = document.getElementById('url-list');
       
       if (dataList.length === 0) {
-        container.innerHTML += '<p class="loading">表示するURLがありません。</p>';
+        urlListContainer.innerHTML = '<p class="loading">表示するURLがありません。</p>';
         return;
       }
 
@@ -260,7 +266,7 @@
         `;
       });
       
-      container.innerHTML += htmlString;
+      urlListContainer.innerHTML = htmlString;
     }
 
     // セキュリティ対策（XSS防止）
