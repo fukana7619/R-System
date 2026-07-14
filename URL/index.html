@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>共有URL一覧</title>
   
-  <link rel="icon" href="https://www.google.com/s2/favicons?domain=github.com&sz=64" type="image/png">
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon.png">
   
   <style>
     body {
@@ -24,8 +25,6 @@
       margin-bottom: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      
-      /* アイコンとテキストを並べるための設定 */
       display: flex;
       align-items: flex-start;
       gap: 15px;
@@ -70,6 +69,36 @@
       color: #888;
       padding: 40px;
     }
+
+    /* 🔄 再読み込みボタンエリアのスタイル */
+    .button-area {
+      text-align: center;
+      margin-top: 30px;
+      margin-bottom: 50px;
+    }
+    .reload-btn {
+      background-color: #ffffff;
+      color: #24292f;
+      border: 1px solid #d0d7de;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: background-color 0.2s;
+    }
+    .reload-btn:hover {
+      background-color: #f6f8fa;
+    }
+    .reload-btn:disabled {
+      background-color: #f6f8fa;
+      color: #8c959f;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -78,45 +107,80 @@
     <div id="loading" class="loading">データを読み込み中...</div>
   </div>
 
+  <div class="button-area">
+    <button id="reloadBtn" class="reload-btn" onclick="forceReloadUrls()">
+      🔄 最新の情報に更新
+    </button>
+  </div>
+
   <script>
-    // GASのウェブアプリURL
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
-    
-    // LocalStorageのキー名
     const CACHE_KEY = "shared_urls_cache";
 
+    // 【初回読み込み】キャッシュがあればすぐ表示、裏で最新データを取得
     async function loadUrls() {
       const container = document.getElementById('container');
-      
-      // ⚡【LocalDB設定】まずはブラウザの保存領域（LocalStorage）からキャッシュを読み込む
       const cachedData = localStorage.getItem(CACHE_KEY);
       
       if (cachedData) {
         console.log("キャッシュからデータを即時表示します");
         const dataList = JSON.parse(cachedData);
-        renderList(dataList); // キャッシュがあれば「0秒」で一瞬で表示！
+        renderList(dataList);
       }
 
-      // 🔄 バックグラウンドでGASから最新データを取得しにいく
+      // 裏でこっそりGASに通信してデータを同期
+      await fetchAndSaveData();
+    }
+
+    // 【新機能】ボタンを押したときの強制リロード（キャッシュを介さず最新化）
+    async function forceReloadUrls() {
+      const reloadBtn = document.getElementById('reloadBtn');
+      
+      // ボタンを一時的に「更新中...」にしてクリック連打を防ぐ
+      reloadBtn.disabled = true;
+      reloadBtn.innerHTML = "⌛ 更新中...";
+
+      console.log("手動リロードを開始します...");
+      const success = await fetchAndSaveData();
+
+      // 元のボタンに戻す
+      reloadBtn.disabled = false;
+      reloadBtn.innerHTML = "🔄 最新の情報に更新";
+
+      if (success) {
+        alert("最新のデータを取得しました！");
+      } else {
+        alert("最新データの取得に失敗しました。電波の良い場所で再度お試しください。");
+      }
+    }
+
+    // GASからデータを取得して画面を更新＆キャッシュに保存する共通関数
+    async function fetchAndSaveData() {
+      const container = document.getElementById('container');
+      const cachedData = localStorage.getItem(CACHE_KEY);
+
       try {
         const response = await fetch(GAS_API_URL);
         if (!response.ok) throw new Error('ネットワークエラーが発生しました');
         
         const newDataList = await response.json();
         
-        // 取得した新しいデータをキャッシュに保存（上書き）
+        // キャッシュを更新
         localStorage.setItem(CACHE_KEY, JSON.stringify(newDataList));
-        console.log("最新データを取得し、キャッシュを更新しました");
+        console.log("最新データをキャッシュに保存しました");
 
-        // 画面の表示を最新データに更新する
+        // 画面を最新化
         renderList(newDataList);
+        return true;
 
       } catch (error) {
-        console.error("最新データの取得に失敗:", error);
-        // キャッシュすら存在しない、かつGASの取得にも失敗した場合のみエラーを表示
+        console.error("データ同期に失敗:", error);
+        
+        // キャッシュすら無い場合はエラー表示
         if (!cachedData) {
           container.innerHTML = '<div class="loading">データの取得に失敗しました。</div>';
         }
+        return false;
       }
     }
 
@@ -131,7 +195,6 @@
 
       let htmlString = '';
       dataList.forEach(item => {
-        // 【アイコン設定②】URLからドメインを抜き出して、GoogleのAPIでファビコンを取得
         let domain = "";
         try {
           domain = new URL(item.url).hostname;
@@ -143,7 +206,6 @@
         htmlString += `
           <div class="url-card">
             <img class="card-icon" src="${iconUrl}" alt="icon" onerror="this.src='https://www.google.com/s2/favicons?domain=example.com&sz=64'">
-            
             <div class="card-content">
               <h1>${escapeHtml(item.title)}</h1>
               <p>${escapeHtml(item.url)}</p>
