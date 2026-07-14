@@ -20,7 +20,6 @@
       margin: 0 auto;
     }
     
-    /* 🕒 最終更新日時表示エリアのスタイル */
     .last-updated {
       text-align: right;
       font-size: 12px;
@@ -28,17 +27,30 @@
       margin-bottom: 15px;
     }
 
-    /* URLカードを囲むエリア */
-    #url-list {
-      min-height: 100px;
+    /* 📂 フォルダ（カテゴリ）ごとのセクション */
+    .category-section {
+      margin-bottom: 35px;
+    }
+    
+    /* 📁 フォルダの見出し */
+    .category-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #586069;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 2px solid #e1e4e8;
+      padding-bottom: 6px;
     }
 
     .url-card {
       background: white;
       padding: 15px;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       display: flex;
       align-items: flex-start;
       gap: 15px;
@@ -55,24 +67,24 @@
       flex-grow: 1;
     }
     h1 {
-      font-size: 18px;
+      font-size: 16px;
       margin-top: 0;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
     }
     p {
-      font-size: 13px;
+      font-size: 12px;
       color: #666;
       word-break: break-all;
-      margin: 0 0 12px 0;
+      margin: 0 0 10px 0;
     }
     .btn {
       display: inline-block;
-      padding: 8px 16px;
+      padding: 6px 12px;
       background-color: #24292f;
       color: white;
       text-decoration: none;
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: bold;
     }
     .btn:hover {
@@ -84,7 +96,6 @@
       padding: 40px;
     }
 
-    /* 🔄 再読み込みボタンエリア */
     .button-area {
       text-align: center;
       margin-top: 30px;
@@ -119,7 +130,6 @@
 
   <div id="container">
     <div id="lastUpdated" class="last-updated"></div>
-    
     <div id="url-list">
       <div id="loading" class="loading">データを読み込み中...</div>
     </div>
@@ -132,85 +142,59 @@
   </div>
 
   <script>
+    // ★新しいGASのURLに書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
-    const CACHE_LIMIT_MS = 60 * 60 * 1000; // キャッシュ有効期限：1時間
+    const CACHE_LIMIT_MS = 60 * 60 * 1000; // 1時間
 
-    // 【初回読み込み】
     async function loadUrls() {
-      const urlListContainer = document.getElementById('url-list');
       const cachedData = localStorage.getItem(CACHE_KEY);
       const lastFetchTime = localStorage.getItem(TIME_KEY);
-      
       const now = Date.now();
       
-      // 1. キャッシュが存在する場合、一旦すぐに表示
       if (cachedData) {
-        console.log("キャッシュからデータを即時表示します");
-        const dataList = JSON.parse(cachedData);
-        renderList(dataList);
-        
-        // 最終更新日時を画面に表示（秒数入り）
+        console.log("キャッシュからデータを表示します");
+        renderList(JSON.parse(cachedData));
         updateTimeDisplay(lastFetchTime);
         
-        // 2. 前回読み込みから1時間以上経過しているかチェック
         if (lastFetchTime && (now - parseInt(lastFetchTime, 10) > CACHE_LIMIT_MS)) {
-          console.log("前回取得から1時間以上経過したため、自動更新します");
           await fetchAndSaveData();
-        } else {
-          console.log("キャッシュの有効期限内（1時間未満）のため、自動更新はスキップします");
         }
       } else {
-        // キャッシュが全くない場合は強制取得
-        console.log("キャッシュが存在しないため、データを取得します");
         await fetchAndSaveData();
       }
     }
 
-    // 【手動リロード】
     async function forceReloadUrls() {
       const reloadBtn = document.getElementById('reloadBtn');
-      
-      // 連打防止
       reloadBtn.disabled = true;
       reloadBtn.innerHTML = "⌛ 更新中...";
-
-      console.log("手動リロード（強制）を開始します...");
       await fetchAndSaveData();
-
-      // 元のボタンに戻す
       reloadBtn.disabled = false;
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
-    // GASからデータを取得して画面を更新＆キャッシュと時刻を保存する共通関数
     async function fetchAndSaveData() {
       const urlListContainer = document.getElementById('url-list');
       const cachedData = localStorage.getItem(CACHE_KEY);
 
       try {
         const response = await fetch(GAS_API_URL);
-        if (!response.ok) throw new Error('ネットワークエラーが発生しました');
+        if (!response.ok) throw new Error('ネットワークエラー');
         
         const newDataList = await response.json();
         const fetchTime = Date.now().toString();
         
-        // データをキャッシュ
         localStorage.setItem(CACHE_KEY, JSON.stringify(newDataList));
         localStorage.setItem(TIME_KEY, fetchTime);
         
-        console.log("最新データをキャッシュに保存しました。タイムスタンプ更新。");
-
-        // 画面と時間を最新化
         renderList(newDataList);
         updateTimeDisplay(fetchTime);
         return true;
 
       } catch (error) {
-        console.error("データ同期に失敗:", error);
-        
-        // キャッシュすら無い場合はエラー表示
+        console.error("同期失敗:", error);
         if (!cachedData) {
           urlListContainer.innerHTML = '<div class="loading">データの取得に失敗しました。</div>';
         }
@@ -218,7 +202,6 @@
       }
     }
 
-    // 🕒 【アップデート】「秒数」まで表示する時間変換関数
     function updateTimeDisplay(timestamp) {
       const displayElem = document.getElementById('lastUpdated');
       if (!displayElem || !timestamp) return;
@@ -229,13 +212,12 @@
       const dd = String(date.getDate()).padStart(2, '0');
       const hh = String(date.getHours()).padStart(2, '0');
       const min = String(date.getMinutes()).padStart(2, '0');
-      const ss = String(date.getSeconds()).padStart(2, '0'); // 秒数を取得
+      const ss = String(date.getSeconds()).padStart(2, '0');
 
-      // 「秒」まで追加！
       displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
     }
 
-    // リストを画面に描画する関数
+    // 📂 【アップデート】データをカテゴリ別に整理して描画する関数
     function renderList(dataList) {
       const urlListContainer = document.getElementById('url-list');
       
@@ -244,32 +226,50 @@
         return;
       }
 
-      let htmlString = '';
+      // 1. データをカテゴリ（フォルダ）ごとにグループ化する
+      const groups = {};
       dataList.forEach(item => {
-        let domain = "";
-        try {
-          domain = new URL(item.url).hostname;
-        } catch(e) {
-          domain = "example.com"; 
+        const cat = item.category || "未分類";
+        if (!groups[cat]) {
+          groups[cat] = [];
         }
-        const iconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-
-        htmlString += `
-          <div class="url-card">
-            <img class="card-icon" src="${iconUrl}" alt="icon" onerror="this.src='https://www.google.com/s2/favicons?domain=example.com&sz=64'">
-            <div class="card-content">
-              <h1>${escapeHtml(item.title)}</h1>
-              <p>${escapeHtml(item.url)}</p>
-              <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="btn">リンクを開く</a>
-            </div>
-          </div>
-        `;
+        groups[cat].push(item);
       });
+
+      // 2. グループごとにHTMLを組み立てる
+      let htmlString = '';
+      for (const category in groups) {
+        htmlString += `<div class="category-section">`;
+        // 📁 フォルダアイコンとフォルダ名
+        htmlString += `<div class="category-title">📁 ${escapeHtml(category)}</div>`;
+        
+        groups[category].forEach(item => {
+          let domain = "";
+          try {
+            domain = new URL(item.url).hostname;
+          } catch(e) {
+            domain = "example.com"; 
+          }
+          const iconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+
+          htmlString += `
+            <div class="url-card">
+              <img class="card-icon" src="${iconUrl}" alt="icon" onerror="this.src='https://www.google.com/s2/favicons?domain=example.com&sz=64'">
+              <div class="card-content">
+                <h1>${escapeHtml(item.title)}</h1>
+                <p>${escapeHtml(item.url)}</p>
+                <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="btn">リンクを開く</a>
+              </div>
+            </div>
+          `;
+        });
+        
+        htmlString += `</div>`; // .category-section の終わり
+      }
       
       urlListContainer.innerHTML = htmlString;
     }
 
-    // セキュリティ対策（XSS防止）
     function escapeHtml(str) {
       if (!str) return '';
       return str.replace(/[&<>'"]/g, function(char) {
@@ -284,7 +284,6 @@
       });
     }
 
-    // ページ読み込み時に実行
     window.onload = loadUrls;
   </script>
 </body>
