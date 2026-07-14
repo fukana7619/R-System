@@ -29,20 +29,65 @@
 
     /* 📂 フォルダ（カテゴリ）ごとのセクション */
     .category-section {
-      margin-bottom: 35px;
+      margin-bottom: 15px;
     }
     
-    /* 📁 フォルダの見出し */
+    /* 📁 フォルダの見出し（クリック可能に変更） */
     .category-title {
       font-size: 16px;
       font-weight: bold;
-      color: #586069;
-      margin-bottom: 12px;
+      color: #24292f;
+      margin-bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between; /* 矢印を右端に寄せる */
+      border-bottom: 2px solid #e1e4e8;
+      padding: 10px 6px;
+      cursor: pointer; /* マウスを乗せたらポインタにする */
+      user-select: none; /* 文字の選択を防ぐ */
+      background-color: #f6f8fa;
+      border-radius: 6px 6px 0 0;
+    }
+    .category-title:hover {
+      background-color: #eaeef2;
+    }
+
+    /* 📁 フォルダ名の左側のアイコンとテキスト用 */
+    .category-title-text {
       display: flex;
       align-items: center;
       gap: 6px;
-      border-bottom: 2px solid #e1e4e8;
-      padding-bottom: 6px;
+    }
+
+    /* 📁 開閉状態を示す矢印 */
+    .category-arrow {
+      font-size: 12px;
+      color: #57606a;
+      transition: transform 0.2s ease; /* 矢印が回るアニメーション */
+    }
+
+    /* 📦 フォルダの中身（URLカードの入れ物） */
+    .category-content {
+      padding: 12px 6px 4px 6px;
+      background: #ffffff;
+      border: 1px solid #e1e4e8;
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      margin-bottom: 20px;
+    }
+
+    /* 🌟 閉じているときのスタイル */
+    .category-section.is-closed .category-content {
+      display: none; /* 中身を非表示にする */
+    }
+    .category-section.is-closed .category-arrow {
+      transform: rotate(-90deg); /* 矢印を横に向ける */
+    }
+
+    /* 未分類用（フォルダ枠なしで直接カードを並べる） */
+    .uncategorized-section {
+      margin-top: 20px;
+      margin-bottom: 20px;
     }
 
     .url-card {
@@ -51,6 +96,7 @@
       margin-bottom: 12px;
       border-radius: 8px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid #e1e4e8;
       display: flex;
       align-items: flex-start;
       gap: 15px;
@@ -142,7 +188,6 @@
   </div>
 
   <script>
-    // ★新しいGASのURLに書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
@@ -217,7 +262,7 @@
       displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
     }
 
-    // 📂 【アップデート】データをカテゴリ別に整理して描画する関数
+    // 📁 【アップデート】データをカテゴリ別に整理して描画する関数
     function renderList(dataList) {
       const urlListContainer = document.getElementById('url-list');
       
@@ -236,38 +281,71 @@
         groups[cat].push(item);
       });
 
-      // 2. グループごとにHTMLを組み立てる
       let htmlString = '';
+
+      // 2. フォルダ分けされたグループを描画（「未分類」以外）
       for (const category in groups) {
-        htmlString += `<div class="category-section">`;
-        // 📁 フォルダアイコンとフォルダ名
-        htmlString += `<div class="category-title">📁 ${escapeHtml(category)}</div>`;
+        if (category === "未分類") continue; // ★「未分類」フォルダはここではスキップ
+
+        htmlString += `
+          <div class="category-section">
+            <div class="category-title" onclick="toggleCategory(this)">
+              <div class="category-title-text">📁 ${escapeHtml(category)}</div>
+              <div class="category-arrow">▼</div>
+            </div>
+            <div class="category-content">
+        `;
         
         groups[category].forEach(item => {
-          let domain = "";
-          try {
-            domain = new URL(item.url).hostname;
-          } catch(e) {
-            domain = "example.com"; 
-          }
-          const iconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-
-          htmlString += `
-            <div class="url-card">
-              <img class="card-icon" src="${iconUrl}" alt="icon" onerror="this.src='https://www.google.com/s2/favicons?domain=example.com&sz=64'">
-              <div class="card-content">
-                <h1>${escapeHtml(item.title)}</h1>
-                <p>${escapeHtml(item.url)}</p>
-                <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="btn">リンクを開く</a>
-              </div>
-            </div>
-          `;
+          htmlString += createCardHtml(item);
         });
         
-        htmlString += `</div>`; // .category-section の終わり
+        htmlString += `
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. ★「未分類」のURLカードを、フォルダ枠なしで一番下に直に並べる
+      if (groups["未分類"] && groups["未分類"].length > 0) {
+        htmlString += `<div class="uncategorized-section">`;
+        groups["未分類"].forEach(item => {
+          htmlString += createCardHtml(item);
+        });
+        htmlString += `</div>`;
       }
       
       urlListContainer.innerHTML = htmlString;
+    }
+
+    // 1件分のカードHTMLを作る共通関数
+    function createCardHtml(item) {
+      let domain = "";
+      try {
+        domain = new URL(item.url).hostname;
+      } catch(e) {
+        domain = "example.com"; 
+      }
+      const iconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+
+      return `
+        <div class="url-card">
+          <img class="card-icon" src="${iconUrl}" alt="icon" onerror="this.src='https://www.google.com/s2/favicons?domain=example.com&sz=64'">
+          <div class="card-content">
+            <h1>${escapeHtml(item.title)}</h1>
+            <p>${escapeHtml(item.url)}</p>
+            <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="btn">リンクを開く</a>
+          </div>
+        </div>
+      `;
+    }
+
+    // 🔄 【新機能】フォルダをクリックしたときに開閉させる関数
+    function toggleCategory(titleElement) {
+      // クリックされたタイトル要素の親（.category-section）を取得
+      const section = titleElement.parentElement;
+      // 「is-closed」というクラスがついているかどうかを切り替える
+      section.classList.toggle('is-closed');
     }
 
     function escapeHtml(str) {
