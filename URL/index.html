@@ -19,6 +19,15 @@
       max-width: 600px;
       margin: 0 auto;
     }
+    
+    /* 🕒 最終更新日時表示エリアのスタイル */
+    .last-updated {
+      text-align: right;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 15px;
+    }
+
     .url-card {
       background: white;
       padding: 15px;
@@ -104,6 +113,8 @@
 <body>
 
   <div id="container">
+    <div id="lastUpdated" class="last-updated"></div>
+    
     <div id="loading" class="loading">データを読み込み中...</div>
   </div>
 
@@ -116,8 +127,8 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
-    const TIME_KEY = "shared_urls_time"; // 前回取得した時刻を記録するキー
-    const CACHE_LIMIT_MS = 60 * 60 * 1000; // キャッシュ有効期限：1時間（ミリ秒換算）
+    const TIME_KEY = "shared_urls_time";
+    const CACHE_LIMIT_MS = 60 * 60 * 1000; // キャッシュ有効期限：1時間
 
     // 【初回読み込み】
     async function loadUrls() {
@@ -133,6 +144,9 @@
         const dataList = JSON.parse(cachedData);
         renderList(dataList);
         
+        // 最終更新日時を画面に表示
+        updateTimeDisplay(lastFetchTime);
+        
         // 2. 前回読み込みから1時間以上経過しているかチェック
         if (lastFetchTime && (now - parseInt(lastFetchTime, 10) > CACHE_LIMIT_MS)) {
           console.log("前回取得から1時間以上経過したため、自動更新します");
@@ -141,13 +155,13 @@
           console.log("キャッシュの有効期限内（1時間未満）のため、自動更新はスキップします");
         }
       } else {
-        // キャッシュが全くない場合は、経過時間に関わらず強制取得
+        // キャッシュが全くない場合は強制取得
         console.log("キャッシュが存在しないため、データを取得します");
         await fetchAndSaveData();
       }
     }
 
-    // 【手動リロード】ボタンを押したときは、1時間ルールを無視して強制取得
+    // 【手動リロード】
     async function forceReloadUrls() {
       const reloadBtn = document.getElementById('reloadBtn');
       
@@ -173,16 +187,17 @@
         if (!response.ok) throw new Error('ネットワークエラーが発生しました');
         
         const newDataList = await response.json();
+        const fetchTime = Date.now().toString();
         
         // データをキャッシュ
         localStorage.setItem(CACHE_KEY, JSON.stringify(newDataList));
-        // 取得成功時のタイムスタンプを保存
-        localStorage.setItem(TIME_KEY, Date.now().toString());
+        localStorage.setItem(TIME_KEY, fetchTime);
         
         console.log("最新データをキャッシュに保存しました。タイムスタンプ更新。");
 
-        // 画面を最新化
+        // 画面と時間を最新化
         renderList(newDataList);
+        updateTimeDisplay(fetchTime);
         return true;
 
       } catch (error) {
@@ -196,12 +211,30 @@
       }
     }
 
+    // 🕒 【新機能】ミリ秒のタイムスタンプを分かりやすい日付形式に変換して表示する関数
+    function updateTimeDisplay(timestamp) {
+      const displayElem = document.getElementById('lastUpdated');
+      if (!displayElem || !timestamp) return;
+
+      const date = new Date(parseInt(timestamp, 10));
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const hh = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+
+      displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}`;
+    }
+
     // リストを画面に描画する関数
     function renderList(dataList) {
       const container = document.getElementById('container');
       
+      // 描画する際、最初期化するが「最終更新日時エリア」は残しておきたいので再定義する
+      container.innerHTML = '<div id="lastUpdated" class="last-updated"></div>';
+      
       if (dataList.length === 0) {
-        container.innerHTML = '<p class="loading">表示するURLがありません。</p>';
+        container.innerHTML += '<p class="loading">表示するURLがありません。</p>';
         return;
       }
 
@@ -227,7 +260,7 @@
         `;
       });
       
-      container.innerHTML = htmlString;
+      container.innerHTML += htmlString;
     }
 
     // セキュリティ対策（XSS防止）
