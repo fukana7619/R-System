@@ -229,7 +229,7 @@
       return userInfo ? JSON.parse(userInfo) : null;
     }
 
-    // 🚀 ページ読み込み時の処理（バックグラウンド検証でサクサク高速化！）
+// 🚀 ページ読み込み時の処理
     async function loadUrls() {
       const user = getUserInfo();
       
@@ -238,7 +238,7 @@
         return;
       }
 
-      // 1. 【瞬時表示】まずはキャッシュを秒速で画面にレンダリングする
+      // 1. まずはキャッシュを画面に表示する（体感速度のため）
       const cachedData = localStorage.getItem(CACHE_KEY);
       const lastFetchTime = localStorage.getItem(TIME_KEY);
       
@@ -249,69 +249,56 @@
         updateTimeDisplay(lastFetchTime);
       }
 
-      // 2. 【裏で通信】表示した後に、GASに「今現在もアカウントが有効か」を確認する
+      // 2. 裏でGASにアクセスして検証
       try {
         const authResult = await refreshUserInfo();
         
         if (authResult.status === "blocked") {
-          // 無効化されていたら、即座に画面を遮断！
+          // 【ブロック】D列がFALSEのとき
           showBlockedScreen(authResult.message);
           return;
+        } else if (authResult.status === "error") {
+          // ★【修正！】スプレッドシートIDの変更や、ユーザー削除などで「ユーザーが見つからない」場合
+          showBlockedScreen(authResult.message || "認証エラー：ユーザー情報が存在しないか、システムエラーが発生しました。");
+          return;
         } else if (authResult.status === "success") {
-          // 有効であれば、ヘッダー等の枠組みを表示しつつ、最新URLに裏で静かに更新する
+          // 有効であれば、最新URLに裏で更新
           document.getElementById("headerArea").style.display = "flex";
           document.getElementById("btnArea").style.display = "block";
           await fetchAndSaveData();
         }
       } catch (e) {
         console.error("バックグラウンド通信エラー:", e);
-        // 通信に失敗した場合のみ、今画面に出ているキャッシュをそのまま使わせる
+        // 純粋なネットワークのオフライン状態などの通信エラー（GASに届いていない）の時だけ、
+        // 例外的に手元のキャッシュを表示させ続けます。
       }
-    }
-
-    // 🔄 「最新の情報に更新」が押されたとき
-    async function forceReloadUrls() {
-      const reloadBtn = document.getElementById('reloadBtn');
-      reloadBtn.disabled = true;
-      reloadBtn.innerHTML = "⌛ 更新中...";
-      
-      // 1. ユーザーの使用可能状態・タグ情報をGASから同期
-      const authResult = await refreshUserInfo();
-      
-      if (authResult.status === "blocked") {
-        showBlockedScreen(authResult.message);
-        return;
-      } else if (authResult.status === "success") {
-        // 2. 更新されたタグを使って最新のURLデータを取得
-        await fetchAndSaveData();
-      } else {
-        alert("認証に失敗しました。接続環境を確認してやり直してください。");
-      }
-      
-      reloadBtn.disabled = false;
-      reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
     // 👤 ユーザー情報をGASと同期してリアルタイム検証する
     async function refreshUserInfo() {
       const user = getUserInfo();
-      if (!user) return { status: "error" };
+      if (!user) return { status: "error", message: "ログイン情報がありません。" };
 
       try {
         const response = await fetch(`${GAS_API_URL}?action=getUser&id=${encodeURIComponent(user.id)}`);
-        if (!response.ok) return { status: "error" };
+        if (!response.ok) return { status: "network_error" }; // 純粋な通信エラー
         
         const result = await response.json();
+        
         if (result.status === "blocked") {
           return { status: "blocked", message: result.message };
+        } else if (result.status === "error") {
+          // ★【修正！】GAS側から「ユーザーが見つかりません」などのエラー応答があった時
+          return { status: "error", message: result.message };
         } else if (result.status === "success") {
           localStorage.setItem("user_info", JSON.stringify(result.user));
           return { status: "success" };
         }
       } catch (e) {
         console.error("ユーザーチェック失敗:", e);
+        return { status: "network_error" }; // 通信自体が失敗した時
       }
-      return { status: "error" };
+      return { status: "network_error" };
     }
 
     // 最新のURLデータを取得
