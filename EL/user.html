@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>収支簿 - ログイン・設定</title>
+  <title>収支簿 - ログイン</title>
   <style>
     :root {
       --primary-color: #4f46e5;
@@ -79,15 +79,10 @@
 <body>
 
 <div class="container">
-  <h2>🔑 収支簿 ログイン設定</h2>
+  <h2>🔑 収支簿 ログイン</h2>
   <p style="font-size: 0.85rem; color: #6b7280; text-align: center; margin-bottom: 20px;">
     スプレッドシートの「ユーザーデータ」に登録したIDとパスワードを入力してください。
   </p>
-  
-  <div class="form-group">
-    <label for="gasUrl">GAS WebアプリのURL</label>
-    <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
-  </div>
   
   <div class="form-group">
     <label for="userId">ログインID</label>
@@ -99,26 +94,27 @@
     <input type="password" id="password" placeholder="••••••••">
   </div>
   
-  <button onclick="saveAndTest()">ログイン ＆ 保存</button>
+  <button onclick="saveAndTest()">ログイン</button>
   
   <div id="status"></div>
 </div>
 
 <script>
+  // 💡 あなたのGASのURLをあらかじめ組み込んで固定します
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbxYb_SOQDiw-k30HciJfRMQvIp66dhoddcJa7Rn7bipj_PTlS8K2UsHPJY3MhEiwMMAaA/exec";
+
   // ページ読み込み時に、すでに保存されている情報があれば自動入力
   window.onload = function() {
-    document.getElementById('gasUrl').value = localStorage.getItem('gas_url') || '';
     document.getElementById('userId').value = localStorage.getItem('user_id') || '';
     document.getElementById('password').value = localStorage.getItem('user_password') || '';
   };
 
   async function saveAndTest() {
-    const gasUrl = document.getElementById('gasUrl').value.trim();
     const userId = document.getElementById('userId').value.trim();
     const password = document.getElementById('password').value.trim();
     const statusDiv = document.getElementById('status');
 
-    if (!gasUrl || !userId || !password) {
+    if (!userId || !password) {
       statusDiv.className = 'error';
       statusDiv.innerText = '⚠️ すべての項目を入力してください。';
       return;
@@ -129,9 +125,9 @@
 
     // GASにテストリクエストを送信して、ログインできるか確認
     try {
-      const response = await fetch(gasUrl, {
+      const response = await fetch(GAS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // CORS回避のためのプレーンテキスト
+        headers: { 'Content-Type': 'text/plain' }, // CORS回避
         body: JSON.stringify({
           id: userId,
           password: password,
@@ -143,16 +139,16 @@
 
       if (result === 'OK') {
         // 成功したらLocalStorage（LocalDB）に保存
-        localStorage.setItem('gas_url', gasUrl);
+        localStorage.setItem('gas_url', GAS_URL); // index.html側で使えるように保存
         localStorage.setItem('user_id', userId);
         localStorage.setItem('user_password', password);
 
         statusDiv.className = 'success';
-        statusDiv.innerText = '🎉 ログイン成功！ 3秒後に移動します...';
+        statusDiv.innerText = '🎉 ログイン成功！ 移動します...';
         
         setTimeout(() => {
           location.href = 'index.html'; // メイン画面へリダイレクト
-        }, 2000);
+        }, 1500);
 
       } else if (result === 'Authentication failed') {
         statusDiv.className = 'error';
@@ -163,7 +159,7 @@
       }
     } catch (err) {
       statusDiv.className = 'error';
-      statusDiv.innerText = '⚠️ GASとの通信に失敗しました。URLが正しいか、GASが正しくデプロイされているか確認してください。';
+      statusDiv.innerText = '⚠️ GASとの通信に失敗しました。GASのデプロイ状態や設定を確認してください。';
       console.error(err);
     }
   }
