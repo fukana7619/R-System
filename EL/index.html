@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>爆速収支簿 - メイン</title>
+  <title>収支簿</title>
   <style>
     :root {
-      --primary-color: #10b981; /* グリーン */
-      --bg-color: #f3f4f6;
+      --primary-color: #0f766e; /* 落ち着いた深緑 */
+      --bg-color: #f8fafc;
       --card-bg: #ffffff;
-      --text-color: #111827;
+      --text-color: #0f172a;
+      --border-color: #e2e8f0;
     }
     body {
       font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -22,35 +23,68 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      max-width: 600px;
+      max-width: 1000px;
       margin: 0 auto 20px auto;
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 10px;
     }
     .header h1 {
       margin: 0;
       font-size: 1.5rem;
       color: var(--primary-color);
+      font-weight: 600;
+    }
+    .header-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
     }
     .logout-btn {
       padding: 6px 12px;
-      background: #ef4444;
+      background: #dc2626;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       font-size: 0.85rem;
     }
-    .container {
-      max-width: 600px;
+    .refresh-btn {
+      padding: 6px 12px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      max-width: 1000px;
       margin: 0 auto;
+    }
+    @media (min-width: 768px) {
+      .main-layout {
+        grid-template-columns: 1fr 1.2fr;
+      }
     }
     .card {
       background: var(--card-bg);
       padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      margin-bottom: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      height: fit-content;
     }
-    /* ダッシュボード（金額表示エリア） */
+    .card h3 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 1.1rem;
+      border-left: 4px solid var(--primary-color);
+      padding-left: 8px;
+      color: var(--text-color);
+    }
     .dashboard {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -58,29 +92,20 @@
       margin-bottom: 20px;
     }
     .dash-box {
-      background: #f9fafb;
-      padding: 15px;
-      border-radius: 8px;
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 6px;
       text-align: center;
-      border: 1px solid #e5e7eb;
-    }
-    .dash-box.highlight {
-      background: #ecfdf5;
-      border-color: #a7f3d0;
+      border: 1px solid var(--border-color);
     }
     .dash-title {
-      font-size: 0.85rem;
-      color: #6b7280;
+      font-size: 0.8rem;
+      color: #64748b;
       margin-bottom: 5px;
-      font-weight: bold;
     }
     .dash-value {
-      font-size: 1.6rem;
+      font-size: 1.3rem;
       font-weight: bold;
-      color: var(--text-color);
-    }
-    .dash-box.highlight .dash-value {
-      color: #065f46;
     }
     .form-group {
       margin-bottom: 15px;
@@ -89,44 +114,76 @@
       display: block;
       margin-bottom: 5px;
       font-weight: bold;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      color: #475569;
     }
     input {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
       box-sizing: border-box;
-      font-size: 1rem;
+      font-size: 0.95rem;
     }
     .inline-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    button {
+    button.submit-btn {
       width: 100%;
-      padding: 12px;
+      padding: 10px;
       background-color: var(--primary-color);
       color: white;
       border: none;
-      border-radius: 6px;
-      font-size: 1.1rem;
+      border-radius: 4px;
+      font-size: 1rem;
       font-weight: bold;
       cursor: pointer;
-      transition: background 0.2s;
     }
-    button:hover {
-      background-color: #059669;
+    button.submit-btn:hover {
+      background-color: #0d5a52;
     }
     #status {
       margin-top: 15px;
       text-align: center;
       font-weight: bold;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
     }
-    .success { color: #10b981; }
-    .error { color: #ef4444; }
+    .success { color: #0f766e; }
+    .error { color: #dc2626; }
+    
+    /* 履歴テーブルのスタイル */
+    .table-container {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+    }
+    .income-text {
+      color: #0f766e;
+      font-weight: bold;
+    }
+    .expense-text {
+      color: #b91c1c;
+    }
+    .summary-row {
+      background-color: #f8fafc;
+      font-style: italic;
+      color: #64748b;
+    }
   </style>
   <script>
     const gasUrl = localStorage.getItem('gas_url');
@@ -141,53 +198,76 @@
 <body>
 
 <div class="header">
-  <h1>💰 マイ爆速収支簿</h1>
-  <button class="logout-btn" onclick="logout()">ログアウト</button>
+  <h1>収支簿</h1>
+  <div class="header-right">
+    <button class="refresh-btn" onclick="fetchDataAndCalculate(true)">最新の状態に更新</button>
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+  </div>
 </div>
 
-<div class="container">
+<div class="main-layout">
   
-  <div class="dashboard">
-    <div class="dash-box highlight">
-      <div class="dash-title">現在の残高（手持ち）</div>
-      <div class="dash-value" id="current-balance">⏳ 計算中...</div>
+  <div>
+    <div class="card" style="margin-bottom: 20px; width: 100%; box-sizing: border-box;">
+      <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #64748b;">
+        ユーザー: <strong><span id="display-user">...</span></strong>
+      </p>
+      <div class="dashboard">
+        <div class="dash-box">
+          <div class="dash-title">現在の残高</div>
+          <div class="dash-value" id="current-balance">0円</div>
+        </div>
+        <div class="dash-box">
+          <div class="dash-title">今月の支出合計</div>
+          <div class="dash-value" id="monthly-expense">0円</div>
+        </div>
+      </div>
     </div>
-    <div class="dash-box">
-      <div class="dash-title">今月の支出合計</div>
-      <div class="dash-value" id="monthly-expense">⏳ 計算中...</div>
-    </div>
-  </div>
 
-  <div class="card" style="padding: 12px 20px; font-size: 0.9rem; background: #fef3c7; border: 1px solid #fde68a;">
-    <label for="start-cash" style="display:inline-block; margin-right: 10px; margin-bottom: 0;">初期手元金（ここからスタート）:</label>
-    <input type="number" id="start-cash" value="3000" style="width: 100px; padding: 4px; display: inline-block;" onchange="updateDashboard()"> 円
+    <div class="card" style="width: 100%; box-sizing: border-box;">
+      <h3>収支の入力</h3>
+      <div class="form-group">
+        <label for="date">日付</label>
+        <input type="date" id="date">
+      </div>
+
+      <div class="form-group">
+        <label for="item">項目</label>
+        <input type="text" id="item" placeholder="例: 食費、お小遣い">
+      </div>
+
+      <div class="inline-group">
+        <div class="form-group">
+          <label for="income">収入</label>
+          <input type="number" id="income" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label for="expense">支出</label>
+          <input type="number" id="expense" value="0" min="0">
+        </div>
+      </div>
+
+      <button class="submit-btn" onclick="addRecord()">記録する</button>
+      <div id="status"></div>
+    </div>
   </div>
 
   <div class="card">
-    <h3 style="margin-top:0; color: var(--primary-color);">収支を記録する</h3>
-    <div class="form-group">
-      <label for="date">日付</label>
-      <input type="date" id="date">
+    <h3>履歴一覧</h3>
+    <div class="table-container">
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>項目</th>
+            <th>収入</th>
+            <th>支出</th>
+          </tr>
+        </thead>
+        <tbody>
+          </tbody>
+      </table>
     </div>
-
-    <div class="form-group">
-      <label for="item">項目（買ったもの、お小遣いなど）</label>
-      <input type="text" id="item" placeholder="例: うまい棒、お年玉">
-    </div>
-
-    <div class="inline-group">
-      <div class="form-group">
-        <label for="income">収入 (円)</label>
-        <input type="number" id="income" value="0" min="0">
-      </div>
-      <div class="form-group">
-        <label for="expense">支出 (円)</label>
-        <input type="number" id="expense" value="0" min="0">
-      </div>
-    </div>
-
-    <button onclick="addRecord()">スプレッドシートに記録する</button>
-    <div id="status"></div>
   </div>
 
 </div>
@@ -196,26 +276,25 @@
   let cachedData = []; // 読み込んだCSVデータを保持する配列
 
   window.onload = function() {
-    document.getElementById('display-user') && (document.getElementById('display-user').innerText = userId);
+    document.getElementById('display-user').innerText = userId;
     
-    // 日付に今日をセット
+    // 日付に今日の日付を設定
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
 
-    // ローカルから「初期手元金」の設定をロード
-    const savedStartCash = localStorage.getItem('start_cash');
-    if (savedStartCash !== null) {
-      document.getElementById('start-cash').value = savedStartCash;
+    // ローカルストレージにキャッシュがあればロード、無ければGASから取得
+    const localCache = localStorage.getItem(`cache_${userId}`);
+    if (localCache) {
+      cachedData = JSON.parse(localCache);
+      updateDashboardAndTable();
+    } else {
+      fetchDataAndCalculate(true);
     }
-
-    // データの初回読み込み＆集計
-    fetchDataAndCalculate();
   };
 
-  // ログアウト処理
   function logout() {
     if (confirm('ログアウトしますか？')) {
       localStorage.clear();
@@ -223,8 +302,14 @@
     }
   }
 
-  // 1. スプレッドシートから履歴データを全件読み込む関数
-  async function fetchDataAndCalculate() {
+  // GASからデータを取得する（forceUpdate = true で強制通信）
+  async function fetchDataAndCalculate(forceUpdate = false) {
+    const statusDiv = document.getElementById('status');
+    if (forceUpdate) {
+      statusDiv.className = '';
+      statusDiv.innerText = 'データを更新中...';
+    }
+
     try {
       const response = await fetch(gasUrl, {
         method: 'POST',
@@ -241,30 +326,34 @@
       const csvText = await response.text();
       
       if (csvText.includes('Sheet not found')) {
-        document.getElementById('current-balance').innerText = 'シート未作成';
-        document.getElementById('monthly-expense').innerText = 'シート未作成';
+        statusDiv.className = 'error';
+        statusDiv.innerText = 'シートが存在しません。ユーザー名のシートを作成してください。';
         return;
       }
 
-      // 改行で区切って配列化
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
       cachedData = lines.map(line => line.split(','));
 
-      // 集計処理を実行
-      updateDashboard();
+      // ローカルストレージにキャッシュ保存
+      localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
+
+      if (forceUpdate) {
+        statusDiv.className = 'success';
+        statusDiv.innerText = '最新の状態に更新しました。';
+        setTimeout(() => { statusDiv.innerText = ''; }, 2000);
+      }
+
+      updateDashboardAndTable();
 
     } catch (err) {
       console.error(err);
-      document.getElementById('current-balance').innerText = 'エラー';
-      document.getElementById('monthly-expense').innerText = 'エラー';
+      statusDiv.className = 'error';
+      statusDiv.innerText = 'データの更新に失敗しました。';
     }
   }
 
-  // 2. 読み込んだデータから残高と今月使った量を計算して画面に表示する関数
-  function updateDashboard() {
-    const startCashInput = parseInt(document.getElementById('start-cash').value) || 0;
-    localStorage.setItem('start_cash', startCashInput); // ローカルに保存しておく
-
+  // ダッシュボードと履歴テーブルの描画
+  function updateDashboardAndTable() {
     let totalIncome = 0;
     let totalExpense = 0;
     let thisMonthExpense = 0;
@@ -273,36 +362,95 @@
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1〜12
 
-    // ヘッダー行（1行目）を避けて、2行目からループ
+    // 先月の年月を特定
+    let lastMonthYear = currentYear;
+    let lastMonth = currentMonth - 1;
+    if (lastMonth === 0) {
+      lastMonth = 12;
+      lastMonthYear = currentYear - 1;
+    }
+
+    // 2か月以上前の合算データを一時格納するオブジェクト { "YYYY-MM": { income, expense } }
+    const olderSummary = {};
+    // 個別表示するレコードを格納する配列
+    const individualRows = [];
+
+    // ヘッダー（1行目）を避けて、2行目からループ
     for (let i = 1; i < cachedData.length; i++) {
       const row = cachedData[i];
       if (row.length < 4) continue;
 
-      const dateStr = row[0]; // "YYYY-MM-DD" や "YYYY/MM/DD"
+      const dateStr = row[0];
+      const item = row[1];
       const income = parseInt(row[2]) || 0;
       const expense = parseInt(row[3]) || 0;
 
       totalIncome += income;
       totalExpense += expense;
 
+      if (!dateStr) continue;
+
+      const rowDate = new Date(dateStr);
+      const rowYear = rowDate.getFullYear();
+      const rowMonth = rowDate.getMonth() + 1;
+
       // 今月の支出を計算
-      if (dateStr) {
-        const rowDate = new Date(dateStr);
-        if (rowDate.getFullYear() === currentYear && (rowDate.getMonth() + 1) === currentMonth) {
-          thisMonthExpense += expense;
+      if (rowYear === currentYear && rowMonth === currentMonth) {
+        thisMonthExpense += expense;
+      }
+
+      // 「今月」または「先月」のデータは個別表示行き
+      if ((rowYear === currentYear && rowMonth === currentMonth) || 
+          (rowYear === lastMonthYear && rowMonth === lastMonth)) {
+        individualRows.push({ date: dateStr, item, income, expense });
+      } else {
+        // それより古い（2か月以上前）データは年月ごとに集約
+        const key = `${rowYear}年${String(rowMonth).padStart(2, '0')}月`;
+        if (!olderSummary[key]) {
+          olderSummary[key] = { income: 0, expense: 0 };
         }
+        olderSummary[key].income += income;
+        olderSummary[key].expense += expense;
       }
     }
 
-    // 計算式：現在の残高 = 初期手元金 + 収入の総和 - 支出の総和
-    const currentBalance = startCashInput + totalIncome - totalExpense;
+    // 現在の残高 = 収入総額 - 支出総額
+    const currentBalance = totalIncome - totalExpense;
+    document.getElementById('current-balance').innerText = `${currentBalance.toLocaleString()}円`;
+    document.getElementById('monthly-expense').innerText = `${thisMonthExpense.toLocaleString()}円`;
 
-    // 画面の数値をアップデート
-    document.getElementById('current-balance').innerText = `¥ ${currentBalance.toLocaleString()}`;
-    document.getElementById('monthly-expense').innerText = `¥ ${thisMonthExpense.toLocaleString()}`;
+    // テーブル描画の生成
+    const tbody = document.querySelector('#history-table tbody');
+    tbody.innerHTML = '';
+
+    // 1. 個別表示行の追加（新しい日付順にするためリバースして追加）
+    individualRows.reverse().forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.date}</td>
+        <td>${row.item}</td>
+        <td class="income-text">${row.income > 0 ? row.income.toLocaleString() : ''}</td>
+        <td class="expense-text">${row.expense > 0 ? row.expense.toLocaleString() : ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 2. まとめた行の追加（古い年月から追加）
+    const sortedOlderKeys = Object.keys(olderSummary).sort().reverse();
+    sortedOlderKeys.forEach(key => {
+      const tr = document.createElement('tr');
+      tr.className = 'summary-row';
+      tr.innerHTML = `
+        <td>-</td>
+        <td>${key}以前の合算</td>
+        <td class="income-text">${olderSummary[key].income > 0 ? olderSummary[key].income.toLocaleString() : ''}</td>
+        <td class="expense-text">${olderSummary[key].expense > 0 ? olderSummary[key].expense.toLocaleString() : ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
   }
 
-  // 3. 収支データの追加処理
+  // 収支データの追加処理
   async function addRecord() {
     const date = document.getElementById('date').value;
     const item = document.getElementById('item').value.trim();
@@ -312,12 +460,12 @@
 
     if (!date || !item) {
       statusDiv.className = 'error';
-      statusDiv.innerText = '⚠️ 日付と項目を入力してください。';
+      statusDiv.innerText = '日付と項目を入力してください。';
       return;
     }
 
     statusDiv.className = '';
-    statusDiv.innerText = '⏳ スプレッドシートに書き込み中...';
+    statusDiv.innerText = 'データを記録中...';
 
     const safeItem = item.replace(/,/g, '，');
     const csvRow = `${date},${safeItem},${income},${expense}`;
@@ -340,22 +488,22 @@
 
       if (result === 'OK') {
         statusDiv.className = 'success';
-        statusDiv.innerText = '✅ スプレッドシートへの記録が完了しました！';
+        statusDiv.innerText = '記録を完了しました。';
         
         // フォームのリセット
         document.getElementById('item').value = '';
         document.getElementById('income').value = '0';
         document.getElementById('expense').value = '0';
 
-        // 💡 記録が成功したら裏でデータをもう一度読み込んで、手元金額と今月の支出を再計算！
-        fetchDataAndCalculate();
+        // 記録成功時は、データに不整合が起きないように強制的に最新状態を再取得
+        await fetchDataAndCalculate(false);
       } else {
         statusDiv.className = 'error';
-        statusDiv.innerText = `❌ 記録に失敗しました: ${result}`;
+        statusDiv.innerText = `記録に失敗しました: ${result}`;
       }
     } catch (err) {
       statusDiv.className = 'error';
-      statusDiv.innerText = '⚠️ サーバーとの通信に失敗しました。';
+      statusDiv.innerText = '通信エラーが発生しました。';
       console.error(err);
     }
   }
