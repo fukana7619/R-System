@@ -85,6 +85,31 @@
       padding-left: 8px;
       color: var(--text-color);
     }
+    /* 履歴見出し用の特別な横並びヘッダー */
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .history-header h3 {
+      margin: 0;
+    }
+    /* 分析ボタンの装飾 */
+    .analysis-btn {
+      display: inline-block;
+      padding: 5px 10px;
+      background-color: #3b82f6; /* 青 */
+      color: white;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: bold;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .analysis-btn:hover {
+      background-color: #2563eb;
+    }
     .dashboard {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -184,7 +209,6 @@
       color: #64748b;
     }
 
-    /* 操作ボタンのスタイル */
     .action-btn {
       padding: 4px 8px;
       border: none;
@@ -277,7 +301,11 @@
   </div>
 
   <div class="card">
-    <h3>履歴一覧</h3>
+    <div class="history-header">
+      <h3>履歴一覧</h3>
+      <a href="dashboard.html" class="analysis-btn">グラフ分析 📈</a>
+    </div>
+    
     <div class="table-container">
       <table id="history-table">
         <thead>
@@ -299,7 +327,7 @@
 
 <script>
   let cachedData = []; 
-  let editIndex = -1; // 💡 現在編集している行のインデックス（-1は通常入力モード）
+  let editIndex = -1; 
 
   window.onload = function() {
     document.getElementById('display-user').innerText = userId;
@@ -417,7 +445,6 @@
         thisMonthExpense += expense;
       }
 
-      // 💡 編集の特定のために元の cachedData 内での「実際の行インデックス(i)」も一緒に保持する
       if ((rowYear === currentYear && rowMonth === currentMonth) || 
           (rowYear === lastMonthYear && rowMonth === lastMonth)) {
         individualRows.push({ originalIndex: i, date: dateStr, item, income, expense });
@@ -442,10 +469,8 @@
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
-    // 個別表示（今月・先月）行
     individualRows.reverse().forEach(row => {
       const tr = document.createElement('tr');
-      // 日付の表示用（テーブル幅を圧迫しないように年月日と時間を改行）
       const displayDate = row.date.replace(' ', '<br>');
       
       tr.innerHTML = `
@@ -461,7 +486,6 @@
       tbody.appendChild(tr);
     });
 
-    // 2か月以上前の合算行（合算行は直接編集できないため、操作欄は空欄）
     const sortedOlderKeys = Object.keys(olderSummary).sort().reverse();
     sortedOlderKeys.forEach(key => {
       const tr = document.createElement('tr');
@@ -477,28 +501,22 @@
     });
   }
 
-  // 💡 1. 修正モードの開始
   function startEdit(index) {
     editIndex = index;
     const row = cachedData[index];
 
-    // 入力欄に現在の値をセット
-    // "2026-07-16 10:23:30" から日付部分 "2026-07-16" だけを切り出す
     document.getElementById('date').value = row[0].split(' ')[0];
     document.getElementById('item').value = row[1];
     document.getElementById('income').value = row[2];
     document.getElementById('expense').value = row[3];
 
-    // UIを「修正中」モードに変更
     document.getElementById('form-title').innerText = '収支の修正';
     document.getElementById('submit-button').innerText = '変更を保存する';
     document.getElementById('cancel-button').style.display = 'block';
 
-    // スムーズに入力欄までスクロール
     document.getElementById('form-title').scrollIntoView({ behavior: 'smooth' });
   }
 
-  // 💡 2. 修正キャンセル
   function cancelEdit() {
     editIndex = -1;
     document.getElementById('item').value = '';
@@ -510,9 +528,7 @@
     document.getElementById('cancel-button').style.display = 'none';
   }
 
-  // 💡 3. スプレッドシート側を直接上書き保存（インポート）する
   async function syncLocalDbToSpreadsheet() {
-    // データをCSVテキストに変換
     const csvContent = cachedData.map(r => r.join(',')).join('\n');
 
     const response = await fetch(gasUrl, {
@@ -534,7 +550,6 @@
     }
   }
 
-  // 💡 4. 削除処理
   async function deleteRecord(index) {
     const itemDesc = cachedData[index][1];
     if (!confirm(`「${itemDesc}」の記録を本当に削除しますか？`)) {
@@ -546,13 +561,9 @@
     statusDiv.innerText = '削除処理中...';
 
     try {
-      // ローカル配列から対象の行を削除
       cachedData.splice(index, 1);
-
-      // スプレッドシートを新しいデータで上書き保存
       await syncLocalDbToSpreadsheet();
 
-      // キャッシュを更新して描画を反映
       localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
       updateDashboardAndTable();
 
@@ -567,7 +578,6 @@
     }
   }
 
-  // 5. 収支データの追加・変更処理
   async function addRecord() {
     const dateInput = document.getElementById('date').value;
     const item = document.getElementById('item').value.trim();
@@ -588,7 +598,6 @@
 
     try {
       if (editIndex === -1) {
-        // --- 通常の新規登録処理 ---
         const csvRow = `${dateInput},${safeItem},${income},${expense}`;
         const response = await fetch(gasUrl, {
           method: 'POST',
@@ -624,25 +633,19 @@
         }
 
       } else {
-        // --- 💡 修正データの反映処理 ---
-        // 既存の登録日時から、時:分:秒の情報を失わないように補完する
         const originalTime = cachedData[editIndex][0].split(' ')[1] || '12:00:00';
         const updatedDateTime = `${dateInput} ${originalTime}`;
 
-        // LocalDB配列の該当データを上書き
         cachedData[editIndex] = [updatedDateTime, safeItem, String(income), String(expense)];
 
-        // スプレッドシートを丸ごと上書き保存
         await syncLocalDbToSpreadsheet();
 
-        // キャッシュを更新して描画
         localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
         updateDashboardAndTable();
 
         statusDiv.className = 'success';
         statusDiv.innerText = '修正が完了しました。';
         
-        // 編集モードを抜ける
         cancelEdit();
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
       }
