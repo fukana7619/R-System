@@ -170,7 +170,7 @@
     }
   }
 
-  // 収支データの追加処理
+// 収支データの追加処理
   async function addRecord() {
     const date = document.getElementById('date').value;
     const item = document.getElementById('item').value.trim();
@@ -187,8 +187,7 @@
     statusDiv.className = '';
     statusDiv.innerText = '⏳ スプレッドシートに書き込み中...';
 
-    // カンマ区切りのデータを作成（GASのenterlineコマンドに渡す形式）
-    // CSVにカンマが含まれるとバグるので、項目名のカンマは全角に変換する安全対策付き
+    // カンマ区切りのデータを作成
     const safeItem = item.replace(/,/g, '，');
     const csvRow = `${date},${safeItem},${income},${expense}`;
 
@@ -201,7 +200,7 @@
           password: password,
           cmd: 'enterline',
           option: 'last',
-          sheet: '履歴', // 💡書き込むシート名を指定（なければ適宜スプレッドシート側で作成してください）
+          sheet: userId, // 💡 ここを「'履歴'」から「userId」に変更！これで自分のユーザー名のシートに書き込まれます
           value1: csvRow
         })
       });
@@ -212,7 +211,7 @@
         statusDiv.className = 'success';
         statusDiv.innerText = '✅ スプレッドシートへの記録が完了しました！';
         
-        // 入力フォームをリセット（日付は残す）
+        // 入力フォームをリセット
         document.getElementById('item').value = '';
         document.getElementById('income').value = '0';
         document.getElementById('expense').value = '0';
