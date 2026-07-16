@@ -20,11 +20,22 @@
       margin: 0 auto;
     }
     
-    .last-updated {
-      text-align: right;
+    /* 🕒 最終更新とユーザー設定へのリンク */
+    .header-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       font-size: 12px;
       color: #888;
       margin-bottom: 15px;
+    }
+    .user-link {
+      color: #0969da;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .user-link:hover {
+      text-decoration: underline;
     }
 
     /* 📂 フォルダ（カテゴリ）ごとのセクション */
@@ -32,7 +43,6 @@
       margin-bottom: 15px;
     }
     
-    /* 📁 フォルダの見出し */
     .category-title {
       font-size: 16px;
       font-weight: bold;
@@ -65,7 +75,6 @@
       transition: transform 0.2s ease;
     }
 
-    /* 📦 フォルダの中身（URLカードの入れ物） */
     .category-content {
       padding: 12px 6px 4px 6px;
       background: #ffffff;
@@ -176,7 +185,10 @@
 <body>
 
   <div id="container">
-    <div id="lastUpdated" class="last-updated"></div>
+    <div class="header-info">
+      <div id="lastUpdated"></div>
+      <a href="user.html" class="user-link">⚙️ ユーザー設定</a>
+    </div>
     <div id="url-list">
       <div id="loading" class="loading">データを読み込み中...</div>
     </div>
@@ -189,12 +201,27 @@
   </div>
 
   <script>
+    // ★新しいGASのURLに書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
     const CACHE_LIMIT_MS = 60 * 60 * 1000; // 1時間
 
+    // 🔑 ログイン情報を取得する関数
+    function getUserInfo() {
+      const userInfo = localStorage.getItem("user_info");
+      return userInfo ? JSON.parse(userInfo) : null;
+    }
+
     async function loadUrls() {
+      const user = getUserInfo();
+      
+      // 【セキュリティ】未ログインの場合は user.html へ飛ばす
+      if (!user) {
+        window.location.href = "user.html";
+        return;
+      }
+
       const cachedData = localStorage.getItem(CACHE_KEY);
       const lastFetchTime = localStorage.getItem(TIME_KEY);
       const now = Date.now();
@@ -221,12 +248,20 @@
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
+    // 🔑 【アップデート】ユーザーのアクセスタグを送信してフィルタ済みのリストを保存する
     async function fetchAndSaveData() {
       const urlListContainer = document.getElementById('url-list');
       const cachedData = localStorage.getItem(CACHE_KEY);
+      const user = getUserInfo();
+
+      if (!user) {
+        window.location.href = "user.html";
+        return;
+      }
 
       try {
-        const response = await fetch(GAS_API_URL);
+        // GASにアクセスタグを送信してフィルタされたURLのみ受け取る
+        const response = await fetch(`${GAS_API_URL}?action=getUrls&tags=${encodeURIComponent(user.tags || "")}`);
         if (!response.ok) throw new Error('ネットワークエラー');
         
         const newDataList = await response.json();
@@ -263,12 +298,11 @@
       displayElem.innerText = `最終更新: ${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
     }
 
-    // 📁 データをカテゴリ別に整理して描画
     function renderList(dataList) {
       const urlListContainer = document.getElementById('url-list');
       
       if (dataList.length === 0) {
-        urlListContainer.innerHTML = '<p class="loading">表示するURLがありません。</p>';
+        urlListContainer.innerHTML = '<p class="loading">閲覧できるURLがありません。</p>';
         return;
       }
 
@@ -283,7 +317,7 @@
 
       let htmlString = '';
 
-      // 1. ★【順番入替】まず「未分類」を一番上にむき出しで描画する
+      // 1. まず「未分類」を一番上に描画
       if (groups["未分類"] && groups["未分類"].length > 0) {
         htmlString += `<div class="uncategorized-section">`;
         groups["未分類"].forEach(item => {
@@ -292,7 +326,7 @@
         htmlString += `</div>`;
       }
 
-      // 2. その後に、畳まれたフォルダを描画する
+      // 2. その後に、畳まれたフォルダを描画
       for (const category in groups) {
         if (category === "未分類") continue;
 
