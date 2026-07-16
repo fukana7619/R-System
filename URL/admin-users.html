@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>👥 ユーザー管理システム (管理者限定)</title>
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      background-color: #f4f6f8;
+      color: #333;
+    }
+    .wrapper {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #e1e4e8;
+    }
+    h2 {
+      margin-top: 0;
+      color: #24292f;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #eaeef2;
+      padding-bottom: 12px;
+      font-size: 20px;
+    }
+    .btn-back {
+      font-size: 13px;
+      text-decoration: none;
+      background-color: #ffffff;
+      color: #24292f;
+      border: 1px solid #d0d7de;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    .btn-back:hover { background-color: #f6f8fa; }
+    
+    /* 入力フォーム */
+    .form-box {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 25px;
+    }
+    .form-box h3 { margin-top: 0; font-size: 14px; color: #24292f; margin-bottom: 12px;}
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .form-grid input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .btn-save-user {
+      background-color: #1f883d;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-save-user:hover { background-color: #1a7134; }
+
+    /* ユーザー一覧テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+      font-size: 13px;
+    }
+    th, td {
+      border-bottom: 1px solid #eaeef2;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #f6f8fa;
+      color: #57606a;
+      font-weight: bold;
+    }
+    .badge-true {
+      background-color: #dafbe1;
+      color: #1a7f37;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .badge-false {
+      background-color: #ffebe9;
+      color: #cf222e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .action-links button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      color: #0969da;
+      font-weight: bold;
+      padding: 0;
+      margin-right: 10px;
+    }
+    .action-links button.delete { color: #cf222e; }
+    .action-links button:hover { text-decoration: underline; }
+
+    /* 一括インポートセクション */
+    .csv-box {
+      border-top: 2px dashed #d0d7de;
+      padding-top: 25px;
+      margin-top: 30px;
+    }
+    .csv-box h3 { margin-top: 0; font-size: 15px; color: #cf222e; }
+    textarea {
+      width: 100%;
+      height: 120px;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 10px;
+      box-sizing: border-box;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+    .csv-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-csv-import {
+      background-color: #cf222e;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-csv-import:hover { background-color: #b31d28; }
+    .btn-csv-export {
+      background-color: #ffffff;
+      color: #24292f;
+      border: 1px solid #d0d7de;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-csv-export:hover { background-color: #f6f8fa; }
+    .csv-desc {
+      font-size: 11px;
+      color: #57606a;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrapper">
+    <h2>
+      <span>👥 ユーザー一元管理</span>
+      <a href="index.html" class="btn-back">🔙 共有URL一覧へ戻る</a>
+    </h2>
+
+    <div class="form-box">
+      <h3 id="formTitle">👤 ユーザーの新規登録 / 情報の直接編集</h3>
+      <div class="form-grid">
+        <input type="text" id="targetId" placeholder="ユーザーID (例: U004)">
+        <input type="text" id="targetPw" placeholder="パスワード (例: pass567)">
+        <input type="text" id="targetTags" placeholder="タグ (カンマ区切り, 例: 部外秘,予定表)">
+        <input type="text" id="targetEnabled" placeholder="有効状態 (TRUE / FALSE)" value="TRUE">
+      </div>
+      <div class="form-grid" style="grid-template-columns: 1fr;">
+        <input type="text" id="targetMsg" placeholder="アカウント無効(FALSE)時にユーザー画面へ表示するロック文言 (空欄ならデフォルトメッセージ表示)">
+      </div>
+      <button class="btn-save-user" id="btnSaveUser" onclick="saveUserDirect()">保存・書き込みする</button>
+      <button class="btn-back" style="margin-left:8px; display:none;" id="btnCancelEdit" onclick="cancelEditMode()">キャンセル</button>
+    </div>
+
+    <h3>現在の登録ユーザー一覧</h3>
+    <div id="loading" style="text-align:center; padding: 20px; color:#888;">データを読込中...</div>
+    <div id="tableContainer" style="overflow-x:auto; display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>ユーザーID</th>
+            <th>パスワード</th>
+            <th>所持タグ</th>
+            <th>ステータス</th>
+            <th>無効時の個別通知文</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          </tbody>
+      </table>
+    </div>
+
+    <div class="csv-box">
+      <h3>⚡️ CSV形式 一括バックアップ ＆ 上書きインポート</h3>
+      <p class="csv-desc">
+        【警告】インポートを実行すると、現在登録されているユーザー情報は**すべてクリアされ、以下のCSVテキストの内容で上書き**されます。<br>
+        データの形式: <code>ユーザーID,パスワード,タグ(カンマ以外またはダブルクォーテーションで括る),有効(TRUE/FALSE),ブロックメッセージ</code>
+      </p>
+      <textarea id="csvTextArea" placeholder="ここにCSVを貼り付け、またはエクスポート時にここへ出力されます"></textarea>
+      
+      <div class="csv-actions">
+        <button class="btn-csv-export" onclick="exportToCsvTextArea()">📥 現在のデータをCSV出力(エクスポート)</button>
+        <button class="btn-csv-import" onclick="importFromCsvTextArea()">📤 CSVの内容で一括上書き保存(インポート)</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ★新しいGASのURLに書き換えてください
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
+    let globalUsersList = [];
+
+    function getAdminCredentials() {
+      const userInfo = localStorage.getItem("user_info");
+      return userInfo ? JSON.parse(userInfo) : null;
+    }
+
+    // 起動処理
+    window.onload = function() {
+      const user = getAdminCredentials();
+      if (!user || !user.id.toUpperCase().startsWith("A")) {
+        alert("閲覧権限がありません。管理者IDでログインしてください。");
+        window.location.href = "user.html";
+        return;
+      }
+      loadUsersData();
+    };
+
+    // ユーザーリスト読み込み
+    async function loadUsersData() {
+      const user = getAdminCredentials();
+      const loadingDiv = document.getElementById("loading");
+      const tableDiv = document.getElementById("tableContainer");
+
+      loadingDiv.style.display = "block";
+      tableDiv.style.display = "none";
+
+      try {
+        const response = await fetch(`${GAS_API_URL}?action=getUsers&id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw)}`);
+        const result = await response.json();
+
+        if (Array.isArray(result)) {
+          globalUsersList = result;
+          renderTable(result);
+        } else {
+          alert("エラー: " + (result.message || "データ取得に失敗しました。"));
+        }
+      } catch (e) {
+        alert("データの通信中にエラーが発生しました。");
+        console.error(e);
+      } finally {
+        loadingDiv.style.display = "none";
+        tableDiv.style.display = "block";
+      }
+    }
+
+    // テーブルの描画
+    function renderTable(users) {
+      const tbody = document.getElementById("userTableBody");
+      tbody.innerHTML = "";
+
+      users.forEach(u => {
+        const tr = document.createElement("tr");
+
+        const badge = u.enabled 
+          ? `<span class="badge-true">有効 (TRUE)</span>` 
+          : `<span class="badge-false">無効 (FALSE)</span>`;
+
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(u.id)}</strong></td>
+          <td><code>${escapeHtml(u.pw)}</code></td>
+          <td>${escapeHtml(u.tags) || '<span style="color:#aaa;">なし</span>'}</td>
+          <td>${badge}</td>
+          <td style="color: #666; font-size:11px;">${escapeHtml(u.message) || '<span style="color:#ccc;">(標準エラー)</span>'}</td>
+          <td class="action-links">
+            <button onclick="startEditUser('${escapeHtml(u.id)}', '${escapeHtml(u.pw)}', '${escapeHtml(u.tags)}', ${u.enabled}, '${escapeHtml(u.message).replace(/'/g, "\\'")}')">✏️ 編集</button>
+            <button class="delete" onclick="deleteUser('${escapeHtml(u.id)}')">🗑️ 削除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 編集モードの開始
+    function startEditUser(id, pw, tags, enabled, message) {
+      document.getElementById("formTitle").innerText = `✏️ ユーザー「${id}」の情報を編集中`;
+      document.getElementById("targetId").value = id;
+      document.getElementById("targetId").disabled = true; // IDはキー項目なので編集不可にする
+      document.getElementById("targetPw").value = pw;
+      document.getElementById("targetTags").value = tags;
+      document.getElementById("targetEnabled").value = enabled ? "TRUE" : "FALSE";
+      document.getElementById("targetMsg").value = message;
+      
+      document.getElementById("btnCancelEdit").style.display = "inline-block";
+      document.getElementById("btnSaveUser").innerText = "変更を適用する";
+    }
+
+    // 編集のキャンセル
+    function cancelEditMode() {
+      document.getElementById("formTitle").innerText = "👤 ユーザーの新規登録 / 情報の直接編集";
+      document.getElementById("targetId").value = "";
+      document.getElementById("targetId").disabled = false;
+      document.getElementById("targetPw").value = "";
+      document.getElementById("targetTags").value = "";
+      document.getElementById("targetEnabled").value = "TRUE";
+      document.getElementById("targetMsg").value = "";
+      
+      document.getElementById("btnCancelEdit").style.display = "none";
+      document.getElementById("btnSaveUser").innerText = "保存・書き込みする";
+    }
+
+    // 個別保存 (追加・上書き)
+    async function saveUserDirect() {
+      const user = getAdminCredentials();
+      if (!user) return;
+
+      const targetId = document.getElementById("targetId").value.trim();
+      const targetPw = document.getElementById("targetPw").value.trim();
+      const targetTags = document.getElementById("targetTags").value.trim();
+      const targetEnabled = document.getElementById("targetEnabled").value.trim().toUpperCase();
+      const targetMsg = document.getElementById("targetMsg").value.trim();
+
+      if (!targetId || !targetPw) {
+        alert("ユーザーID と パスワード は必須入力です。");
+        return;
+      }
+
+      if (targetEnabled !== "TRUE" && targetEnabled !== "FALSE") {
+        alert("有効状態は TRUE または FALSE で入力してください。");
+        return;
+      }
+
+      const saveBtn = document.getElementById("btnSaveUser");
+      saveBtn.disabled = true;
+      saveBtn.innerText = "通信中...";
+
+      try {
+        const api = `${GAS_API_URL}?action=editUser&id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw)}` +
+                    `&targetId=${encodeURIComponent(targetId)}` +
+                    `&targetPw=${encodeURIComponent(targetPw)}` +
+                    `&targetTags=${encodeURIComponent(targetTags)}` +
+                    `&targetEnabled=${encodeURIComponent(targetEnabled)}` +
+                    `&targetMsg=${encodeURIComponent(targetMsg)}`;
+
+        const response = await fetch(api);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          alert(result.message);
+          cancelEditMode();
+          await loadUsersData(); // 再ロード
+        } else {
+          alert("エラー: " + result.message);
+        }
+      } catch (e) {
+        alert("通信失敗しました。");
+        console.error(e);
+      } finally {
+        saveBtn.disabled = false;
+        if (document.getElementById("targetId").disabled) {
+          saveBtn.innerText = "変更を適用する";
+        } else {
+          saveBtn.innerText = "保存・書き込みする";
+        }
+      }
+    }
+
+    // 個別ユーザーの削除
+    async function deleteUser(targetId) {
+      const user = getAdminCredentials();
+      if (!user) return;
+
+      if (targetId === user.id) {
+        alert("自分自身のアカウントを削除することはできません！");
+        return;
+      }
+
+      if (!confirm(`ユーザー「${targetId}」をスプレッドシートから完全に削除します。\nよろしいですか？`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${GAS_API_URL}?action=deleteUser&id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw)}&targetId=${encodeURIComponent(targetId)}`);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          alert(result.message);
+          await loadUsersData();
+        } else {
+          alert("エラー: " + result.message);
+        }
+      } catch (e) {
+        alert("削除処理中に通信エラーが発生しました。");
+        console.error(e);
+      }
+    }
+
+    // CSVエクスポート
+    function exportToCsvTextArea() {
+      if (globalUsersList.length === 0) {
+        alert("出力するユーザーデータがありません。");
+        return;
+      }
+
+      let csvContent = "";
+      globalUsersList.forEach(u => {
+        // ダブルクォーテーションで囲んでエスケープ
+        const tagsEscaped = `"${u.tags.replace(/"/g, '""')}"`;
+        const msgEscaped = `"${u.message.replace(/"/g, '""')}"`;
+        csvContent += `${u.id},${u.pw},${tagsEscaped},${u.enabled ? 'TRUE' : 'FALSE'},${msgEscaped}\n`;
+      });
+
+      document.getElementById("csvTextArea").value = csvContent;
+      alert("現在の登録状況をCSV形式に変換し、テキストエリアに出力しました！これをコピーしてバックアップとして保存できます。");
+    }
+
+    // CSVインポート
+    async function importFromCsvTextArea() {
+      const user = getAdminCredentials();
+      if (!user) return;
+
+      const csvData = document.getElementById("csvTextArea").value.trim();
+      if (!csvData) {
+        alert("貼り付けられたCSVデータが空です。");
+        return;
+      }
+
+      if (!confirm("【最終警告】\n入力されたCSVの内容で、スプレッドシートのユーザー情報を「完全上書き」します。\n本当に実行してもよろしいですか？")) {
+        return;
+      }
+
+      const importBtn = document.querySelector(".btn-csv-import");
+      importBtn.disabled = true;
+      importBtn.innerText = "インポート同期中...";
+
+      try {
+        // GETパラメータ制限を避けるため、パラメータとして直接送信
+        const response = await fetch(`${GAS_API_URL}?action=bulkUpdateUsers&id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw)}&csvData=${encodeURIComponent(csvData)}`);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          alert(result.message);
+          document.getElementById("csvTextArea").value = "";
+          await loadUsersData();
+        } else {
+          alert("インポート失敗: " + result.message);
+        }
+      } catch (e) {
+        alert("インポート処理中に通信エラーが発生しました。");
+        console.error(e);
+      } finally {
+        importBtn.disabled = false;
+        importBtn.innerText = "📤 CSVの内容で一括上書き保存(インポート)";
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>'"]/g, function(char) {
+        const entities = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        };
+        return entities[char];
+      });
+    }
+  </script>
+</body>
+</html>
