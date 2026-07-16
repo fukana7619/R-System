@@ -203,15 +203,33 @@
     // ★新しいGASのURLに書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
 
-    window.onload = function() {
+    window.onload = async function() {
       const userInfo = localStorage.getItem("user_info");
       
       if (userInfo) {
-        const user = JSON.parse(userInfo);
+        let user = JSON.parse(userInfo);
+        
+        // ログインフォームを隠し、プロフィールを表示
         document.getElementById("loginFormArea").style.display = "none";
         document.getElementById("profileArea").style.display = "block";
         document.getElementById("loggedInUser").innerText = user.id;
         document.getElementById("userTags").innerText = user.tags || "なし";
+
+        // ★ ページを開いたときに自動でGASから最新のユーザー情報を引っ張る
+        try {
+          const response = await fetch(`${GAS_API_URL}?action=getUser&id=${encodeURIComponent(user.id)}`);
+          if (response.ok) {
+            const result = await response.json();
+            if (result.status === "success") {
+              // 最新化したユーザー情報を保存・再描画
+              localStorage.setItem("user_info", JSON.stringify(result.user));
+              document.getElementById("userTags").innerText = result.user.tags || "なし";
+              console.log("ユーザー設定画面のタグ情報を更新しました:", result.user.tags);
+            }
+          }
+        } catch (e) {
+          console.error("ユーザー情報の自動更新に失敗:", e);
+        }
       }
     };
 
@@ -252,7 +270,7 @@
       }
     }
 
-    // 🔒 【新機能！】パスワード変更の処理
+    // パスワード変更
     async function handleChangePassword() {
       const user = JSON.parse(localStorage.getItem("user_info"));
       if (!user) return;
@@ -286,8 +304,6 @@
         if (result.status === "success") {
           successMsg.innerText = result.message;
           successMsg.style.display = "block";
-          
-          // 入力フォームをクリア
           document.getElementById("currentPw").value = "";
           document.getElementById("newPw").value = "";
         } else {
