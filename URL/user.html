@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - 共有URL一覧</title>
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background-color: #f9f9f9;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-box {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 360px;
+      border: 1px solid #e1e4e8;
+    }
+    h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      font-size: 20px;
+      text-align: center;
+    }
+    .input-group {
+      margin-bottom: 15px;
+    }
+    .input-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      color: #57606a;
+      margin-bottom: 6px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .input-group input:focus {
+      border-color: #0969da;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(9,105,218,0.15);
+    }
+    .btn-login {
+      width: 100%;
+      padding: 10px;
+      background-color: #24292f;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .btn-login:hover {
+      background-color: #000;
+    }
+    .btn-login:disabled {
+      background-color: #8c959f;
+      cursor: not-allowed;
+    }
+    .error-msg {
+      color: #cf222e;
+      font-size: 13px;
+      margin-bottom: 15px;
+      display: none;
+      background: #ffebe9;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(207,34,46,0.15);
+    }
+    /* ログイン成功後の設定画面用（後々いじれるように） */
+    .profile-box {
+      display: none;
+      text-align: center;
+    }
+    .profile-box p {
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .btn-logout {
+      background-color: #cf222e;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-logout:hover {
+      background-color: #a40e26;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-box">
+    <div id="loginFormArea">
+      <h2>URL一覧 ログイン</h2>
+      <div id="errorMsg" class="error-msg"></div>
+      
+      <div class="input-group">
+        <label for="userId">ユーザーID</label>
+        <input type="text" id="userId" placeholder="IDを入力してください">
+      </div>
+      
+      <div class="input-group">
+        <label for="userPw">パスワード</label>
+        <input type="password" id="userPw" placeholder="パスワードを入力してください">
+      </div>
+      
+      <button id="loginBtn" class="btn-login" onclick="handleLogin()">ログイン</button>
+    </div>
+
+    <div id="profileArea" class="profile-box">
+      <h2>ユーザー設定</h2>
+      <p>ユーザーID: <strong id="loggedInUser">--</strong></p>
+      <p>所持タグ: <span id="userTags" style="color:#57606a;">--</span></p>
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+      <button class="btn-logout" onclick="handleLogout()">ログアウト</button>
+    </div>
+  </div>
+
+  <script>
+    // ★新しいGASのURLに書き換えてください
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
+
+    // ページ読み込み時にログイン状態を確認
+    window.onload = function() {
+      const userInfo = localStorage.getItem("user_info");
+      
+      // すでにログインしている場合は、設定画面を出す
+      if (userInfo) {
+        const user = JSON.parse(userInfo);
+        document.getElementById("loginFormArea").style.display = "none";
+        document.getElementById("profileArea").style.display = "block";
+        document.getElementById("loggedInUser").innerText = user.id;
+        document.getElementById("userTags").innerText = user.tags || "なし";
+      }
+    };
+
+    // ログイン処理
+    async function handleLogin() {
+      const id = document.getElementById("userId").value.trim();
+      const pw = document.getElementById("userPw").value.trim();
+      const errorMsg = document.getElementById("errorMsg");
+      const loginBtn = document.getElementById("loginBtn");
+
+      if (!id || !pw) {
+        showError("IDとパスワードを入力してください。");
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.innerText = "⏳ 認証中...";
+      errorMsg.style.display = "none";
+
+      try {
+        // GASに認証リクエスト
+        const response = await fetch(`${GAS_API_URL}?action=login&id=${encodeURIComponent(id)}&pw=${encodeURIComponent(pw)}`);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          // LocalStorageにユーザー情報を保存（毎回ログインしなくてよくなる）
+          localStorage.setItem("user_info", JSON.stringify(result.user));
+          
+          // キャッシュのクリア（ユーザーが変わるため古いURLキャッシュを破棄）
+          localStorage.removeItem("shared_urls_cache");
+          localStorage.removeItem("shared_urls_time");
+
+          // メインページ（index.html）へ遷移
+          window.location.href = "index.html";
+        } else {
+          showError(result.message || "ログインに失敗しました。");
+        }
+      } catch (e) {
+        console.error(e);
+        showError("通信エラーが発生しました。");
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerText = "ログイン";
+      }
+    }
+
+    // ログアウト処理
+    function handleLogout() {
+      localStorage.removeItem("user_info");
+      localStorage.removeItem("shared_urls_cache");
+      localStorage.removeItem("shared_urls_time");
+      window.location.reload();
+    }
+
+    function showError(msg) {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.innerText = msg;
+      errorMsg.style.display = "block";
+    }
+  </script>
+</body>
+</html>
