@@ -37,7 +37,7 @@
       text-decoration: underline;
     }
 
-    /* 📂 フォルダ（カテゴリ）ごとのセクション */
+    /* 📁 カテゴリセクション */
     .category-section {
       margin-bottom: 15px;
     }
@@ -179,21 +179,40 @@
       color: #8c959f;
       cursor: not-allowed;
     }
+
+    /* 🚨 アカウント無効化時のエラー画面表示 */
+    .blocked-screen {
+      text-align: center;
+      background: #ffebe9;
+      color: #cf222e;
+      border: 1px solid rgba(207,34,46,0.15);
+      border-radius: 8px;
+      padding: 30px;
+      margin-top: 50px;
+    }
+    .blocked-screen h2 {
+      margin-top: 0;
+    }
+    .blocked-screen a {
+      color: #0969da;
+      font-weight: bold;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
 
   <div id="container">
-    <div class="header-info">
-      <div id="lastUpdated"></div>
+    <div id="headerArea" class="header-info" style="display: none;">
+      <div id="lastUpdated">最終更新: --</div>
       <a href="user.html" class="user-link">⚙️ ユーザー設定</a>
     </div>
     <div id="url-list">
-      <div id="loading" class="loading">データを読み込み中...</div>
+      <div id="loading" class="loading">🔒 アカウントの認証状態を確認中...</div>
     </div>
   </div>
 
-  <div class="button-area">
+  <div id="btnArea" class="button-area" style="display: none;">
     <button id="reloadBtn" class="reload-btn" onclick="forceReloadUrls()">
       🔄 最新の情報に更新
     </button>
@@ -204,13 +223,13 @@
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
-    const CACHE_LIMIT_MS = 60 * 60 * 1000; // 1時間
 
     function getUserInfo() {
       const userInfo = localStorage.getItem("user_info");
       return userInfo ? JSON.parse(userInfo) : null;
     }
 
+    // 🚀 ページ読み込み時の処理
     async function loadUrls() {
       const user = getUserInfo();
       
@@ -219,20 +238,31 @@
         return;
       }
 
-      const cachedData = localStorage.getItem(CACHE_KEY);
-      const lastFetchTime = localStorage.getItem(TIME_KEY);
-      const now = Date.now();
+      // ★【毎回実行】ページリロード時にも、まずリアルタイムにGASを叩いて有効チェックを行う
+      const authResult = await refreshUserInfo();
       
-      if (cachedData) {
-        console.log("キャッシュからデータを表示します");
-        renderList(JSON.parse(cachedData));
-        updateTimeDisplay(lastFetchTime);
+      if (authResult.status === "blocked") {
+        showBlockedScreen(authResult.message);
+        return;
+      } else if (authResult.status === "success") {
+        // 認証OKなら、ヘッダーとボタンエリアを表示
+        document.getElementById("headerArea").style.display = "flex";
+        document.getElementById("btnArea").style.display = "block";
         
-        if (lastFetchTime && (now - parseInt(lastFetchTime, 10) > CACHE_LIMIT_MS)) {
-          await fetchAndSaveData();
-        }
-      } else {
+        // 最新タグを使ってURLデータを再取得
         await fetchAndSaveData();
+      } else {
+        // 通信エラーなどの場合、キャッシュがあればそれを一時表示
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const lastFetchTime = localStorage.getItem(TIME_KEY);
+        if (cachedData) {
+          document.getElementById("headerArea").style.display = "flex";
+          document.getElementById("btnArea").style.display = "block";
+          renderList(JSON.parse(cachedData));
+          updateTimeDisplay(lastFetchTime);
+        } else {
+          document.getElementById('url-list').innerHTML = '<div class="loading">認証情報の確認、またはデータの取得に失敗しました。</div>';
+        }
       }
     }
 
@@ -242,46 +272,51 @@
       reloadBtn.disabled = true;
       reloadBtn.innerHTML = "⌛ 更新中...";
       
-      // ★ 1. まずユーザー情報のタグ情報をGASから再取得して更新する
-      const updatedUserSuccess = await refreshUserInfo();
+      // ★ 1. ユーザーの使用可能状態・タグ情報をGASから同期
+      const authResult = await refreshUserInfo();
       
-      if (updatedUserSuccess) {
-        // ★ 2. 更新されたタグを使ってURLデータを再取得する
+      if (authResult.status === "blocked") {
+        showBlockedScreen(authResult.message);
+        return;
+      } else if (authResult.status === "success") {
+        // ★ 2. 更新されたタグを使って最新のURLデータを取得
         await fetchAndSaveData();
       } else {
-        alert("ユーザー情報の同期に失敗したため、URLを更新できませんでした。ログインし直してください。");
+        alert("認証に失敗しました。インターネット接続を確認して再試行してください。");
       }
       
       reloadBtn.disabled = false;
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
-    // 👤 ユーザーのタグ情報をGASから同期する処理
+    // 👤 ユーザー情報をリアルタイムにGASにチェックしに行く処理
     async function refreshUserInfo() {
       const user = getUserInfo();
-      if (!user) return false;
+      if (!user) return { status: "error" };
 
       try {
         const response = await fetch(`${GAS_API_URL}?action=getUser&id=${encodeURIComponent(user.id)}`);
-        if (!response.ok) return false;
+        if (!response.ok) return { status: "error" };
         
         const result = await response.json();
-        if (result.status === "success") {
-          // localStorageの情報を上書きして新しいタグを保存
+        if (result.status === "blocked") {
+          // アカウントが停止（D列がFALSE）されている場合
+          return { status: "blocked", message: result.message };
+        } else if (result.status === "success") {
+          // 有効な場合、新しいタグを保存
           localStorage.setItem("user_info", JSON.stringify(result.user));
-          console.log("ユーザー情報を最新化しました:", result.user);
-          return true;
+          return { status: "success" };
         }
       } catch (e) {
-        console.error("ユーザー情報の最新化に失敗:", e);
+        console.error("ユーザーチェック失敗:", e);
       }
-      return false;
+      return { status: "error" };
     }
 
+    // 最新のURLデータを取得
     async function fetchAndSaveData() {
       const urlListContainer = document.getElementById('url-list');
-      const cachedData = localStorage.getItem(CACHE_KEY);
-      const user = getUserInfo(); // 最新化したユーザー情報を取得
+      const user = getUserInfo();
 
       if (!user) {
         window.location.href = "user.html";
@@ -289,27 +324,55 @@
       }
 
       try {
-        // 最新化されたタグを使ってGASにアクセス
-        const response = await fetch(`${GAS_API_URL}?action=getUrls&tags=${encodeURIComponent(user.tags || "")}`);
+        // ユーザーIDもパラメータに付与して安全性を担保
+        const response = await fetch(`${GAS_API_URL}?action=getUrls&id=${encodeURIComponent(user.id)}&tags=${encodeURIComponent(user.tags || "")}`);
+        
         if (!response.ok) throw new Error('ネットワークエラー');
         
-        const newDataList = await response.json();
-        const fetchTime = Date.now().toString();
+        const resultData = await response.json();
         
-        localStorage.setItem(CACHE_KEY, JSON.stringify(newDataList));
+        // 万が一、URL取得処理のレスポンスが blocked で返ってきた場合
+        if (resultData.status === "blocked") {
+          showBlockedScreen(resultData.message);
+          return;
+        }
+
+        const fetchTime = Date.now().toString();
+        localStorage.setItem(CACHE_KEY, JSON.stringify(resultData));
         localStorage.setItem(TIME_KEY, fetchTime);
         
-        renderList(newDataList);
+        renderList(resultData);
         updateTimeDisplay(fetchTime);
-        return true;
 
       } catch (error) {
-        console.error("同期失敗:", error);
+        console.error("URLデータ取得失敗:", error);
+        const cachedData = localStorage.getItem(CACHE_KEY);
         if (!cachedData) {
           urlListContainer.innerHTML = '<div class="loading">データの取得に失敗しました。</div>';
         }
-        return false;
       }
+    }
+
+    // ⛔ 使用不可能（アクセス拒否）のときの画面描画
+    function showBlockedScreen(message) {
+      // キャッシュを全て削除して、裏から侵入できないようにする
+      localStorage.removeItem("user_info");
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(TIME_KEY);
+
+      // 画面全体をエラーメッセージに変更
+      document.getElementById("headerArea").style.display = "none";
+      document.getElementById("btnArea").style.display = "none";
+      
+      const urlListContainer = document.getElementById('url-list');
+      urlListContainer.innerHTML = `
+        <div class="blocked-screen">
+          <h2>🚫 アクセス制限</h2>
+          <p id="blockMessageText" style="font-size: 15px; font-weight: bold; margin: 20px 0;">${escapeHtml(message)}</p>
+          <hr style="border: 0; border-top: 1px solid rgba(207,34,46,0.15); margin: 20px 0;">
+          <a href="user.html">🔑 別のユーザーでログインする</a>
+        </div>
+      `;
     }
 
     function updateTimeDisplay(timestamp) {
@@ -330,7 +393,7 @@
     function renderList(dataList) {
       const urlListContainer = document.getElementById('url-list');
       
-      if (dataList.length === 0) {
+      if (!Array.isArray(dataList) || dataList.length === 0) {
         urlListContainer.innerHTML = '<p class="loading">閲覧できるURLがありません。</p>';
         return;
       }
