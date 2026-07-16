@@ -20,7 +20,6 @@
       margin: 0 auto;
     }
     
-    /* 🕒 最終更新とユーザー設定へのリンク */
     .header-info {
       display: flex;
       justify-content: space-between;
@@ -207,7 +206,6 @@
     const TIME_KEY = "shared_urls_time";
     const CACHE_LIMIT_MS = 60 * 60 * 1000; // 1時間
 
-    // 🔑 ログイン情報を取得する関数
     function getUserInfo() {
       const userInfo = localStorage.getItem("user_info");
       return userInfo ? JSON.parse(userInfo) : null;
@@ -216,7 +214,6 @@
     async function loadUrls() {
       const user = getUserInfo();
       
-      // 【セキュリティ】未ログインの場合は user.html へ飛ばす
       if (!user) {
         window.location.href = "user.html";
         return;
@@ -239,20 +236,52 @@
       }
     }
 
+    // 🔄 「最新の情報に更新」が押されたとき
     async function forceReloadUrls() {
       const reloadBtn = document.getElementById('reloadBtn');
       reloadBtn.disabled = true;
       reloadBtn.innerHTML = "⌛ 更新中...";
-      await fetchAndSaveData();
+      
+      // ★ 1. まずユーザー情報のタグ情報をGASから再取得して更新する
+      const updatedUserSuccess = await refreshUserInfo();
+      
+      if (updatedUserSuccess) {
+        // ★ 2. 更新されたタグを使ってURLデータを再取得する
+        await fetchAndSaveData();
+      } else {
+        alert("ユーザー情報の同期に失敗したため、URLを更新できませんでした。ログインし直してください。");
+      }
+      
       reloadBtn.disabled = false;
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
-    // 🔑 【アップデート】ユーザーのアクセスタグを送信してフィルタ済みのリストを保存する
+    // 👤 ユーザーのタグ情報をGASから同期する処理
+    async function refreshUserInfo() {
+      const user = getUserInfo();
+      if (!user) return false;
+
+      try {
+        const response = await fetch(`${GAS_API_URL}?action=getUser&id=${encodeURIComponent(user.id)}`);
+        if (!response.ok) return false;
+        
+        const result = await response.json();
+        if (result.status === "success") {
+          // localStorageの情報を上書きして新しいタグを保存
+          localStorage.setItem("user_info", JSON.stringify(result.user));
+          console.log("ユーザー情報を最新化しました:", result.user);
+          return true;
+        }
+      } catch (e) {
+        console.error("ユーザー情報の最新化に失敗:", e);
+      }
+      return false;
+    }
+
     async function fetchAndSaveData() {
       const urlListContainer = document.getElementById('url-list');
       const cachedData = localStorage.getItem(CACHE_KEY);
-      const user = getUserInfo();
+      const user = getUserInfo(); // 最新化したユーザー情報を取得
 
       if (!user) {
         window.location.href = "user.html";
@@ -260,7 +289,7 @@
       }
 
       try {
-        // GASにアクセスタグを送信してフィルタされたURLのみ受け取る
+        // 最新化されたタグを使ってGASにアクセス
         const response = await fetch(`${GAS_API_URL}?action=getUrls&tags=${encodeURIComponent(user.tags || "")}`);
         if (!response.ok) throw new Error('ネットワークエラー');
         
@@ -317,7 +346,6 @@
 
       let htmlString = '';
 
-      // 1. まず「未分類」を一番上に描画
       if (groups["未分類"] && groups["未分類"].length > 0) {
         htmlString += `<div class="uncategorized-section">`;
         groups["未分類"].forEach(item => {
@@ -326,7 +354,6 @@
         htmlString += `</div>`;
       }
 
-      // 2. その後に、畳まれたフォルダを描画
       for (const category in groups) {
         if (category === "未分類") continue;
 
