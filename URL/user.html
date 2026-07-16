@@ -214,17 +214,15 @@
         document.getElementById("loggedInUser").innerText = user.id;
         document.getElementById("userTags").innerText = user.tags || "なし";
 
-        // ★ 設定画面を開いた時も自動でGASから最新情報を検証
+        // ★ 設定画面を開いた時も自動でGASから最新の「有効/無効」状態を検証
         try {
           const response = await fetch(`${GAS_API_URL}?action=getUser&id=${encodeURIComponent(user.id)}`);
           if (response.ok) {
             const result = await response.json();
             if (result.status === "blocked") {
-              // 停止されていたら強制ログアウト&メッセージ表示
               alert("🚫 アクセス制限:\n\n" + result.message);
               handleLogout();
             } else if (result.status === "success") {
-              // 正常ならタグ更新
               localStorage.setItem("user_info", JSON.stringify(result.user));
               document.getElementById("userTags").innerText = result.user.tags || "なし";
             }
