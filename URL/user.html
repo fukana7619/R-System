@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ログイン - 共有URL一覧</title>
+  <title>ユーザー設定 / ログイン - 共有URL一覧</title>
   <link rel="icon" href="icon.png" type="image/png">
   <link rel="apple-touch-icon" href="icon.png">
   <style>
@@ -55,7 +55,7 @@
       outline: none;
       box-shadow: 0 0 0 3px rgba(9,105,218,0.15);
     }
-    .btn-login {
+    .btn-action {
       width: 100%;
       padding: 10px;
       background-color: #24292f;
@@ -67,12 +67,31 @@
       cursor: pointer;
       margin-top: 10px;
     }
-    .btn-login:hover {
+    .btn-action:hover {
       background-color: #000;
     }
-    .btn-login:disabled {
+    .btn-action:disabled {
       background-color: #8c959f;
       cursor: not-allowed;
+    }
+    .btn-back {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background-color: #ffffff;
+      color: #24292f;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      text-decoration: none;
+      box-sizing: border-box;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    .btn-back:hover {
+      background-color: #f6f8fa;
     }
     .error-msg {
       color: #cf222e;
@@ -84,14 +103,26 @@
       border-radius: 6px;
       border: 1px solid rgba(207,34,46,0.15);
     }
-    /* ログイン成功後の設定画面用（後々いじれるように） */
+    .success-msg {
+      color: #1a7f37;
+      font-size: 13px;
+      margin-bottom: 15px;
+      display: none;
+      background: #dafbe1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(26,127,55,0.15);
+    }
     .profile-box {
       display: none;
-      text-align: center;
     }
-    .profile-box p {
-      font-size: 14px;
+    .profile-info {
+      text-align: center;
       margin-bottom: 20px;
+    }
+    .profile-info p {
+      font-size: 14px;
+      margin: 6px 0;
     }
     .btn-logout {
       background-color: #cf222e;
@@ -101,9 +132,20 @@
       border-radius: 6px;
       font-weight: bold;
       cursor: pointer;
+      width: 100%;
+      margin-top: 20px;
     }
     .btn-logout:hover {
       background-color: #a40e26;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #24292f;
+      border-bottom: 1px solid #e1e4e8;
+      padding-bottom: 5px;
+      margin-top: 20px;
+      margin-bottom: 15px;
     }
   </style>
 </head>
@@ -124,14 +166,35 @@
         <input type="password" id="userPw" placeholder="パスワードを入力してください">
       </div>
       
-      <button id="loginBtn" class="btn-login" onclick="handleLogin()">ログイン</button>
+      <button id="loginBtn" class="btn-action" onclick="handleLogin()">ログイン</button>
     </div>
 
     <div id="profileArea" class="profile-box">
       <h2>ユーザー設定</h2>
-      <p>ユーザーID: <strong id="loggedInUser">--</strong></p>
-      <p>所持タグ: <span id="userTags" style="color:#57606a;">--</span></p>
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+      <div id="settingErrorMsg" class="error-msg"></div>
+      <div id="settingSuccessMsg" class="success-msg"></div>
+
+      <div class="profile-info">
+        <p>ユーザーID: <strong id="loggedInUser">--</strong></p>
+        <p>所持タグ: <span id="userTags" style="color:#57606a;">--</span></p>
+      </div>
+
+      <a href="index.html" class="btn-back">🔙 一覧画面に戻る</a>
+
+      <div class="section-title">🔑 パスワード変更</div>
+      
+      <div class="input-group">
+        <label for="currentPw">現在のパスワード</label>
+        <input type="password" id="currentPw" placeholder="現在のパスワード">
+      </div>
+
+      <div class="input-group">
+        <label for="newPw">新しいパスワード</label>
+        <input type="password" id="newPw" placeholder="新しいパスワード">
+      </div>
+
+      <button id="changePwBtn" class="btn-action" onclick="handleChangePassword()">パスワードを変更する</button>
+
       <button class="btn-logout" onclick="handleLogout()">ログアウト</button>
     </div>
   </div>
@@ -140,11 +203,9 @@
     // ★新しいGASのURLに書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
 
-    // ページ読み込み時にログイン状態を確認
     window.onload = function() {
       const userInfo = localStorage.getItem("user_info");
       
-      // すでにログインしている場合は、設定画面を出す
       if (userInfo) {
         const user = JSON.parse(userInfo);
         document.getElementById("loginFormArea").style.display = "none";
@@ -162,7 +223,7 @@
       const loginBtn = document.getElementById("loginBtn");
 
       if (!id || !pw) {
-        showError("IDとパスワードを入力してください。");
+        showError("IDとパスワードを入力してください。", "errorMsg");
         return;
       }
 
@@ -171,29 +232,73 @@
       errorMsg.style.display = "none";
 
       try {
-        // GASに認証リクエスト
         const response = await fetch(`${GAS_API_URL}?action=login&id=${encodeURIComponent(id)}&pw=${encodeURIComponent(pw)}`);
         const result = await response.json();
 
         if (result.status === "success") {
-          // LocalStorageにユーザー情報を保存（毎回ログインしなくてよくなる）
           localStorage.setItem("user_info", JSON.stringify(result.user));
-          
-          // キャッシュのクリア（ユーザーが変わるため古いURLキャッシュを破棄）
           localStorage.removeItem("shared_urls_cache");
           localStorage.removeItem("shared_urls_time");
-
-          // メインページ（index.html）へ遷移
           window.location.href = "index.html";
         } else {
-          showError(result.message || "ログインに失敗しました。");
+          showError(result.message || "ログインに失敗しました。", "errorMsg");
         }
       } catch (e) {
         console.error(e);
-        showError("通信エラーが発生しました。");
+        showError("通信エラーが発生しました。", "errorMsg");
       } finally {
         loginBtn.disabled = false;
         loginBtn.innerText = "ログイン";
+      }
+    }
+
+    // 🔒 【新機能！】パスワード変更の処理
+    async function handleChangePassword() {
+      const user = JSON.parse(localStorage.getItem("user_info"));
+      if (!user) return;
+
+      const currentPw = document.getElementById("currentPw").value.trim();
+      const newPw = document.getElementById("newPw").value.trim();
+      const changePwBtn = document.getElementById("changePwBtn");
+      const errorMsg = document.getElementById("settingErrorMsg");
+      const successMsg = document.getElementById("settingSuccessMsg");
+
+      errorMsg.style.display = "none";
+      successMsg.style.display = "none";
+
+      if (!currentPw || !newPw) {
+        showError("両方のパスワードを入力してください。", "settingErrorMsg");
+        return;
+      }
+
+      if (currentPw === newPw) {
+        showError("新しいパスワードが現在と同じです。", "settingErrorMsg");
+        return;
+      }
+
+      changePwBtn.disabled = true;
+      changePwBtn.innerText = "⏳ 変更中...";
+
+      try {
+        const response = await fetch(`${GAS_API_URL}?action=updatePw&id=${encodeURIComponent(user.id)}&currentPw=${encodeURIComponent(currentPw)}&newPw=${encodeURIComponent(newPw)}`);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          successMsg.innerText = result.message;
+          successMsg.style.display = "block";
+          
+          // 入力フォームをクリア
+          document.getElementById("currentPw").value = "";
+          document.getElementById("newPw").value = "";
+        } else {
+          showError(result.message || "パスワードの変更に失敗しました。", "settingErrorMsg");
+        }
+      } catch (e) {
+        console.error(e);
+        showError("通信エラーが発生しました。", "settingErrorMsg");
+      } finally {
+        changePwBtn.disabled = false;
+        changePwBtn.innerText = "パスワードを変更する";
       }
     }
 
@@ -205,8 +310,8 @@
       window.location.reload();
     }
 
-    function showError(msg) {
-      const errorMsg = document.getElementById("errorMsg");
+    function showError(msg, elementId) {
+      const errorMsg = document.getElementById(elementId);
       errorMsg.innerText = msg;
       errorMsg.style.display = "block";
     }
