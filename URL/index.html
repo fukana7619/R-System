@@ -37,6 +37,33 @@
       text-decoration: underline;
     }
 
+    /* 管理者用：上部アクションエリア */
+    .admin-bar {
+      display: none; /* 管理者のみJSでflexにする */
+      justify-content: space-between;
+      align-items: center;
+      background: #fff8c5;
+      border: 1px solid rgba(190,131,0,0.15);
+      padding: 10px 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .btn-admin-add {
+      background-color: #1f883d;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .btn-admin-add:hover {
+      background-color: #1a7134;
+    }
+
     /* 📁 カテゴリセクション */
     .category-section {
       margin-bottom: 15px;
@@ -109,6 +136,7 @@
       display: flex;
       align-items: flex-start;
       gap: 15px;
+      position: relative;
     }
     .card-icon {
       width: 32px;
@@ -124,13 +152,21 @@
     h1 {
       font-size: 16px;
       margin-top: 0;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+      padding-right: 80px; /* 管理ボタンと被らない余白 */
     }
     p {
       font-size: 12px;
       color: #666;
       word-break: break-all;
       margin: 0 0 10px 0;
+      padding-right: 80px;
+    }
+    .card-tags {
+      font-size: 10px;
+      color: #8c959f;
+      display: block;
+      margin-bottom: 8px;
     }
     .btn {
       display: inline-block;
@@ -145,6 +181,27 @@
     .btn:hover {
       background-color: #000;
     }
+
+    /* 管理者用操作ボタン（カード内右上） */
+    .admin-actions {
+      display: none; /* 管理者のみJSで表示 */
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      gap: 5px;
+    }
+    .btn-edit, .btn-delete {
+      border: 1px solid #d0d7de;
+      background: white;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-edit:hover { background: #f6f8fa; color: #0969da; }
+    .btn-delete:hover { background: #ffebe9; color: #cf222e; }
+
     .loading {
       text-align: center;
       color: #888;
@@ -174,11 +231,6 @@
     .reload-btn:hover {
       background-color: #f6f8fa;
     }
-    .reload-btn:disabled {
-      background-color: #f6f8fa;
-      color: #8c959f;
-      cursor: not-allowed;
-    }
 
     /* 🚫 アカウント無効化時のエラー画面表示 */
     .blocked-screen {
@@ -198,6 +250,33 @@
       font-weight: bold;
       text-decoration: none;
     }
+
+    /* 📝 管理用編集モーダル（ポップアップ窓） */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .modal h3 { margin-top: 0; margin-bottom: 15px; }
+    .modal-group { margin-bottom: 12px; }
+    .modal-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+    .modal-group input { width: 100%; padding: 8px; border: 1px solid #d0d7de; border-radius: 6px; box-sizing: border-box; }
+    .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .btn-cancel { background: #f6f8fa; border: 1px solid #d0d7de; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-save { background: #1f883d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-save:hover { background: #1a7134; }
   </style>
 </head>
 <body>
@@ -207,6 +286,12 @@
       <div id="lastUpdated">最終更新: --</div>
       <a href="user.html" class="user-link">⚙️ ユーザー設定</a>
     </div>
+
+    <div id="adminBar" class="admin-bar">
+      <span>👑 管理者モードでログイン中</span>
+      <button class="btn-admin-add" onclick="openAddModal()">➕ 新規URL追加</button>
+    </div>
+
     <div id="url-list">
       <div id="loading" class="loading">🔒 読み込み中...</div>
     </div>
@@ -218,8 +303,38 @@
     </button>
   </div>
 
+  <div id="urlModal" class="modal">
+    <div class="modal-content">
+      <h3 id="modalTitle">URLの追加</h3>
+      <input type="hidden" id="editOriginalTitle">
+      <input type="hidden" id="editOriginalUrl">
+      
+      <div class="modal-group">
+        <label for="modalInputTitle">タイトル *</label>
+        <input type="text" id="modalInputTitle" placeholder="例: Google">
+      </div>
+      <div class="modal-group">
+        <label for="modalInputUrl">URL *</label>
+        <input type="text" id="modalInputUrl" placeholder="例: https://google.com">
+      </div>
+      <div class="modal-group">
+        <label for="modalInputCategory">カテゴリー</label>
+        <input type="text" id="modalInputCategory" placeholder="例: 検索エンジン (空欄は未分類)">
+      </div>
+      <div class="modal-group">
+        <label for="modalInputTags">閲覧に必要なタグ（カンマ区切り）</label>
+        <input type="text" id="modalInputTags" placeholder="例: Admin, 予定表 (空欄は誰も閲覧不可)">
+      </div>
+
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button id="btnModalSubmit" class="btn-save" onclick="submitModalData()">保存する</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // ★新しいGASのURLに書き換えてください [cite: 1]
+    // ★新しいGASのURLに書き換えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzRWzFDsYmTrjZ5PRF83Kj9u1SYeE--dA_zOkBKpsu5ThZlBXXs8Aj0B7Gmouq6QeIdDA/exec";
     const CACHE_KEY = "shared_urls_cache";
     const TIME_KEY = "shared_urls_time";
@@ -229,7 +344,7 @@
       return userInfo ? JSON.parse(userInfo) : null;
     }
 
-    // 🚀 ページ読み込み時の処理（キャッシュ最優先で爆速！）
+    // 🚀 ページ読み込み（完全キャッシュ最優先）
     async function loadUrls() {
       const user = getUserInfo();
       
@@ -238,7 +353,11 @@
         return;
       }
 
-      // 【秒速表示】アクセス時はGASを呼ばず、キャッシュを一瞬で描画するだけ
+      // 管理者の場合は管理用バーを露出させる
+      if (user.id.toUpperCase().startsWith("A")) {
+        document.getElementById("adminBar").style.display = "flex";
+      }
+
       const cachedData = localStorage.getItem(CACHE_KEY);
       const lastFetchTime = localStorage.getItem(TIME_KEY);
       
@@ -248,12 +367,11 @@
         renderList(JSON.parse(cachedData));
         updateTimeDisplay(lastFetchTime);
       } else {
-        // キャッシュがない最初の一度だけ自動でデータを取得しにいく
         await forceReloadUrls();
       }
     }
 
-    // 🔄 「最新の情報に更新」が押されたとき（ここで厳格な二重認証を走らせる）
+    // 🔄 「最新の情報に更新」
     async function forceReloadUrls() {
       const reloadBtn = document.getElementById('reloadBtn');
       reloadBtn.disabled = true;
@@ -274,13 +392,12 @@
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
-    // 👤 ユーザー情報をGASと同期して、ID/タグ/パスワードをリアルタイム検証
+    // 👤 ユーザー認証同期
     async function refreshUserInfo() {
       const user = getUserInfo();
       if (!user) return { status: "error", message: "ログイン情報がありません。" };
 
       try {
-        // ID、タグに加えて、セッション保存されているパスワード(user.pw)も一緒に送り確認する
         const response = await fetch(`${GAS_API_URL}?action=getUser&id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw || "")}`);
         if (!response.ok) return { status: "network_error" };
         
@@ -301,7 +418,7 @@
       return { status: "network_error" };
     }
 
-    // 最新のURLデータを取得
+    // URL取得
     async function fetchAndSaveData() {
       const urlListContainer = document.getElementById('url-list');
       const user = getUserInfo();
@@ -341,13 +458,117 @@
       }
     }
 
-    // ⛔ 使用不可能時の画面ロック表示
+    // モーダル操作 (追加・編集ポップアップ)
+    let modalMode = "add"; // add or edit
+
+    function openAddModal() {
+      modalMode = "add";
+      document.getElementById("modalTitle").innerText = "URLの新規追加";
+      document.getElementById("modalInputTitle").value = "";
+      document.getElementById("modalInputUrl").value = "";
+      document.getElementById("modalInputCategory").value = "";
+      document.getElementById("modalInputTags").value = "";
+      document.getElementById("urlModal").style.display = "flex";
+    }
+
+    function openEditModal(title, url, category, tags) {
+      modalMode = "edit";
+      document.getElementById("modalTitle").innerText = "URLの編集";
+      document.getElementById("editOriginalTitle").value = title;
+      document.getElementById("editOriginalUrl").value = url;
+      document.getElementById("modalInputTitle").value = title;
+      document.getElementById("modalInputUrl").value = url;
+      document.getElementById("modalInputCategory").value = category === "未分類" ? "" : category;
+      document.getElementById("modalInputTags").value = tags;
+      document.getElementById("urlModal").style.display = "flex";
+    }
+
+    function closeModal() {
+      document.getElementById("urlModal").style.display = "none";
+    }
+
+    // 登録・更新処理の送信
+    async function submitModalData() {
+      const user = getUserInfo();
+      if (!user) return;
+
+      const title = document.getElementById("modalInputTitle").value.trim();
+      const url = document.getElementById("modalInputUrl").value.trim();
+      const category = document.getElementById("modalInputCategory").value.trim();
+      const tags = document.getElementById("modalInputTags").value.trim();
+
+      if (!title || !url) {
+        alert("タイトルとURLは必ず入力してください。");
+        return;
+      }
+
+      const submitBtn = document.getElementById("btnModalSubmit");
+      submitBtn.disabled = true;
+      submitBtn.innerText = "送信中...";
+
+      let apiEndpoint = `${GAS_API_URL}?id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw)}&title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}&category=${encodeURIComponent(category)}&tags=${encodeURIComponent(tags)}`;
+
+      if (modalMode === "add") {
+        apiEndpoint += `&action=addUrl`;
+      } else {
+        const originalTitle = document.getElementById("editOriginalTitle").value;
+        const originalUrl = document.getElementById("editOriginalUrl").value;
+        apiEndpoint += `&action=editUrl&originalTitle=${encodeURIComponent(originalTitle)}&originalUrl=${encodeURIComponent(originalUrl)}`;
+      }
+
+      try {
+        const response = await fetch(apiEndpoint);
+        const result = await response.json();
+        if (result.status === "success") {
+          alert(result.message);
+          closeModal();
+          // 更新完了したら自動リロード
+          await forceReloadUrls();
+        } else {
+          alert("エラー: " + result.message);
+        }
+      } catch (e) {
+        alert("通信中にエラーが発生しました。");
+        console.error(e);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "保存する";
+      }
+    }
+
+    // 削除処理
+    async function deleteUrlData(title, url) {
+      const user = getUserInfo();
+      if (!user) return;
+
+      if (!confirm(`本当に「${title}」を削除してもよろしいですか？\n(スプレッドシートからも完全に削除されます)`)) {
+        return;
+      }
+
+      try {
+        const apiEndpoint = `${GAS_API_URL}?action=deleteUrl&id=${encodeURIComponent(user.id)}&pw=${encodeURIComponent(user.pw)}&title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
+        const response = await fetch(apiEndpoint);
+        const result = await response.json();
+        if (result.status === "success") {
+          alert(result.message);
+          await forceReloadUrls();
+        } else {
+          alert("削除失敗: " + result.message);
+        }
+      } catch (e) {
+        alert("通信エラーが発生しました。");
+        console.error(e);
+      }
+    }
+
+    // ⛔ 使用不可能時の画面ロック
     function showBlockedScreen(message) {
       localStorage.removeItem("user_info");
       localStorage.removeItem(CACHE_KEY);
       localStorage.removeItem(TIME_KEY);
 
       document.getElementById("headerArea").style.display = "none";
+      document.getElementById("adminBar").style.display = "none";
       document.getElementById("btnArea").style.display = "none";
       
       const urlListContainer = document.getElementById('url-list');
@@ -426,6 +647,13 @@
       }
       
       urlListContainer.innerHTML = htmlString;
+
+      // 👑 管理者ならカード内の「編集・削除」ボタンを表示する
+      const user = getUserInfo();
+      if (user && user.id.toUpperCase().startsWith("A")) {
+        const actionBoxes = document.querySelectorAll('.admin-actions');
+        actionBoxes.forEach(box => box.style.display = 'flex');
+      }
     }
 
     function createCardHtml(item) {
@@ -436,14 +664,24 @@
         domain = "example.com"; 
       }
       const iconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+      
+      const safeTitle = escapeHtml(item.title);
+      const safeUrl = escapeHtml(item.url);
+      const safeCategory = escapeHtml(item.category || "未分類");
+      const safeTags = escapeHtml(item.tags || "");
 
       return `
         <div class="url-card">
           <img class="card-icon" src="${iconUrl}" alt="icon" onerror="this.src='https://www.google.com/s2/favicons?domain=example.com&sz=64'">
           <div class="card-content">
-            <h1>${escapeHtml(item.title)}</h1>
-            <p>${escapeHtml(item.url)}</p>
-            <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="btn">リンクを開く</a>
+            <h1>${safeTitle}</h1>
+            <p>${safeUrl}</p>
+            ${safeTags ? `<span class="card-tags">🔑 必要タグ: ${safeTags}</span>` : ''}
+            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn">リンクを開く</a>
+          </div>
+          <div class="admin-actions">
+            <button class="btn-edit" onclick="openEditModal('${safeTitle.replace(/'/g, "\\'")}', '${safeUrl.replace(/'/g, "\\'")}', '${safeCategory.replace(/'/g, "\\'")}', '${safeTags.replace(/'/g, "\\'")}')">✏️ 編集</button>
+            <button class="btn-delete" onclick="deleteUrlData('${safeTitle.replace(/'/g, "\\'")}', '${safeUrl.replace(/'/g, "\\'")}')">🗑️ 削除</button>
           </div>
         </div>
       `;
