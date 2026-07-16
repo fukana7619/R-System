@@ -18,10 +18,6 @@
       margin: 0;
       padding: 20px;
     }
-    /* リダイレクトチェック中の隠し用 */
-    body.loading {
-      display: none;
-    }
     .header {
       display: flex;
       justify-content: space-between;
@@ -99,7 +95,7 @@
     .error { color: #ef4444; }
   </style>
   <script>
-    // 💡【超重要】ページの読み込みが開始された瞬間に認証チェック（チラつき防止）
+    // 💡 ログイン情報のチェック
     const gasUrl = localStorage.getItem('gas_url');
     const userId = localStorage.getItem('user_id');
     const password = localStorage.getItem('user_password');
@@ -151,10 +147,9 @@
 <script>
   // 画面の初期設定
   window.onload = function() {
-    // ユーザー名表示
-    document.getElementById('display-user').innerText = localStorage.getItem('user_id');
+    document.getElementById('display-user').innerText = userId;
     
-    // 日付入力欄に「今日の日付」を自動でセット（使いやすさUP！）
+    // 日付入力欄に「今日の日付」を自動でセット
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -164,13 +159,13 @@
 
   // ログアウト処理
   function logout() {
-    if (confirm('ログアウトしますか？（保存したログインデータが消去されます）')) {
+    if (confirm('ログアウトしますか？（ログインデータが消去されます）')) {
       localStorage.clear();
       location.href = 'user.html';
     }
   }
 
-// 収支データの追加処理
+  // 収支データの追加処理
   async function addRecord() {
     const date = document.getElementById('date').value;
     const item = document.getElementById('item').value.trim();
@@ -187,7 +182,7 @@
     statusDiv.className = '';
     statusDiv.innerText = '⏳ スプレッドシートに書き込み中...';
 
-    // カンマ区切りのデータを作成
+    // カンマ区切りのデータを作成（項目名のカンマは全角に変換する安全対策付き）
     const safeItem = item.replace(/,/g, '，');
     const csvRow = `${date},${safeItem},${income},${expense}`;
 
@@ -200,7 +195,7 @@
           password: password,
           cmd: 'enterline',
           option: 'last',
-          sheet: userId, // 💡 ここを「'履歴'」から「userId」に変更！これで自分のユーザー名のシートに書き込まれます
+          sheet: userId, // 💡 ログインしているユーザーのIDと同じ名前のシートを指定！
           value1: csvRow
         })
       });
@@ -211,7 +206,7 @@
         statusDiv.className = 'success';
         statusDiv.innerText = '✅ スプレッドシートへの記録が完了しました！';
         
-        // 入力フォームをリセット
+        // 入力フォームをリセット（日付は残す）
         document.getElementById('item').value = '';
         document.getElementById('income').value = '0';
         document.getElementById('expense').value = '0';
