@@ -48,7 +48,10 @@
       border-radius: 8px;
       margin-bottom: 20px;
       font-size: 13px;
-      font-weight: bold;
+    }
+    .admin-actions-top {
+      display: flex;
+      gap: 8px;
     }
     .btn-admin-add {
       background-color: #1f883d;
@@ -62,6 +65,20 @@
     }
     .btn-admin-add:hover {
       background-color: #1a7134;
+    }
+    .btn-admin-users {
+      background-color: #0969da;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .btn-admin-users:hover {
+      background-color: #0c57b4;
     }
 
     /* 📁 カテゴリセクション */
@@ -288,8 +305,11 @@
     </div>
 
     <div id="adminBar" class="admin-bar">
-      <span>👑 管理者モードでログイン中</span>
-      <button class="btn-admin-add" onclick="openAddModal()">➕ 新規URL追加</button>
+      <span>👑 管理者モード</span>
+      <div class="admin-actions-top">
+        <a href="admin-users.html" class="btn-admin-users">👥 ユーザー管理</a>
+        <button class="btn-admin-add" onclick="openAddModal()">➕ 新規URL追加</button>
+      </div>
     </div>
 
     <div id="url-list">
@@ -344,7 +364,6 @@
       return userInfo ? JSON.parse(userInfo) : null;
     }
 
-    // 🚀 ページ読み込み（完全キャッシュ最優先）
     async function loadUrls() {
       const user = getUserInfo();
       
@@ -353,7 +372,6 @@
         return;
       }
 
-      // 管理者の場合は管理用バーを露出させる
       if (user.id.toUpperCase().startsWith("A")) {
         document.getElementById("adminBar").style.display = "flex";
       }
@@ -371,7 +389,6 @@
       }
     }
 
-    // 🔄 「最新の情報に更新」
     async function forceReloadUrls() {
       const reloadBtn = document.getElementById('reloadBtn');
       reloadBtn.disabled = true;
@@ -392,7 +409,6 @@
       reloadBtn.innerHTML = "🔄 最新の情報に更新";
     }
 
-    // 👤 ユーザー認証同期
     async function refreshUserInfo() {
       const user = getUserInfo();
       if (!user) return { status: "error", message: "ログイン情報がありません。" };
@@ -418,7 +434,6 @@
       return { status: "network_error" };
     }
 
-    // URL取得
     async function fetchAndSaveData() {
       const urlListContainer = document.getElementById('url-list');
       const user = getUserInfo();
@@ -458,8 +473,7 @@
       }
     }
 
-    // モーダル操作 (追加・編集ポップアップ)
-    let modalMode = "add"; // add or edit
+    let modalMode = "add";
 
     function openAddModal() {
       modalMode = "add";
@@ -487,7 +501,6 @@
       document.getElementById("urlModal").style.display = "none";
     }
 
-    // 登録・更新処理の送信
     async function submitModalData() {
       const user = getUserInfo();
       if (!user) return;
@@ -522,7 +535,6 @@
         if (result.status === "success") {
           alert(result.message);
           closeModal();
-          // 更新完了したら自動リロード
           await forceReloadUrls();
         } else {
           alert("エラー: " + result.message);
@@ -536,7 +548,6 @@
       }
     }
 
-    // 削除処理
     async function deleteUrlData(title, url) {
       const user = getUserInfo();
       if (!user) return;
@@ -561,7 +572,6 @@
       }
     }
 
-    // ⛔ 使用不可能時の画面ロック
     function showBlockedScreen(message) {
       localStorage.removeItem("user_info");
       localStorage.removeItem(CACHE_KEY);
@@ -648,7 +658,6 @@
       
       urlListContainer.innerHTML = htmlString;
 
-      // 👑 管理者ならカード内の「編集・削除」ボタンを表示する
       const user = getUserInfo();
       if (user && user.id.toUpperCase().startsWith("A")) {
         const actionBoxes = document.querySelectorAll('.admin-actions');
