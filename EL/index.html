@@ -96,11 +96,11 @@
   </style>
   <script>
     // 💡 ログイン情報のチェック
-    const gasUrl = localStorage.getItem('gas_url');
-    const userId = localStorage.getItem('user_id');
-    const password = localStorage.getItem('user_password');
+    const savedUrl = localStorage.getItem('gas_url');
+    const savedUser = localStorage.getItem('user_id');
+    const savedPass = localStorage.getItem('user_password');
 
-    if (!gasUrl || !userId || !password) {
+    if (!savedUrl || !savedUser || !savedPass) {
       // ログイン情報がなければ即座に user.html へ飛ばす
       location.href = 'user.html';
     }
@@ -145,6 +145,11 @@
 </div>
 
 <script>
+  // グローバル変数としてログイン情報を定義し、全ての関数から呼び出せるようにします
+  const gasUrl = localStorage.getItem('gas_url');
+  const userId = localStorage.getItem('user_id');
+  const password = localStorage.getItem('user_password');
+
   // 画面の初期設定
   window.onload = function() {
     document.getElementById('display-user').innerText = userId;
@@ -182,7 +187,6 @@
     statusDiv.className = '';
     statusDiv.innerText = '⏳ スプレッドシートに書き込み中...';
 
-    // カンマ区切りのデータを作成（項目名のカンマは全角に変換する安全対策付き）
     const safeItem = item.replace(/,/g, '，');
     const csvRow = `${date},${safeItem},${income},${expense}`;
 
@@ -195,7 +199,7 @@
           password: password,
           cmd: 'enterline',
           option: 'last',
-          sheet: userId, // 💡 ログインしているユーザーのIDと同じ名前のシートを指定！
+          sheet: userId,
           value1: csvRow
         })
       });
@@ -206,7 +210,7 @@
         statusDiv.className = 'success';
         statusDiv.innerText = '✅ スプレッドシートへの記録が完了しました！';
         
-        // 入力フォームをリセット（日付は残す）
+        // 入力フォームをリセット
         document.getElementById('item').value = '';
         document.getElementById('income').value = '0';
         document.getElementById('expense').value = '0';
