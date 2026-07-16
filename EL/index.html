@@ -6,8 +6,8 @@
   <title>爆速収支簿 - メイン</title>
   <style>
     :root {
-      --primary-color: #10b981; /* お金っぽいグリーン */
-      --bg-color: #f9fafb;
+      --primary-color: #10b981; /* グリーン */
+      --bg-color: #f3f4f6;
       --card-bg: #ffffff;
       --text-color: #111827;
     }
@@ -40,12 +40,47 @@
       font-size: 0.85rem;
     }
     .container {
-      background: var(--card-bg);
-      padding: 25px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
       max-width: 600px;
       margin: 0 auto;
+    }
+    .card {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    /* ダッシュボード（金額表示エリア） */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .dash-box {
+      background: #f9fafb;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #e5e7eb;
+    }
+    .dash-box.highlight {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+    }
+    .dash-title {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .dash-value {
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: var(--text-color);
+    }
+    .dash-box.highlight .dash-value {
+      color: #065f46;
     }
     .form-group {
       margin-bottom: 15px;
@@ -69,7 +104,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    button.submit-btn {
+    button {
       width: 100%;
       padding: 12px;
       background-color: var(--primary-color);
@@ -80,9 +115,8 @@
       font-weight: bold;
       cursor: pointer;
       transition: background 0.2s;
-      margin-top: 10px;
     }
-    button.submit-btn:hover {
+    button:hover {
       background-color: #059669;
     }
     #status {
@@ -95,13 +129,11 @@
     .error { color: #ef4444; }
   </style>
   <script>
-    // 💡 ログイン情報のチェック
-    const savedUrl = localStorage.getItem('gas_url');
-    const savedUser = localStorage.getItem('user_id');
-    const savedPass = localStorage.getItem('user_password');
+    const gasUrl = localStorage.getItem('gas_url');
+    const userId = localStorage.getItem('user_id');
+    const password = localStorage.getItem('user_password');
 
-    if (!savedUrl || !savedUser || !savedPass) {
-      // ログイン情報がなければ即座に user.html へ飛ばす
+    if (!gasUrl || !userId || !password) {
       location.href = 'user.html';
     }
   </script>
@@ -114,63 +146,163 @@
 </div>
 
 <div class="container">
-  <p style="margin: 0 0 20px 0; font-size: 0.9rem; color: #6b7280;">
-    ログイン中: <strong id="display-user">...</strong> さん
-  </p>
-
-  <div class="form-group">
-    <label for="date">日付</label>
-    <input type="date" id="date">
-  </div>
-
-  <div class="form-group">
-    <label for="item">項目（買ったもの、お小遣いなど）</label>
-    <input type="text" id="item" placeholder="例: うまい棒、お年玉">
-  </div>
-
-  <div class="inline-group">
-    <div class="form-group">
-      <label for="income">収入 (円)</label>
-      <input type="number" id="income" value="0" min="0">
+  
+  <div class="dashboard">
+    <div class="dash-box highlight">
+      <div class="dash-title">現在の残高（手持ち）</div>
+      <div class="dash-value" id="current-balance">⏳ 計算中...</div>
     </div>
-    <div class="form-group">
-      <label for="expense">支出 (円)</label>
-      <input type="number" id="expense" value="0" min="0">
+    <div class="dash-box">
+      <div class="dash-title">今月の支出合計</div>
+      <div class="dash-value" id="monthly-expense">⏳ 計算中...</div>
     </div>
   </div>
 
-  <button class="submit-btn" onclick="addRecord()">スプレッドシートに記録する</button>
+  <div class="card" style="padding: 12px 20px; font-size: 0.9rem; background: #fef3c7; border: 1px solid #fde68a;">
+    <label for="start-cash" style="display:inline-block; margin-right: 10px; margin-bottom: 0;">初期手元金（ここからスタート）:</label>
+    <input type="number" id="start-cash" value="3000" style="width: 100px; padding: 4px; display: inline-block;" onchange="updateDashboard()"> 円
+  </div>
 
-  <div id="status"></div>
+  <div class="card">
+    <h3 style="margin-top:0; color: var(--primary-color);">収支を記録する</h3>
+    <div class="form-group">
+      <label for="date">日付</label>
+      <input type="date" id="date">
+    </div>
+
+    <div class="form-group">
+      <label for="item">項目（買ったもの、お小遣いなど）</label>
+      <input type="text" id="item" placeholder="例: うまい棒、お年玉">
+    </div>
+
+    <div class="inline-group">
+      <div class="form-group">
+        <label for="income">収入 (円)</label>
+        <input type="number" id="income" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label for="expense">支出 (円)</label>
+        <input type="number" id="expense" value="0" min="0">
+      </div>
+    </div>
+
+    <button onclick="addRecord()">スプレッドシートに記録する</button>
+    <div id="status"></div>
+  </div>
+
 </div>
 
 <script>
-  // グローバル変数としてログイン情報を定義し、全ての関数から呼び出せるようにします
-  const gasUrl = localStorage.getItem('gas_url');
-  const userId = localStorage.getItem('user_id');
-  const password = localStorage.getItem('user_password');
+  let cachedData = []; // 読み込んだCSVデータを保持する配列
 
-  // 画面の初期設定
   window.onload = function() {
-    document.getElementById('display-user').innerText = userId;
+    document.getElementById('display-user') && (document.getElementById('display-user').innerText = userId);
     
-    // 日付入力欄に「今日の日付」を自動でセット
+    // 日付に今日をセット
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
+
+    // ローカルから「初期手元金」の設定をロード
+    const savedStartCash = localStorage.getItem('start_cash');
+    if (savedStartCash !== null) {
+      document.getElementById('start-cash').value = savedStartCash;
+    }
+
+    // データの初回読み込み＆集計
+    fetchDataAndCalculate();
   };
 
   // ログアウト処理
   function logout() {
-    if (confirm('ログアウトしますか？（ログインデータが消去されます）')) {
+    if (confirm('ログアウトしますか？')) {
       localStorage.clear();
       location.href = 'user.html';
     }
   }
 
-  // 収支データの追加処理
+  // 1. スプレッドシートから履歴データを全件読み込む関数
+  async function fetchDataAndCalculate() {
+    try {
+      const response = await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          id: userId,
+          password: password,
+          cmd: 'csv',
+          option: 'export',
+          sheet: userId
+        })
+      });
+
+      const csvText = await response.text();
+      
+      if (csvText.includes('Sheet not found')) {
+        document.getElementById('current-balance').innerText = 'シート未作成';
+        document.getElementById('monthly-expense').innerText = 'シート未作成';
+        return;
+      }
+
+      // 改行で区切って配列化
+      const lines = csvText.split('\n').filter(line => line.trim() !== '');
+      cachedData = lines.map(line => line.split(','));
+
+      // 集計処理を実行
+      updateDashboard();
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById('current-balance').innerText = 'エラー';
+      document.getElementById('monthly-expense').innerText = 'エラー';
+    }
+  }
+
+  // 2. 読み込んだデータから残高と今月使った量を計算して画面に表示する関数
+  function updateDashboard() {
+    const startCashInput = parseInt(document.getElementById('start-cash').value) || 0;
+    localStorage.setItem('start_cash', startCashInput); // ローカルに保存しておく
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let thisMonthExpense = 0;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1〜12
+
+    // ヘッダー行（1行目）を避けて、2行目からループ
+    for (let i = 1; i < cachedData.length; i++) {
+      const row = cachedData[i];
+      if (row.length < 4) continue;
+
+      const dateStr = row[0]; // "YYYY-MM-DD" や "YYYY/MM/DD"
+      const income = parseInt(row[2]) || 0;
+      const expense = parseInt(row[3]) || 0;
+
+      totalIncome += income;
+      totalExpense += expense;
+
+      // 今月の支出を計算
+      if (dateStr) {
+        const rowDate = new Date(dateStr);
+        if (rowDate.getFullYear() === currentYear && (rowDate.getMonth() + 1) === currentMonth) {
+          thisMonthExpense += expense;
+        }
+      }
+    }
+
+    // 計算式：現在の残高 = 初期手元金 + 収入の総和 - 支出の総和
+    const currentBalance = startCashInput + totalIncome - totalExpense;
+
+    // 画面の数値をアップデート
+    document.getElementById('current-balance').innerText = `¥ ${currentBalance.toLocaleString()}`;
+    document.getElementById('monthly-expense').innerText = `¥ ${thisMonthExpense.toLocaleString()}`;
+  }
+
+  // 3. 収支データの追加処理
   async function addRecord() {
     const date = document.getElementById('date').value;
     const item = document.getElementById('item').value.trim();
@@ -210,10 +342,13 @@
         statusDiv.className = 'success';
         statusDiv.innerText = '✅ スプレッドシートへの記録が完了しました！';
         
-        // 入力フォームをリセット
+        // フォームのリセット
         document.getElementById('item').value = '';
         document.getElementById('income').value = '0';
         document.getElementById('expense').value = '0';
+
+        // 💡 記録が成功したら裏でデータをもう一度読み込んで、手元金額と今月の支出を再計算！
+        fetchDataAndCalculate();
       } else {
         statusDiv.className = 'error';
         statusDiv.innerText = `❌ 記録に失敗しました: ${result}`;
