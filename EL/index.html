@@ -153,7 +153,6 @@
     .success { color: #0f766e; }
     .error { color: #dc2626; }
     
-    /* 履歴テーブルのスタイル */
     .table-container {
       overflow-x: auto;
     }
@@ -218,7 +217,7 @@
           <div class="dash-value" id="current-balance">0円</div>
         </div>
         <div class="dash-box">
-          <div class="dash-title">今月の支出合計</div>
+          <div class="dash-title">今月の収支合計</div>
           <div class="dash-value" id="monthly-expense">0円</div>
         </div>
       </div>
@@ -258,14 +257,14 @@
       <table id="history-table">
         <thead>
           <tr>
-            <th>日付</th>
+            <th style="min-width: 130px;">日付</th>
             <th>項目</th>
             <th>収入</th>
             <th>支出</th>
           </tr>
         </thead>
         <tbody>
-          </tbody>
+        </tbody>
       </table>
     </div>
   </div>
@@ -273,19 +272,17 @@
 </div>
 
 <script>
-  let cachedData = []; // 読み込んだCSVデータを保持する配列
+  let cachedData = []; 
 
   window.onload = function() {
     document.getElementById('display-user').innerText = userId;
     
-    // 日付に今日の日付を設定
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
 
-    // ローカルストレージにキャッシュがあればロード、無ければGASから取得
     const localCache = localStorage.getItem(`cache_${userId}`);
     if (localCache) {
       cachedData = JSON.parse(localCache);
@@ -302,7 +299,6 @@
     }
   }
 
-  // GASからデータを取得する（forceUpdate = true で強制通信）
   async function fetchDataAndCalculate(forceUpdate = false) {
     const statusDiv = document.getElementById('status');
     if (forceUpdate) {
@@ -334,7 +330,6 @@
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
       cachedData = lines.map(line => line.split(','));
 
-      // ローカルストレージにキャッシュ保存
       localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
 
       if (forceUpdate) {
@@ -352,17 +347,16 @@
     }
   }
 
-  // ダッシュボードと履歴テーブルの描画
   function updateDashboardAndTable() {
     let totalIncome = 0;
     let totalExpense = 0;
+    let thisMonthIncome = 0;
     let thisMonthExpense = 0;
 
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1〜12
+    const currentMonth = now.getMonth() + 1; 
 
-    // 先月の年月を特定
     let lastMonthYear = currentYear;
     let lastMonth = currentMonth - 1;
     if (lastMonth === 0) {
@@ -370,12 +364,9 @@
       lastMonthYear = currentYear - 1;
     }
 
-    // 2か月以上前の合算データを一時格納するオブジェクト { "YYYY-MM": { income, expense } }
     const olderSummary = {};
-    // 個別表示するレコードを格納する配列
     const individualRows = [];
 
-    // ヘッダー（1行目）を避けて、2行目からループ
     for (let i = 1; i < cachedData.length; i++) {
       const row = cachedData[i];
       if (row.length < 4) continue;
@@ -394,17 +385,16 @@
       const rowYear = rowDate.getFullYear();
       const rowMonth = rowDate.getMonth() + 1;
 
-      // 今月の支出を計算
+      // 💡 今月の収入と支出をそれぞれ集計
       if (rowYear === currentYear && rowMonth === currentMonth) {
+        thisMonthIncome += income;
         thisMonthExpense += expense;
       }
 
-      // 「今月」または「先月」のデータは個別表示行き
       if ((rowYear === currentYear && rowMonth === currentMonth) || 
           (rowYear === lastMonthYear && rowMonth === lastMonth)) {
         individualRows.push({ date: dateStr, item, income, expense });
       } else {
-        // それより古い（2か月以上前）データは年月ごとに集約
         const key = `${rowYear}年${String(rowMonth).padStart(2, '0')}月`;
         if (!olderSummary[key]) {
           olderSummary[key] = { income: 0, expense: 0 };
@@ -416,18 +406,22 @@
 
     // 現在の残高 = 収入総額 - 支出総額
     const currentBalance = totalIncome - totalExpense;
-    document.getElementById('current-balance').innerText = `${currentBalance.toLocaleString()}円`;
-    document.getElementById('monthly-expense').innerText = `${thisMonthExpense.toLocaleString()}円`;
+    // 💡 今月の収支合計 = 今月の収入 - 今月の支出
+    const monthlyNetBalance = thisMonthIncome - thisMonthExpense;
 
-    // テーブル描画の生成
+    document.getElementById('current-balance').innerText = `${currentBalance.toLocaleString()}円`;
+    
+    // 今月の収支合計の表示をプラスマイナスで分かりやすく調整
+    const netText = monthlyNetBalance > 0 ? `+${monthlyNetBalance.toLocaleString()}` : monthlyNetBalance.toLocaleString();
+    document.getElementById('monthly-expense').innerText = `${netText}円`;
+
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
-    // 1. 個別表示行の追加（新しい日付順にするためリバースして追加）
     individualRows.reverse().forEach(row => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${row.date}</td>
+        <td style="font-size: 0.8rem; white-space: nowrap;">${row.date}</td>
         <td>${row.item}</td>
         <td class="income-text">${row.income > 0 ? row.income.toLocaleString() : ''}</td>
         <td class="expense-text">${row.expense > 0 ? row.expense.toLocaleString() : ''}</td>
@@ -435,7 +429,6 @@
       tbody.appendChild(tr);
     });
 
-    // 2. まとめた行の追加（古い年月から追加）
     const sortedOlderKeys = Object.keys(olderSummary).sort().reverse();
     sortedOlderKeys.forEach(key => {
       const tr = document.createElement('tr');
@@ -486,17 +479,27 @@
 
       const result = await response.text();
 
-      if (result === 'OK') {
+      // 💡 GASからのレスポンスが "OK,日付,項目,収入,支出" の形式で戻ってきます
+      if (result.startsWith('OK')) {
         statusDiv.className = 'success';
         statusDiv.innerText = '記録を完了しました。';
         
+        // 追加された行データを配列に変換
+        const addedRow = result.substring(3).split(','); // "OK,"の後ろをパース
+
+        // 💡 LocalDB (localStorage & cachedData) を直接書き換えて高速同期！
+        cachedData.push(addedRow);
+        localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
+
+        // 通信せずに即座に計算して描画を更新
+        updateDashboardAndTable();
+
         // フォームのリセット
         document.getElementById('item').value = '';
         document.getElementById('income').value = '0';
         document.getElementById('expense').value = '0';
 
-        // 記録成功時は、データに不整合が起きないように強制的に最新状態を再取得
-        await fetchDataAndCalculate(false);
+        setTimeout(() => { statusDiv.innerText = ''; }, 2000);
       } else {
         statusDiv.className = 'error';
         statusDiv.innerText = `記録に失敗しました: ${result}`;
