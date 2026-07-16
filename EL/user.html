@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>収支簿 - ログイン・設定</title>
+  <style>
+    :root {
+      --primary-color: #4f46e5;
+      --bg-color: #f3f4f6;
+      --card-bg: #ffffff;
+      --text-color: #1f2937;
+    }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 400px;
+    }
+    h2 {
+      margin-top: 0;
+      text-align: center;
+      color: var(--primary-color);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background-color: #4338ca;
+    }
+    #status {
+      margin-top: 15px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🔑 収支簿 ログイン設定</h2>
+  <p style="font-size: 0.85rem; color: #6b7280; text-align: center; margin-bottom: 20px;">
+    スプレッドシートの「ユーザーデータ」に登録したIDとパスワードを入力してください。
+  </p>
+  
+  <div class="form-group">
+    <label for="gasUrl">GAS WebアプリのURL</label>
+    <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
+  </div>
+  
+  <div class="form-group">
+    <label for="userId">ログインID</label>
+    <input type="text" id="userId" placeholder="例: jiro">
+  </div>
+  
+  <div class="form-group">
+    <label for="password">パスワード</label>
+    <input type="password" id="password" placeholder="••••••••">
+  </div>
+  
+  <button onclick="saveAndTest()">ログイン ＆ 保存</button>
+  
+  <div id="status"></div>
+</div>
+
+<script>
+  // ページ読み込み時に、すでに保存されている情報があれば自動入力
+  window.onload = function() {
+    document.getElementById('gasUrl').value = localStorage.getItem('gas_url') || '';
+    document.getElementById('userId').value = localStorage.getItem('user_id') || '';
+    document.getElementById('password').value = localStorage.getItem('user_password') || '';
+  };
+
+  async function saveAndTest() {
+    const gasUrl = document.getElementById('gasUrl').value.trim();
+    const userId = document.getElementById('userId').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const statusDiv = document.getElementById('status');
+
+    if (!gasUrl || !userId || !password) {
+      statusDiv.className = 'error';
+      statusDiv.innerText = '⚠️ すべての項目を入力してください。';
+      return;
+    }
+
+    statusDiv.className = '';
+    statusDiv.innerText = '⏳ 接続テスト中...';
+
+    // GASにテストリクエストを送信して、ログインできるか確認
+    try {
+      const response = await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' }, // CORS回避のためのプレーンテキスト
+        body: JSON.stringify({
+          id: userId,
+          password: password,
+          cmd: 'test'
+        })
+      });
+
+      const result = await response.text();
+
+      if (result === 'OK') {
+        // 成功したらLocalStorage（LocalDB）に保存
+        localStorage.setItem('gas_url', gasUrl);
+        localStorage.setItem('user_id', userId);
+        localStorage.setItem('user_password', password);
+
+        statusDiv.className = 'success';
+        statusDiv.innerText = '🎉 ログイン成功！ 3秒後に移動します...';
+        
+        setTimeout(() => {
+          location.href = 'index.html'; // メイン画面へリダイレクト
+        }, 2000);
+
+      } else if (result === 'Authentication failed') {
+        statusDiv.className = 'error';
+        statusDiv.innerText = '❌ ユーザーIDまたはパスワードが違います。';
+      } else {
+        statusDiv.className = 'error';
+        statusDiv.innerText = `❌ エラー: ${result}`;
+      }
+    } catch (err) {
+      statusDiv.className = 'error';
+      statusDiv.innerText = '⚠️ GASとの通信に失敗しました。URLが正しいか、GASが正しくデプロイされているか確認してください。';
+      console.error(err);
+    }
+  }
+</script>
+
+</body>
+</html>
