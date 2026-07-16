@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>爆速収支簿 - メイン</title>
+  <style>
+    :root {
+      --primary-color: #10b981; /* お金っぽいグリーン */
+      --bg-color: #f9fafb;
+      --card-bg: #ffffff;
+      --text-color: #111827;
+    }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+    }
+    /* リダイレクトチェック中の隠し用 */
+    body.loading {
+      display: none;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: var(--primary-color);
+    }
+    .logout-btn {
+      padding: 6px 12px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .container {
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    .inline-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    button.submit-btn {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 10px;
+    }
+    button.submit-btn:hover {
+      background-color: #059669;
+    }
+    #status {
+      margin-top: 15px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+  </style>
+  <script>
+    // 💡【超重要】ページの読み込みが開始された瞬間に認証チェック（チラつき防止）
+    const gasUrl = localStorage.getItem('gas_url');
+    const userId = localStorage.getItem('user_id');
+    const password = localStorage.getItem('user_password');
+
+    if (!gasUrl || !userId || !password) {
+      // ログイン情報がなければ即座に user.html へ飛ばす
+      location.href = 'user.html';
+    }
+  </script>
+</head>
+<body>
+
+<div class="header">
+  <h1>💰 マイ爆速収支簿</h1>
+  <button class="logout-btn" onclick="logout()">ログアウト</button>
+</div>
+
+<div class="container">
+  <p style="margin: 0 0 20px 0; font-size: 0.9rem; color: #6b7280;">
+    ログイン中: <strong id="display-user">...</strong> さん
+  </p>
+
+  <div class="form-group">
+    <label for="date">日付</label>
+    <input type="date" id="date">
+  </div>
+
+  <div class="form-group">
+    <label for="item">項目（買ったもの、お小遣いなど）</label>
+    <input type="text" id="item" placeholder="例: うまい棒、お年玉">
+  </div>
+
+  <div class="inline-group">
+    <div class="form-group">
+      <label for="income">収入 (円)</label>
+      <input type="number" id="income" value="0" min="0">
+    </div>
+    <div class="form-group">
+      <label for="expense">支出 (円)</label>
+      <input type="number" id="expense" value="0" min="0">
+    </div>
+  </div>
+
+  <button class="submit-btn" onclick="addRecord()">スプレッドシートに記録する</button>
+
+  <div id="status"></div>
+</div>
+
+<script>
+  // 画面の初期設定
+  window.onload = function() {
+    // ユーザー名表示
+    document.getElementById('display-user').innerText = localStorage.getItem('user_id');
+    
+    // 日付入力欄に「今日の日付」を自動でセット（使いやすさUP！）
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
+  };
+
+  // ログアウト処理
+  function logout() {
+    if (confirm('ログアウトしますか？（保存したログインデータが消去されます）')) {
+      localStorage.clear();
+      location.href = 'user.html';
+    }
+  }
+
+  // 収支データの追加処理
+  async function addRecord() {
+    const date = document.getElementById('date').value;
+    const item = document.getElementById('item').value.trim();
+    const income = parseInt(document.getElementById('income').value) || 0;
+    const expense = parseInt(document.getElementById('expense').value) || 0;
+    const statusDiv = document.getElementById('status');
+
+    if (!date || !item) {
+      statusDiv.className = 'error';
+      statusDiv.innerText = '⚠️ 日付と項目を入力してください。';
+      return;
+    }
+
+    statusDiv.className = '';
+    statusDiv.innerText = '⏳ スプレッドシートに書き込み中...';
+
+    // カンマ区切りのデータを作成（GASのenterlineコマンドに渡す形式）
+    // CSVにカンマが含まれるとバグるので、項目名のカンマは全角に変換する安全対策付き
+    const safeItem = item.replace(/,/g, '，');
+    const csvRow = `${date},${safeItem},${income},${expense}`;
+
+    try {
+      const response = await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          id: userId,
+          password: password,
+          cmd: 'enterline',
+          option: 'last',
+          sheet: '履歴', // 💡書き込むシート名を指定（なければ適宜スプレッドシート側で作成してください）
+          value1: csvRow
+        })
+      });
+
+      const result = await response.text();
+
+      if (result === 'OK') {
+        statusDiv.className = 'success';
+        statusDiv.innerText = '✅ スプレッドシートへの記録が完了しました！';
+        
+        // 入力フォームをリセット（日付は残す）
+        document.getElementById('item').value = '';
+        document.getElementById('income').value = '0';
+        document.getElementById('expense').value = '0';
+      } else {
+        statusDiv.className = 'error';
+        statusDiv.innerText = `❌ 記録に失敗しました: ${result}`;
+      }
+    } catch (err) {
+      statusDiv.className = 'error';
+      statusDiv.innerText = '⚠️ サーバーとの通信に失敗しました。';
+      console.error(err);
+    }
+  }
+</script>
+
+</body>
+</html>
