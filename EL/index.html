@@ -85,7 +85,6 @@
       padding-left: 8px;
       color: var(--text-color);
     }
-    /* 履歴見出し用の特別な横並びヘッダー */
     .history-header {
       display: flex;
       justify-content: space-between;
@@ -95,7 +94,6 @@
     .history-header h3 {
       margin: 0;
     }
-    /* 分析ボタンの装飾 */
     .analysis-btn {
       display: inline-block;
       padding: 5px 10px;
@@ -412,16 +410,10 @@
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; 
 
-    let lastMonthYear = currentYear;
-    let lastMonth = currentMonth - 1;
-    if (lastMonth === 0) {
-      lastMonth = 12;
-      lastMonthYear = currentYear - 1;
-    }
+    // 💡 履歴の全生データを集計するための配列
+    const allRecords = [];
 
-    const olderSummary = {};
-    const individualRows = [];
-
+    // ヘッダー行を避けてデータを格納
     for (let i = 1; i < cachedData.length; i++) {
       const row = cachedData[i];
       if (row.length < 4) continue;
@@ -440,36 +432,36 @@
       const rowYear = rowDate.getFullYear();
       const rowMonth = rowDate.getMonth() + 1;
 
+      // 今月の集計
       if (rowYear === currentYear && rowMonth === currentMonth) {
         thisMonthIncome += income;
         thisMonthExpense += expense;
       }
 
-      if ((rowYear === currentYear && rowMonth === currentMonth) || 
-          (rowYear === lastMonthYear && rowMonth === lastMonth)) {
-        individualRows.push({ originalIndex: i, date: dateStr, item, income, expense });
-      } else {
-        const key = `${rowYear}年${String(rowMonth).padStart(2, '0')}月`;
-        if (!olderSummary[key]) {
-          olderSummary[key] = { income: 0, expense: 0 };
-        }
-        olderSummary[key].income += income;
-        olderSummary[key].expense += expense;
-      }
+      allRecords.push({ originalIndex: i, date: dateStr, item, income, expense });
     }
 
+    // 現在の残高 ＆ 今月の収支合計の算出
     const currentBalance = totalIncome - totalExpense;
     const monthlyNetBalance = thisMonthIncome - thisMonthExpense;
 
     document.getElementById('current-balance').innerText = `${currentBalance.toLocaleString()}円`;
-    
     const netText = monthlyNetBalance > 0 ? `+${monthlyNetBalance.toLocaleString()}` : monthlyNetBalance.toLocaleString();
     document.getElementById('monthly-expense').innerText = `${netText}円`;
 
+    // テーブル描画の準備
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
-    individualRows.reverse().forEach(row => {
+    // 💡 最新順にソート（日付文字列で降順ソート）
+    allRecords.sort((a, b) => b.date.localeCompare(a.date));
+
+    // 💡 最新の7件を切り出し、残りを合算用に回す
+    const latest7 = allRecords.slice(0, 7);
+    const olderRecords = allRecords.slice(7);
+
+    // 1. 最新7件を1件ずつ個別テーブル表示
+    latest7.forEach(row => {
       const tr = document.createElement('tr');
       const displayDate = row.date.replace(' ', '<br>');
       
@@ -486,19 +478,27 @@
       tbody.appendChild(tr);
     });
 
-    const sortedOlderKeys = Object.keys(olderSummary).sort().reverse();
-    sortedOlderKeys.forEach(key => {
+    // 2. 8件目以降がある場合は、それらを1行に合算して表示
+    if (olderRecords.length > 0) {
+      let olderIncomeSum = 0;
+      let olderExpenseSum = 0;
+
+      olderRecords.forEach(row => {
+        olderIncomeSum += row.income;
+        olderExpenseSum += row.expense;
+      });
+
       const tr = document.createElement('tr');
       tr.className = 'summary-row';
       tr.innerHTML = `
         <td>-</td>
-        <td>${key}以前の合算</td>
-        <td class="income-text">${olderSummary[key].income > 0 ? olderSummary[key].income.toLocaleString() : ''}</td>
-        <td class="expense-text">${olderSummary[key].expense > 0 ? olderSummary[key].expense.toLocaleString() : ''}</td>
+        <td>過去データの合算</td>
+        <td class="income-text">${olderIncomeSum > 0 ? olderIncomeSum.toLocaleString() : ''}</td>
+        <td class="expense-text">${olderExpenseSum > 0 ? olderExpenseSum.toLocaleString() : ''}</td>
         <td></td>
       `;
       tbody.appendChild(tr);
-    });
+    }
   }
 
   function startEdit(index) {
