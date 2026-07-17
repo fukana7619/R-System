@@ -279,3 +279,17 @@ table.data-table th {
   font-weight: bold;
   border-radius: 4px;
 }
+
+/* 💡 今月の収支：プラス（緑系）のとき */
+.bg-income {
+  background-color: #f0fdf4 !important; /* 薄い緑 */
+  color: #166534 !important;            /* 濃い緑 */
+  border-color: #bbf7d0 !important;     /* 緑の枠線 */
+}
+
+/* 💡 今月の収支：マイナス（赤系）のとき */
+.bg-expense {
+  background-color: #fef2f2 !important; /* 薄い赤 */
+  color: #991b1b !important;            /* 濃い赤 */
+  border-color: #fecaca !important;     /* 赤の枠線 */
+}
