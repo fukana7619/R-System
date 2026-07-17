@@ -42,7 +42,6 @@
       gap: 16px;
       align-items: center;
     }
-    /* 💡 主張しすぎないバージョン情報のスタイル */
     .version-display {
       font-size: 0.8rem;
       color: #94a3b8;
@@ -69,11 +68,35 @@
       cursor: pointer;
       font-size: 0.85rem;
     }
+    
+    /* 💡 テーブルの2コラムを廃止し、縦長ウィンドウで勝手に縦並びになるFlexboxに変更 */
     .main-layout {
-      display: block;
+      display: flex;
+      gap: 20px;
       max-width: 1200px;
       margin: 0 auto;
+      width: 100%;
     }
+    .left-col {
+      flex: 45; /* 45%相当 */
+      min-width: 0;
+    }
+    .right-col {
+      flex: 55; /* 55%相当 */
+      min-width: 0;
+    }
+
+    /* 💡 画面幅が900px未満（縦長ウィンドウ・スマホ）になったら縦一列にする指定 */
+    @media (max-width: 900px) {
+      .main-layout {
+        flex-direction: column;
+      }
+      .left-col, .right-col {
+        flex: 1;
+        width: 100%;
+      }
+    }
+
     .card {
       background: var(--card-bg);
       padding: 20px;
@@ -89,25 +112,6 @@
       border-left: 4px solid var(--primary-color);
       padding-left: 8px;
       color: var(--text-color);
-    }
-    
-    /* 2コラムレイアウト用 */
-    .layout-table {
-      width: 100%;
-      border-collapse: collapse;
-      border: none;
-    }
-    .layout-table td {
-      padding: 0;
-      border: none;
-      vertical-align: top;
-    }
-    .left-col {
-      width: 45%;
-      padding-right: 20px;
-    }
-    .right-col {
-      width: 55%;
     }
 
     .dashboard-table {
@@ -306,164 +310,163 @@
 </div>
 
 <div class="main-layout">
-  <table class="layout-table">
-    <tr>
-      <td class="left-col">
-        <div class="card" style="width: 100%;">
-          <table class="user-filter-table">
+  <div class="left-col">
+    <div class="card">
+      <table class="user-filter-table">
+        <tr>
+          <td style="width: 40%; font-size: 0.85rem; color: #64748b;">
+            ユーザー: <strong><span id="display-user">...</span></strong>
+          </td>
+          <td style="width: 60%; text-align: right; font-size: 0.85rem; color: #475569;">
+            <label style="display:inline; margin-right:5px;">表示対象:</label>
+            <select id="wallet-filter" class="filter-select" onchange="updateDashboardAndTable()">
+              <option value="__all__">✨ 全体（全財産）</option>
+            </select>
+          </td>
+        </tr>
+      </table>
+      
+      <table class="dashboard-table" style="margin-top: 10px;">
+        <tr>
+          <td>
+            <div class="dash-box">
+              <div class="dash-title" id="balance-title">現在の残高</div>
+              <div class="dash-value" id="current-balance">0円</div>
+            </div>
+          </td>
+          <td>
+            <div class="dash-box">
+              <div class="dash-title" id="monthly-title">今月の収支合計</div>
+              <div class="dash-value" id="monthly-expense">0円</div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 id="form-title">収支の入力</h3>
+      
+      <div class="form-group">
+        <label for="date">日付</label>
+        <input type="date" id="date">
+      </div>
+
+      <div class="form-group">
+        <label for="origin-select">決済手段</label>
+        <table class="input-row-table">
+          <tr>
+            <td>
+              <select id="origin-select" onchange="toggleInput('origin')">
+                <option value="__other__">その他（自由入力）</option>
+              </select>
+            </td>
+            <td id="origin-text-cell" class="text-input-cell">
+              <input type="text" id="origin-text" class="dynamic-text-input" placeholder="例: 現金, ICカード">
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="form-group">
+        <table class="inline-group-table">
+          <tr>
+            <td>
+              <label for="income">収入</label>
+              <input type="number" id="income" placeholder="0" min="0">
+            </td>
+            <td>
+              <label for="expense">支出</label>
+              <input type="number" id="expense" placeholder="0" min="0">
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="form-group">
+        <label for="usage-select">用途（使い道）</label>
+        <table class="input-row-table">
+          <tr>
+            <td>
+              <select id="usage-select" onchange="toggleInput('usage')">
+                <option value="__other__">その他（自由入力）</option>
+              </select>
+            </td>
+            <td id="usage-text-cell" class="text-input-cell">
+              <input type="text" id="usage-text" class="dynamic-text-input" placeholder="例: 食費, 交通費">
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="form-group">
+        <label for="content-select">内容（詳細）</label>
+        <table class="input-row-table">
+          <tr>
+            <td>
+              <select id="content-select" onchange="toggleInput('content')">
+                <option value="__other__">その他（自由入力）</option>
+              </select>
+            </td>
+            <td id="content-text-cell" class="text-input-cell">
+              <input type="text" id="content-text" class="dynamic-text-input" placeholder="例: コンビニ, 文房具">
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <button class="submit-btn" id="submit-button" onclick="addRecord()">記録する</button>
+      <button class="submit-btn" id="cancel-button" onclick="cancelEdit()" style="display:none; background-color: #64748b; margin-top: 8px;">キャンセル</button>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="card">
+      <table class="history-header">
+        <tr>
+          <td><h3 style="margin:0; border-left:4px solid var(--primary-color); padding-left:8px;">履歴一覧</h3></td>
+          <td style="text-align: right;"><a href="dashboard.html" class="analysis-btn">グラフ分析 📈</a></td>
+        </tr>
+      </table>
+      
+      <div class="table-container">
+        <table id="history-table" class="data-table">
+          <thead>
             <tr>
-              <td style="width: 40%; font-size: 0.85rem; color: #64748b;">
-                ユーザー: <strong><span id="display-user">...</span></strong>
-              </td>
-              <td style="width: 60%; text-align: right; font-size: 0.85rem; color: #475569;">
-                <label style="display:inline; margin-right:5px;">表示対象:</label>
-                <select id="wallet-filter" class="filter-select" onchange="updateDashboardAndTable()">
-                  <option value="__all__">✨ 全体（全財産）</option>
-                </select>
-              </td>
+              <th style="width: 15%;">日付</th>
+              <th style="width: 20%;">決済手段</th>
+              <th style="width: 15%;">収入</th>
+              <th style="width: 15%;">支出</th>
+              <th style="width: 20%;">用途 / 内容</th>
+              <th style="width: 15%; text-align: center;">操作</th>
             </tr>
-          </table>
-          
-          <table class="dashboard-table" style="margin-top: 10px;">
-            <tr>
-              <td>
-                <div class="dash-box">
-                  <div class="dash-title" id="balance-title">現在の残高</div>
-                  <div class="dash-value" id="current-balance">0円</div>
-                </div>
-              </td>
-              <td>
-                <div class="dash-box">
-                  <div class="dash-title" id="monthly-title">今月の収支合計</div>
-                  <div class="dash-value" id="monthly-expense">0円</div>
-                </div>
-              </td>
-            </tr>
-          </table>
-        </div>
-
-        <div class="card" style="width: 100%;">
-          <h3 id="form-title">収支の入力</h3>
-          
-          <div class="form-group">
-            <label for="date">日付</label>
-            <input type="date" id="date">
-          </div>
-
-          <div class="form-group">
-            <label for="origin-select">決済手段</label>
-            <table class="input-row-table">
-              <tr>
-                <td>
-                  <select id="origin-select" onchange="toggleInput('origin')">
-                    <option value="__other__">その他（自由入力）</option>
-                  </select>
-                </td>
-                <td id="origin-text-cell" class="text-input-cell">
-                  <input type="text" id="origin-text" class="dynamic-text-input" placeholder="例: 現金, ICカード">
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="form-group">
-            <table class="inline-group-table">
-              <tr>
-                <td>
-                  <label for="income">収入</label>
-                  <input type="number" id="income" placeholder="0" min="0">
-                </td>
-                <td>
-                  <label for="expense">支出</label>
-                  <input type="number" id="expense" placeholder="0" min="0">
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="form-group">
-            <label for="usage-select">用途（使い道）</label>
-            <table class="input-row-table">
-              <tr>
-                <td>
-                  <select id="usage-select" onchange="toggleInput('usage')">
-                    <option value="__other__">その他（自由入力）</option>
-                  </select>
-                </td>
-                <td id="usage-text-cell" class="text-input-cell">
-                  <input type="text" id="usage-text" class="dynamic-text-input" placeholder="例: 食費, 交通費">
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="form-group">
-            <label for="content-select">内容（詳細）</label>
-            <table class="input-row-table">
-              <tr>
-                <td>
-                  <select id="content-select" onchange="toggleInput('content')">
-                    <option value="__other__">その他（自由入力）</option>
-                  </select>
-                </td>
-                <td id="content-text-cell" class="text-input-cell">
-                  <input type="text" id="content-text" class="dynamic-text-input" placeholder="例: コンビニ, 文房具">
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <button class="submit-btn" id="submit-button" onclick="addRecord()">記録する</button>
-          <button class="submit-btn" id="cancel-button" onclick="cancelEdit()" style="display:none; background-color: #64748b; margin-top: 8px;">キャンセル</button>
-          <div id="status"></div>
-        </div>
-      </td>
-
-      <td class="right-col">
-        <div class="card" style="width: 100%;">
-          <table class="history-header">
-            <tr>
-              <td><h3 style="margin:0; border-left:4px solid var(--primary-color); padding-left:8px;">履歴一覧</h3></td>
-              <td style="text-align: right;"><a href="dashboard.html" class="analysis-btn">グラフ分析 📈</a></td>
-            </tr>
-          </table>
-          
-          <div class="table-container">
-            <table id="history-table" class="data-table">
-              <thead>
-                <tr>
-                  <th style="width: 15%;">日付</th>
-                  <th style="width: 20%;">決済手段</th> <th style="width: 15%;">収入</th>
-                  <th style="width: 15%;">支出</th>
-                  <th style="width: 20%;">用途 / 内容</th>
-                  <th style="width: 15%; text-align: center;">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </td>
-    </tr>
-  </table>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
   let cachedData = []; 
   let editIndex = -1; 
 
-  window.onload = function() {
+  window.onload = async function() {
     document.getElementById('display-user').innerText = userId;
     
     const today = new Date();
     document.getElementById('date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+    // 💡 バージョン表示をonloadの最初の方で確実に呼び出す
+    await fetchVersion();
+
     const localCache = localStorage.getItem(`cache_${userId}`);
     if (localCache) {
       cachedData = JSON.parse(localCache);
       updateDashboardAndTable(true);
-      fetchVersion(); // 💡 お知らせに代わりバージョンを取得
     } else {
       fetchDataAndCalculate(true);
     }
@@ -488,7 +491,6 @@
     }
   }
 
-  // 💡 infoシートの1行目（B1セル）からバージョンを読み取る関数にリニューアル
   async function fetchVersion() {
     const versionTag = document.getElementById('version-tag');
     try {
@@ -503,7 +505,6 @@
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
       if (lines.length > 0) {
         const firstRow = lines[0].split(',');
-        // A1が「バージョン」であれば、B1の値を反映
         if (firstRow[0] === 'バージョン' && firstRow[1]) {
           versionTag.innerText = `Ver ${firstRow[1].trim()}`;
           versionTag.style.display = 'inline-block';
@@ -519,7 +520,7 @@
     if (forceUpdate) { statusDiv.className = ''; statusDiv.innerText = 'データを更新中...'; }
 
     try {
-      fetchVersion();
+      await fetchVersion();
       const response = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -550,7 +551,6 @@
     }
   }
 
-  // 💡 プルダウン生成ロジック：見た目順は変えず、初期状態でランキング1位を自動選択
   function buildDynamicSelect(prefix, columnIndex, allRecords) {
     const select = document.getElementById(`${prefix}-select`);
     const textInput = document.getElementById(`${prefix}-text`);
@@ -566,7 +566,6 @@
 
     const sortedOptions = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
 
-    // 見た目順はそのまま：1番上に「その他」
     select.innerHTML = '<option value="__other__">その他（自由入力）</option>';
     sortedOptions.forEach(opt => {
       const optionEl = document.createElement('option');
@@ -575,20 +574,16 @@
       select.appendChild(optionEl);
     });
 
-    // 💡 初期選択（または記録成功後の初期化）時の判定ロジック
     if (editIndex === -1 && (!currentValue || currentValue === '__other__' && textInput.value === '')) {
       if (sortedOptions.length > 0) {
-        // ランキング1位（sortedOptions[0]）を標準指定！
         select.value = sortedOptions[0];
         textInput.style.display = 'none';
         textInput.value = '';
       } else {
-        // 過去データゼロならその他
         select.value = '__other__';
         textInput.style.display = 'block';
       }
     } else if (currentValue && currentValue !== '__other__') {
-      // 修正モードや手動変更時の維持
       if (sortedOptions.includes(currentValue)) {
         select.value = currentValue;
         textInput.style.display = 'none';
@@ -598,7 +593,6 @@
         textInput.value = currentValue;
       }
     } else {
-      // 「その他」が手動選択されていてテキストがある場合はそのまま
       textInput.style.display = 'block';
     }
   }
@@ -687,7 +681,6 @@
     const net = thisMonthIncome - thisMonthExpense;
     document.getElementById('monthly-expense').innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
 
-    // 💡 プルダウンの中身をランキング集計して更新
     buildDynamicSelect('origin', 1, allRecords);
     buildDynamicSelect('usage', 4, allRecords);
     buildDynamicSelect('content', 5, allRecords);
@@ -798,7 +791,7 @@
     document.getElementById('expense').value = '';
     
     ['origin', 'usage', 'content'].forEach(p => {
-      document.getElementById(`${p}-select`).value = ''; // 💡 一旦空にして自動選択を走らせる
+      document.getElementById(`${p}-select`).value = ''; 
       document.getElementById(`${p}-text`).value = '';
     });
 
@@ -869,7 +862,6 @@
           cachedData.push(addedRow);
           localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
           
-          // 💡 記録成功後の初期化：セレクトボックスをリセットして次のランキング1位を走らせる
           document.getElementById('income').value = '';
           document.getElementById('expense').value = '';
           ['origin', 'usage', 'content'].forEach(p => {
