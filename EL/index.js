@@ -31,23 +31,17 @@ window.onload = async function() {
   const today = new Date();
   document.getElementById('date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  // 1. キャッシュから「一瞬で」画面を組み立てる（表示速度0秒の爆速化）
+  // 1. キャッシュが存在するか確認
   const localCache = localStorage.getItem(`cache_${userId}`);
+  
   if (localCache) {
+    // キャッシュがあるなら「一瞬で」画面を組み立てて、裏で静かに同期（ぐるぐるは回さない）
     cachedData = JSON.parse(localCache);
     updateDashboardAndTable(true);
-  }
-
-  // 💡 修正：直前にログインしてきたかどうかの判定
-  // ログイン画面（user.html）が遷移時に「ログインしたよ」という目印（referrer）を残しているかチェック
-  const isJustLoggedIn = document.referrer.includes('user.html');
-
-  if (isJustLoggedIn) {
-    // ログイン直後はしっかりデータを同期させたいので、円を回して待たせる
-    await fetchDataAndCalculate(false, true); 
-  } else {
-    // 通常のアクセス（リロードなど）時は、裏側（非同期）で静かにデータを更新（円は回さない）
     await fetchDataAndCalculate(false, false); 
+  } else {
+    // 💡 キャッシュがない（初回・ログアウト直後など）なら、絶対にデータが必要なのでぐるぐるを回して待たせる！
+    await fetchDataAndCalculate(false, true); 
   }
 };
 
