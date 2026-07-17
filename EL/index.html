@@ -164,6 +164,22 @@
       font-size: 0.95rem;
       background-color: #fff;
     }
+    
+    /* ユーザー情報＆フィルターエリアの横並び用 */
+    .user-filter-table {
+      width: 100%;
+    }
+    .user-filter-table td {
+      vertical-align: middle !important;
+    }
+    .filter-select {
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      width: auto;
+      display: inline-block;
+      border-color: var(--primary-color);
+    }
+
     .input-row-table {
       width: 100%;
     }
@@ -307,20 +323,31 @@
     <tr>
       <td class="left-col">
         <div class="card" style="width: 100%;">
-          <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #64748b;">
-            ユーザー: <strong><span id="display-user">...</span></strong>
-          </p>
-          <table class="dashboard-table">
+          <table class="user-filter-table">
+            <tr>
+              <td style="width: 40%; font-size: 0.85rem; color: #64748b;">
+                ユーザー: <strong><span id="display-user">...</span></strong>
+              </td>
+              <td style="width: 60%; text-align: right; font-size: 0.85rem; color: #475569;">
+                <label style="display:inline; margin-right:5px;">表示対象:</label>
+                <select id="wallet-filter" class="filter-select" onchange="updateDashboardAndTable()">
+                  <option value="__all__">✨ 全体（全財産）</option>
+                </select>
+              </td>
+            </tr>
+          </table>
+          
+          <table class="dashboard-table" style="margin-top: 10px;">
             <tr>
               <td>
                 <div class="dash-box">
-                  <div class="dash-title">現在の残高</div>
+                  <div class="dash-title" id="balance-title">現在の残高</div>
                   <div class="dash-value" id="current-balance">0円</div>
                 </div>
               </td>
               <td>
                 <div class="dash-box">
-                  <div class="dash-title">今月の収支合計</div>
+                  <div class="dash-title" id="monthly-title">今月の収支合計</div>
                   <div class="dash-value" id="monthly-expense">0円</div>
                 </div>
               </td>
@@ -449,7 +476,7 @@
     const localCache = localStorage.getItem(`cache_${userId}`);
     if (localCache) {
       cachedData = JSON.parse(localCache);
-      updateDashboardAndTable();
+      updateDashboardAndTable(true); // 初回読み込み時はお財布フィルター項目を生成する
       fetchNews();
     } else {
       fetchDataAndCalculate(true);
@@ -531,7 +558,7 @@
         statusDiv.innerText = '最新の状態に更新しました。';
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
       }
-      updateDashboardAndTable();
+      updateDashboardAndTable(true); // 💡 サーバーから新データが来たらお財布フィルターを再生成
     } catch (err) {
       console.error(err);
       statusDiv.className = 'error';
@@ -542,7 +569,6 @@
   function buildDynamicSelect(prefix, columnIndex, allRecords) {
     const select = document.getElementById(`${prefix}-select`);
     const textInput = document.getElementById(`${prefix}-text`);
-    
     const currentValue = select.value;
 
     const counts = {};
@@ -580,7 +606,39 @@
     }
   }
 
-  function updateDashboardAndTable() {
+  // 💡 ユーザーの「元（お財布）」を集計対象プルダウンとして組み立てる（最近いじった順＝直近の行に出てくる順）
+  function buildWalletFilter(allRecords) {
+    const filterSelect = document.getElementById('wallet-filter');
+    const currentValue = filterSelect.value;
+
+    // Aから並んでいるallRecordsは日付順にソートされる前（つまり入力された時系列順）
+    // 直近で使われたものが最後（配列の後ろ）に来るので、後ろからループして登場順リストを作る
+    const uniqueWallets = [];
+    for (let i = allRecords.length - 1; i >= 0; i--) {
+      const wallet = allRecords[i].origin;
+      if (wallet && wallet.trim() !== '' && !uniqueWallets.includes(wallet)) {
+        uniqueWallets.push(wallet);
+      }
+    }
+
+    // 初期化して「全体」を一番上にセット
+    filterSelect.innerHTML = '<option value="__all__">✨ 全体（全財産）</option>';
+    uniqueWallets.forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w;
+      opt.innerText = `👛 ${w}`;
+      filterSelect.appendChild(opt);
+    });
+
+    // 以前選んでいたお財布がまだ存在すれば選択状態をキープ、なければ「全体」にする
+    if (uniqueWallets.includes(currentValue)) {
+      filterSelect.value = currentValue;
+    } else {
+      filterSelect.value = '__all__';
+    }
+  }
+
+  function updateDashboardAndTable(shouldRebuildFilter = false) {
     let totalIncome = 0, totalExpense = 0, thisMonthIncome = 0, thisMonthExpense = 0;
     const now = new Date(), currentYear = now.getFullYear(), currentMonth = now.getMonth() + 1; 
 
@@ -597,33 +655,64 @@
       const usage = row[4] || '';
       const content = row[5] || '';
 
-      totalIncome += income;
-      totalExpense += expense;
-
       if (!dateStr) continue;
-      const rowDate = new Date(dateStr);
-      if (rowDate.getFullYear() === currentYear && (rowDate.getMonth() + 1) === currentMonth) {
-        thisMonthIncome += income;
-        thisMonthExpense += expense;
-      }
 
       allRecords.push({ originalIndex: i, date: dateStr, origin, income, expense, usage, content, rawRow: row });
     }
 
+    // 💡 1. フィルターが必要な場合は先にプルダウンを組み立てる
+    if (shouldRebuildFilter) {
+      buildWalletFilter(allRecords);
+    }
+
+    // 💡 2. 現在選択されているお財布フィルターを取得
+    const selectedWallet = document.getElementById('wallet-filter').value;
+
+    // タイトルの文言を切り替える
+    if (selectedWallet === '__all__') {
+      document.getElementById('balance-title').innerText = '現在の残高';
+      document.getElementById('monthly-title').innerText = '今月の収支合計';
+    } else {
+      document.getElementById('balance-title').innerText = `「${selectedWallet}」の残高`;
+      document.getElementById('monthly-title').innerText = `「${selectedWallet}」の今月収支`;
+    }
+
+    // 💡 3. 選択されたお財布に基づいて金額と履歴データをフィルタリング
+    const filteredRecords = [];
+
+    allRecords.forEach(row => {
+      // 全体選択、またはお財布名が一致する場合のみ集計に含める
+      if (selectedWallet === '__all__' || row.origin === selectedWallet) {
+        totalIncome += row.income;
+        totalExpense += row.expense;
+
+        const rowDate = new Date(row.date);
+        if (rowDate.getFullYear() === currentYear && (rowDate.getMonth() + 1) === currentMonth) {
+          thisMonthIncome += row.income;
+          thisMonthExpense += row.expense;
+        }
+
+        filteredRecords.push(row);
+      }
+    });
+
+    // ダッシュボードに反映
     document.getElementById('current-balance').innerText = `${(totalIncome - totalExpense).toLocaleString()}円`;
     const net = thisMonthIncome - thisMonthExpense;
     document.getElementById('monthly-expense').innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
 
+    // 収支入力欄のオートコンプリート生成は、常に入力履歴全体をベースにするためallRecordsを使用
     buildDynamicSelect('origin', 1, allRecords);
     buildDynamicSelect('usage', 4, allRecords);
     buildDynamicSelect('content', 5, allRecords);
 
+    // 💡 4. テーブル描画（フィルターされたデータだけを表示）
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
-    allRecords.sort((a, b) => b.date.localeCompare(a.date));
-    const latest7 = allRecords.slice(0, 7);
-    const olderRecords = allRecords.slice(7);
+    filteredRecords.sort((a, b) => b.date.localeCompare(a.date));
+    const latest7 = filteredRecords.slice(0, 7);
+    const olderRecords = filteredRecords.slice(7);
 
     latest7.forEach(row => {
       const tr = document.createElement('tr');
@@ -718,7 +807,6 @@
     document.getElementById('form-title').scrollIntoView({ behavior: 'smooth' });
   }
 
-  // 💡 修正キャンセル時のフォームリセット：0ではなく「空」にしてplaceholderを表示させる
   function cancelEdit() {
     editIndex = -1;
     document.getElementById('income').value = '';
@@ -755,7 +843,7 @@
       cachedData.splice(index, 1);
       await syncLocalDbToSpreadsheet();
       localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
-      updateDashboardAndTable();
+      updateDashboardAndTable(true); // 💡 削除でお財布が消える可能性もあるのでフィルター再生成
       statusDiv.className = 'success'; statusDiv.innerText = '削除が完了しました。';
       setTimeout(() => { statusDiv.innerText = ''; }, 2000);
     } catch (err) {
@@ -767,11 +855,8 @@
   async function addRecord() {
     const dateInput = document.getElementById('date').value;
     const origin = getInputValue('origin');
-    
-    // 💡 空欄で送信された場合は自動的に 0 として計算・保存する
     const income = parseInt(document.getElementById('income').value) || 0;
     const expense = parseInt(document.getElementById('expense').value) || 0;
-    
     const usage = getInputValue('usage');
     const content = getInputValue('content');
     const statusDiv = document.getElementById('status');
@@ -799,9 +884,8 @@
           const addedRow = result.substring(3).split(','); 
           cachedData.push(addedRow);
           localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
-          updateDashboardAndTable();
+          updateDashboardAndTable(true); // 💡 新しいお財布が追加されたかもしれないのでフィルター再生成
           
-          // 💡 記録成功後のリセット処理：0ではなく「空」にして即入力できるようにする
           document.getElementById('income').value = '';
           document.getElementById('expense').value = '';
           document.getElementById('origin-text').value = '';
@@ -816,7 +900,7 @@
         cachedData[editIndex] = [`${dateInput} ${originalTime}`, origin, String(income), String(expense), usage, content];
         await syncLocalDbToSpreadsheet();
         localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
-        updateDashboardAndTable();
+        updateDashboardAndTable(true); // 💡 修正でお財布名が変わったかもしれないのでフィルター再生成
         statusDiv.className = 'success'; statusDiv.innerText = '修正が完了しました。';
         cancelEdit();
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
