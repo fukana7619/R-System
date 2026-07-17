@@ -9,22 +9,24 @@ if (!gasUrl || !userId || !password) {
 let cachedData = []; 
 let editIndex = -1; 
 
-window.onload = async function() {
+// ==========================================
+// 1. ライフサイクル & 初期化処理
+// ==========================================
+window.onload = function() {
   document.getElementById('display-user').innerText = userId;
   
   const today = new Date();
   document.getElementById('date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  // 💡 バージョン表示をonloadの最初の方で確実に呼び出す
-  await fetchVersion();
-
+  // 1. まずはキャッシュから「一瞬で」画面を組み立てる（表示速度0秒）
   const localCache = localStorage.getItem(`cache_${userId}`);
   if (localCache) {
     cachedData = JSON.parse(localCache);
     updateDashboardAndTable(true);
-  } else {
-    fetchDataAndCalculate(true);
   }
+
+  // 2. バックグラウンド（裏側）でデータを最新の状態に更新しにいく
+  fetchDataAndCalculate(false); 
 };
 
 function logout() {
@@ -46,6 +48,9 @@ function toggleInput(prefix) {
   }
 }
 
+// ==========================================
+// 2. API（GAS）連携処理
+// ==========================================
 async function fetchVersion() {
   const versionTag = document.getElementById('version-tag');
   try {
@@ -70,9 +75,13 @@ async function fetchVersion() {
   }
 }
 
-async function fetchDataAndCalculate(forceUpdate = false) {
+async function fetchDataAndCalculate(showNotification = false) {
   const statusDiv = document.getElementById('status');
-  if (forceUpdate) { statusDiv.className = ''; statusDiv.innerText = 'データを更新中...'; }
+  
+  if (showNotification) { 
+    statusDiv.className = ''; 
+    statusDiv.innerText = 'データを更新中...'; 
+  }
 
   try {
     await fetchVersion();
@@ -93,19 +102,26 @@ async function fetchDataAndCalculate(forceUpdate = false) {
     cachedData = lines.map(line => line.split(','));
     localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
 
-    if (forceUpdate) {
+    // 最新データで画面を再描画
+    updateDashboardAndTable(true);
+
+    if (showNotification) {
       statusDiv.className = 'success';
       statusDiv.innerText = '最新の状態に更新しました。';
       setTimeout(() => { statusDiv.innerText = ''; }, 2000);
     }
-    updateDashboardAndTable(true);
   } catch (err) {
     console.error(err);
-    statusDiv.className = 'error';
-    statusDiv.innerText = 'データの更新に失敗しました。';
+    if (showNotification) {
+      statusDiv.className = 'error';
+      statusDiv.innerText = 'データの更新に失敗しました。';
+    }
   }
 }
 
+// ==========================================
+// 3. UI（プルダウン・ダッシュボード）生成処理
+// ==========================================
 function buildDynamicSelect(prefix, columnIndex, allRecords) {
   const select = document.getElementById(`${prefix}-select`);
   const textInput = document.getElementById(`${prefix}-text`);
@@ -292,6 +308,9 @@ function getInputValue(prefix) {
   return select.value;
 }
 
+// ==========================================
+// 4. データ作成・編集・削除処理
+// ==========================================
 function startEdit(index) {
   editIndex = index;
   const row = cachedData[index];
