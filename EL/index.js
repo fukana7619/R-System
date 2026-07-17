@@ -150,7 +150,7 @@ function buildDynamicSelect(prefix, columnIndex, allRecords) {
   sortedOptions.forEach(opt => {
     const optionEl = document.createElement('option');
     optionEl.value = opt;
-    optionEl.innerText = `${opt} (${counts[opt]}回)`;
+    optionEl.innerText = opt; // 💡 修正：「(何回)」の文字を削除してスッキリ化
     select.appendChild(optionEl);
   });
 
@@ -258,8 +258,25 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
   });
 
   document.getElementById('current-balance').innerText = `${(totalIncome - totalExpense).toLocaleString()}円`;
+  
+  // 💡 修正箇所：今月の収支合計の色変え判定ロジック
   const net = thisMonthIncome - thisMonthExpense;
-  document.getElementById('monthly-expense').innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
+  const monthlyExpenseEl = document.getElementById('monthly-expense');
+  // 親のダッシュボードボックスを取得
+  const monthlyBox = monthlyExpenseEl.closest('.dash-box'); 
+  
+  monthlyExpenseEl.innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
+
+  if (monthlyBox) {
+    // 一旦色変え用クラスをリセット
+    monthlyBox.classList.remove('bg-income', 'bg-expense');
+    
+    if (net > 0) {
+      monthlyBox.classList.add('bg-income');  // プラスなら緑
+    } else if (net < 0) {
+      monthlyBox.classList.add('bg-expense'); // マイナスなら赤
+    }
+  }
 
   buildDynamicSelect('origin', 1, allRecords);
   buildDynamicSelect('usage', 4, allRecords);
@@ -315,29 +332,23 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
 
   // 1. 横並び（PC）かつ要素が存在するときのみ、動的限界値を探る
   if (window.innerWidth > 900) {
-    // 💡 修正ポイント：left-col内の「2つ目のカード（入力フォーム）」を基準ターゲットにする
     const leftCards = document.querySelectorAll('.left-col .card');
-    const inputCard = leftCards[leftCards.length - 1]; // 2番目のカードを取得
+    const inputCard = leftCards[leftCards.length - 1]; 
     const rightCard = document.querySelector('.right-col .card');
 
     if (inputCard && rightCard) {
-      // 余裕をもった多めの限界値で一旦仮描画
       let testLimit = Math.min(filteredRecords.length, 25); 
       drawTable(testLimit);
 
-      // 入力フォームカード（本物のコンテンツ）の底辺を取得
       let leftBottom = inputCard.getBoundingClientRect().bottom;
 
-      // 右側カードのmargin-bottom（20px）による影響も含めて計算
       const rightCardStyle = window.getComputedStyle(rightCard);
       const marginBottom = parseFloat(rightCardStyle.marginBottom) || 0;
       let rightBottomWithMargin = rightCard.getBoundingClientRect().bottom + marginBottom;
 
-      // 右側が左側の入力フォームの底辺をはみ出している間、描画件数を1件ずつ減らす
       while (rightBottomWithMargin > leftBottom && testLimit > 3) {
         testLimit--;
         drawTable(testLimit);
-        // 位置を再取得してループ判定
         leftBottom = inputCard.getBoundingClientRect().bottom;
         rightBottomWithMargin = rightCard.getBoundingClientRect().bottom + marginBottom;
       }
@@ -345,7 +356,6 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
       drawTable(5); 
     }
   } else {
-    // 2. 縦並び（スマホ等）のときは「5件固定＋合算」
     drawTable(5);
   }
 }
