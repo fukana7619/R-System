@@ -39,29 +39,17 @@
     }
     .header-right {
       display: flex;
-      gap: 12px;
+      gap: 16px;
       align-items: center;
     }
-    .news-banner {
-      display: none;
-      background-color: #ffedd5;
-      color: #9a3412;
-      padding: 6px 12px;
-      border-radius: 20px;
+    /* 💡 主張しすぎないバージョン情報のスタイル */
+    .version-display {
       font-size: 0.8rem;
-      font-weight: bold;
-      max-width: 300px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      border: 1px solid #fed7aa;
-      cursor: pointer;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0% { opacity: 0.9; }
-      50% { opacity: 1; }
-      100% { opacity: 0.9; }
+      color: #94a3b8;
+      font-family: monospace;
+      background-color: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
     }
     .logout-btn {
       padding: 6px 12px;
@@ -165,7 +153,6 @@
       background-color: #fff;
     }
     
-    /* ユーザー情報＆フィルターエリアの横並び用 */
     .user-filter-table {
       width: 100%;
     }
@@ -312,7 +299,7 @@
 <div class="header">
   <h1>収支簿</h1>
   <div class="header-right">
-    <div id="news-banner" class="news-banner" title="クリックで全表示">お知らせを取得中...</div>
+    <div id="version-tag" class="version-display" style="display:none;">Ver -.-.-</div>
     <button class="refresh-btn" onclick="fetchDataAndCalculate(true)">最新の状態に更新</button>
     <button class="logout-btn" onclick="logout()">ログアウト</button>
   </div>
@@ -364,7 +351,7 @@
           </div>
 
           <div class="form-group">
-            <label for="origin-select">元（どこから）</label>
+            <label for="origin-select">決済手段</label>
             <table class="input-row-table">
               <tr>
                 <td>
@@ -446,11 +433,10 @@
               <thead>
                 <tr>
                   <th style="width: 15%;">日付</th>
-                  <th style="width: 15%;">元</th>
-                  <th style="width: 15%;">収入</th>
+                  <th style="width: 20%;">決済手段</th> <th style="width: 15%;">収入</th>
                   <th style="width: 15%;">支出</th>
                   <th style="width: 20%;">用途 / 内容</th>
-                  <th style="width: 20%; text-align: center;">操作</th>
+                  <th style="width: 15%; text-align: center;">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -476,8 +462,8 @@
     const localCache = localStorage.getItem(`cache_${userId}`);
     if (localCache) {
       cachedData = JSON.parse(localCache);
-      updateDashboardAndTable(true); // 初回読み込み時はお財布フィルター項目を生成する
-      fetchNews();
+      updateDashboardAndTable(true);
+      fetchVersion(); // 💡 お知らせに代わりバージョンを取得
     } else {
       fetchDataAndCalculate(true);
     }
@@ -502,8 +488,9 @@
     }
   }
 
-  async function fetchNews() {
-    const banner = document.getElementById('news-banner');
+  // 💡 infoシートの1行目（B1セル）からバージョンを読み取る関数にリニューアル
+  async function fetchVersion() {
+    const versionTag = document.getElementById('version-tag');
     try {
       const response = await fetch(gasUrl, {
         method: 'POST',
@@ -511,22 +498,19 @@
         body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: 'info' })
       });
       const csvText = await response.text();
-      if (csvText.includes('Sheet not found') || csvText.trim() === '') {
-        banner.style.display = 'none';
-        return;
-      }
+      if (csvText.includes('Sheet not found') || csvText.trim() === '') return;
+      
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
-      if (lines.length <= 1) { banner.style.display = 'none'; return; }
-
-      const latestNewsRow = lines[lines.length - 1].split(',');
-      if (latestNewsRow.length >= 2) {
-        banner.innerText = `📢 ${latestNewsRow[1]}`;
-        banner.style.display = 'block';
-        banner.onclick = function() { alert(`【配信日: ${latestNewsRow[0]}】\n\n${latestNewsRow[1]}`); };
+      if (lines.length > 0) {
+        const firstRow = lines[0].split(',');
+        // A1が「バージョン」であれば、B1の値を反映
+        if (firstRow[0] === 'バージョン' && firstRow[1]) {
+          versionTag.innerText = `Ver ${firstRow[1].trim()}`;
+          versionTag.style.display = 'inline-block';
+        }
       }
     } catch (err) {
       console.error(err);
-      banner.style.display = 'none';
     }
   }
 
@@ -535,7 +519,7 @@
     if (forceUpdate) { statusDiv.className = ''; statusDiv.innerText = 'データを更新中...'; }
 
     try {
-      fetchNews();
+      fetchVersion();
       const response = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -558,7 +542,7 @@
         statusDiv.innerText = '最新の状態に更新しました。';
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
       }
-      updateDashboardAndTable(true); // 💡 サーバーから新データが来たらお財布フィルターを再生成
+      updateDashboardAndTable(true);
     } catch (err) {
       console.error(err);
       statusDiv.className = 'error';
@@ -566,6 +550,7 @@
     }
   }
 
+  // 💡 プルダウン生成ロジック：見た目順は変えず、初期状態でランキング1位を自動選択
   function buildDynamicSelect(prefix, columnIndex, allRecords) {
     const select = document.getElementById(`${prefix}-select`);
     const textInput = document.getElementById(`${prefix}-text`);
@@ -581,6 +566,7 @@
 
     const sortedOptions = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
 
+    // 見た目順はそのまま：1番上に「その他」
     select.innerHTML = '<option value="__other__">その他（自由入力）</option>';
     sortedOptions.forEach(opt => {
       const optionEl = document.createElement('option');
@@ -589,7 +575,20 @@
       select.appendChild(optionEl);
     });
 
-    if (currentValue && currentValue !== '__other__') {
+    // 💡 初期選択（または記録成功後の初期化）時の判定ロジック
+    if (editIndex === -1 && (!currentValue || currentValue === '__other__' && textInput.value === '')) {
+      if (sortedOptions.length > 0) {
+        // ランキング1位（sortedOptions[0]）を標準指定！
+        select.value = sortedOptions[0];
+        textInput.style.display = 'none';
+        textInput.value = '';
+      } else {
+        // 過去データゼロならその他
+        select.value = '__other__';
+        textInput.style.display = 'block';
+      }
+    } else if (currentValue && currentValue !== '__other__') {
+      // 修正モードや手動変更時の維持
       if (sortedOptions.includes(currentValue)) {
         select.value = currentValue;
         textInput.style.display = 'none';
@@ -598,21 +597,16 @@
         textInput.style.display = 'block';
         textInput.value = currentValue;
       }
-    } else if (select.value === '__other__' && textInput.value !== '') {
-      // 自由入力維持
     } else {
-      select.value = '__other__';
+      // 「その他」が手動選択されていてテキストがある場合はそのまま
       textInput.style.display = 'block';
     }
   }
 
-  // 💡 ユーザーの「元（お財布）」を集計対象プルダウンとして組み立てる（最近いじった順＝直近の行に出てくる順）
   function buildWalletFilter(allRecords) {
     const filterSelect = document.getElementById('wallet-filter');
     const currentValue = filterSelect.value;
 
-    // Aから並んでいるallRecordsは日付順にソートされる前（つまり入力された時系列順）
-    // 直近で使われたものが最後（配列の後ろ）に来るので、後ろからループして登場順リストを作る
     const uniqueWallets = [];
     for (let i = allRecords.length - 1; i >= 0; i--) {
       const wallet = allRecords[i].origin;
@@ -621,7 +615,6 @@
       }
     }
 
-    // 初期化して「全体」を一番上にセット
     filterSelect.innerHTML = '<option value="__all__">✨ 全体（全財産）</option>';
     uniqueWallets.forEach(w => {
       const opt = document.createElement('option');
@@ -630,7 +623,6 @@
       filterSelect.appendChild(opt);
     });
 
-    // 以前選んでいたお財布がまだ存在すれば選択状態をキープ、なければ「全体」にする
     if (uniqueWallets.includes(currentValue)) {
       filterSelect.value = currentValue;
     } else {
@@ -660,15 +652,12 @@
       allRecords.push({ originalIndex: i, date: dateStr, origin, income, expense, usage, content, rawRow: row });
     }
 
-    // 💡 1. フィルターが必要な場合は先にプルダウンを組み立てる
     if (shouldRebuildFilter) {
       buildWalletFilter(allRecords);
     }
 
-    // 💡 2. 現在選択されているお財布フィルターを取得
     const selectedWallet = document.getElementById('wallet-filter').value;
 
-    // タイトルの文言を切り替える
     if (selectedWallet === '__all__') {
       document.getElementById('balance-title').innerText = '現在の残高';
       document.getElementById('monthly-title').innerText = '今月の収支合計';
@@ -677,11 +666,9 @@
       document.getElementById('monthly-title').innerText = `「${selectedWallet}」の今月収支`;
     }
 
-    // 💡 3. 選択されたお財布に基づいて金額と履歴データをフィルタリング
     const filteredRecords = [];
 
     allRecords.forEach(row => {
-      // 全体選択、またはお財布名が一致する場合のみ集計に含める
       if (selectedWallet === '__all__' || row.origin === selectedWallet) {
         totalIncome += row.income;
         totalExpense += row.expense;
@@ -696,17 +683,15 @@
       }
     });
 
-    // ダッシュボードに反映
     document.getElementById('current-balance').innerText = `${(totalIncome - totalExpense).toLocaleString()}円`;
     const net = thisMonthIncome - thisMonthExpense;
     document.getElementById('monthly-expense').innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
 
-    // 収支入力欄のオートコンプリート生成は、常に入力履歴全体をベースにするためallRecordsを使用
+    // 💡 プルダウンの中身をランキング集計して更新
     buildDynamicSelect('origin', 1, allRecords);
     buildDynamicSelect('usage', 4, allRecords);
     buildDynamicSelect('content', 5, allRecords);
 
-    // 💡 4. テーブル描画（フィルターされたデータだけを表示）
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
@@ -813,15 +798,14 @@
     document.getElementById('expense').value = '';
     
     ['origin', 'usage', 'content'].forEach(p => {
-      document.getElementById(`${p}-select`).value = '__other__';
-      const txt = document.getElementById(`${p}-text`);
-      txt.style.display = 'block';
-      txt.value = '';
+      document.getElementById(`${p}-select`).value = ''; // 💡 一旦空にして自動選択を走らせる
+      document.getElementById(`${p}-text`).value = '';
     });
 
     document.getElementById('form-title').innerText = '収支の入力';
     document.getElementById('submit-button').innerText = '記録する';
     document.getElementById('cancel-button').style.display = 'none';
+    updateDashboardAndTable();
   }
 
   async function syncLocalDbToSpreadsheet() {
@@ -843,7 +827,7 @@
       cachedData.splice(index, 1);
       await syncLocalDbToSpreadsheet();
       localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
-      updateDashboardAndTable(true); // 💡 削除でお財布が消える可能性もあるのでフィルター再生成
+      updateDashboardAndTable(true);
       statusDiv.className = 'success'; statusDiv.innerText = '削除が完了しました。';
       setTimeout(() => { statusDiv.innerText = ''; }, 2000);
     } catch (err) {
@@ -862,7 +846,7 @@
     const statusDiv = document.getElementById('status');
 
     if (!dateInput || (!origin && !usage)) {
-      statusDiv.className = 'error'; statusDiv.innerText = '日付、元、用途を入力してください。';
+      statusDiv.className = 'error'; statusDiv.innerText = '日付、決済手段、用途を入力してください。';
       return;
     }
 
@@ -884,13 +868,16 @@
           const addedRow = result.substring(3).split(','); 
           cachedData.push(addedRow);
           localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
-          updateDashboardAndTable(true); // 💡 新しいお財布が追加されたかもしれないのでフィルター再生成
           
+          // 💡 記録成功後の初期化：セレクトボックスをリセットして次のランキング1位を走らせる
           document.getElementById('income').value = '';
           document.getElementById('expense').value = '';
-          document.getElementById('origin-text').value = '';
-          document.getElementById('usage-text').value = '';
-          document.getElementById('content-text').value = '';
+          ['origin', 'usage', 'content'].forEach(p => {
+            document.getElementById(`${p}-select`).value = '';
+            document.getElementById(`${p}-text`).value = '';
+          });
+          
+          updateDashboardAndTable(true);
           setTimeout(() => { statusDiv.innerText = ''; }, 2000);
         } else {
           statusDiv.className = 'error'; statusDiv.innerText = `記録に失敗しました: ${result}`;
@@ -900,7 +887,7 @@
         cachedData[editIndex] = [`${dateInput} ${originalTime}`, origin, String(income), String(expense), usage, content];
         await syncLocalDbToSpreadsheet();
         localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
-        updateDashboardAndTable(true); // 💡 修正でお財布名が変わったかもしれないのでフィルター再生成
+        
         statusDiv.className = 'success'; statusDiv.innerText = '修正が完了しました。';
         cancelEdit();
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
