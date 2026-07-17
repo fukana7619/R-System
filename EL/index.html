@@ -12,6 +12,9 @@
       --text-color: #0f172a;
       --border-color: #e2e8f0;
     }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     body {
       font-family: 'Helvetica Neue', Arial, sans-serif;
       background-color: var(--bg-color);
@@ -23,7 +26,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      max-width: 1000px;
+      max-width: 1200px;
       margin: 0 auto 20px auto;
       border-bottom: 2px solid var(--primary-color);
       padding-bottom: 10px;
@@ -39,10 +42,9 @@
       gap: 12px;
       align-items: center;
     }
-    /* 💡 新設：お知らせ表示エリアのスタイル */
     .news-banner {
-      display: none; /* 初期状態は非表示 */
-      background-color: #ffedd5; /* 薄いオレンジ */
+      display: none;
+      background-color: #ffedd5;
       color: #9a3412;
       padding: 6px 12px;
       border-radius: 20px;
@@ -53,6 +55,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       border: 1px solid #fed7aa;
+      cursor: pointer;
       animation: pulse 2s infinite;
     }
     @keyframes pulse {
@@ -79,16 +82,9 @@
       font-size: 0.85rem;
     }
     .main-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 20px;
-      max-width: 1000px;
+      display: block;
+      max-width: 1200px;
       margin: 0 auto;
-    }
-    @media (min-width: 768px) {
-      .main-layout {
-        grid-template-columns: 1fr 1.3fr;
-      }
     }
     .card {
       background: var(--card-bg);
@@ -96,7 +92,7 @@
       border-radius: 8px;
       border: 1px solid var(--border-color);
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      height: fit-content;
+      margin-bottom: 20px;
     }
     .card h3 {
       margin-top: 0;
@@ -106,34 +102,33 @@
       padding-left: 8px;
       color: var(--text-color);
     }
-    .history-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    
+    /* 2コラムテーブルレイアウト用（Flex/Grid禁止のためtableを使用） */
+    .layout-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+    }
+    .layout-table td {
+      padding: 0;
+      border: none;
+      vertical-align: top;
+    }
+    .left-col {
+      width: 45%;
+      padding-right: 20px;
+    }
+    .right-col {
+      width: 55%;
+    }
+
+    .dashboard-table {
+      width: 100%;
       margin-bottom: 15px;
     }
-    .history-header h3 {
-      margin: 0;
-    }
-    .analysis-btn {
-      display: inline-block;
-      padding: 5px 10px;
-      background-color: #3b82f6;
-      color: white;
-      text-decoration: none;
-      font-size: 0.8rem;
-      font-weight: bold;
-      border-radius: 4px;
-      transition: background 0.2s;
-    }
-    .analysis-btn:hover {
-      background-color: #2563eb;
-    }
-    .dashboard {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-bottom: 20px;
+    .dashboard-table td {
+      width: 50%;
+      padding: 6px;
     }
     .dash-box {
       background: #f8fafc;
@@ -161,19 +156,39 @@
       font-size: 0.85rem;
       color: #475569;
     }
-    input {
+    input, select {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid var(--border-color);
       border-radius: 4px;
-      box-sizing: border-box;
       font-size: 0.95rem;
+      background-color: #fff;
     }
-    .inline-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+    /* プルダウンと自由入力が並ぶエリア */
+    .input-row-table {
+      width: 100%;
     }
+    .input-row-table td {
+      padding: 0;
+    }
+    .input-row-table td.text-input-cell {
+      padding-left: 10px;
+    }
+    .dynamic-text-input {
+      display: none; /* 初期状態は非表示 */
+    }
+
+    .inline-group-table {
+      width: 100%;
+    }
+    .inline-group-table td {
+      width: 50%;
+      padding: 0;
+    }
+    .inline-group-table td:last-child {
+      padding-left: 10px;
+    }
+
     button.submit-btn {
       width: 100%;
       padding: 10px;
@@ -200,17 +215,17 @@
     .table-container {
       overflow-x: auto;
     }
-    table {
+    table.data-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 0.9rem;
       text-align: left;
     }
-    th, td {
+    table.data-table th, table.data-table td {
       padding: 10px;
       border-bottom: 1px solid var(--border-color);
     }
-    th {
+    table.data-table th {
       background-color: #f1f5f9;
       color: #475569;
       font-weight: 600;
@@ -249,6 +264,23 @@
     .delete-btn:hover {
       background-color: #fca5a5;
     }
+    .history-header {
+      width: 100%;
+      margin-bottom: 15px;
+    }
+    .history-header td {
+      border: none;
+    }
+    .analysis-btn {
+      display: inline-block;
+      padding: 5px 10px;
+      background-color: #3b82f6;
+      color: white;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: bold;
+      border-radius: 4px;
+    }
   </style>
   <script>
     const gasUrl = localStorage.getItem('gas_url');
@@ -272,76 +304,137 @@
 </div>
 
 <div class="main-layout">
-  
-  <div>
-    <div class="card" style="margin-bottom: 20px; width: 100%; box-sizing: border-box;">
-      <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #64748b;">
-        ユーザー: <strong><span id="display-user">...</span></strong>
-      </p>
-      <div class="dashboard">
-        <div class="dash-box">
-          <div class="dash-title">現在の残高</div>
-          <div class="dash-value" id="current-balance">0円</div>
+  <table class="layout-table">
+    <tr>
+      <td class="left-col">
+        <div class="card" style="width: 100%;">
+          <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #64748b;">
+            ユーザー: <strong><span id="display-user">...</span></strong>
+          </p>
+          <table class="dashboard-table">
+            <tr>
+              <td>
+                <div class="dash-box">
+                  <div class="dash-title">現在の残高</div>
+                  <div class="dash-value" id="current-balance">0円</div>
+                </div>
+              </td>
+              <td>
+                <div class="dash-box">
+                  <div class="dash-title">今月の収支合計</div>
+                  <div class="dash-value" id="monthly-expense">0円</div>
+                </div>
+              </td>
+            </tr>
+          </table>
         </div>
-        <div class="dash-box">
-          <div class="dash-title">今月の収支合計</div>
-          <div class="dash-value" id="monthly-expense">0円</div>
+
+        <div class="card" style="width: 100%;">
+          <h3 id="form-title">収支の入力</h3>
+          
+          <div class="form-group">
+            <label for="date">日付</label>
+            <input type="date" id="date">
+          </div>
+
+          <div class="form-group">
+            <label for="origin-select">元（どこから）</label>
+            <table class="input-row-table">
+              <tr>
+                <td>
+                  <select id="origin-select" onchange="toggleInput('origin')">
+                    <option value="__other__">その他（自由入力）</option>
+                  </select>
+                </td>
+                <td id="origin-text-cell" class="text-input-cell">
+                  <input type="text" id="origin-text" class="dynamic-text-input" placeholder="例: 現金, ICカード">
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="form-group">
+            <table class="inline-group-table">
+              <tr>
+                <td>
+                  <label for="income">収入</label>
+                  <input type="number" id="income" placeholder="0" min="0">
+                </td>
+                <td>
+                  <label for="expense">支出</label>
+                  <input type="number" id="expense" placeholder="0" min="0">
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="form-group">
+            <label for="usage-select">用途（使い道）</label>
+            <table class="input-row-table">
+              <tr>
+                <td>
+                  <select id="usage-select" onchange="toggleInput('usage')">
+                    <option value="__other__">その他（自由入力）</option>
+                  </select>
+                </td>
+                <td id="usage-text-cell" class="text-input-cell">
+                  <input type="text" id="usage-text" class="dynamic-text-input" placeholder="例: 食費, 交通費">
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="form-group">
+            <label for="content-select">内容（詳細）</label>
+            <table class="input-row-table">
+              <tr>
+                <td>
+                  <select id="content-select" onchange="toggleInput('content')">
+                    <option value="__other__">その他（自由入力）</option>
+                  </select>
+                </td>
+                <td id="content-text-cell" class="text-input-cell">
+                  <input type="text" id="content-text" class="dynamic-text-input" placeholder="例: コンビニ, 文房具">
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <button class="submit-btn" id="submit-button" onclick="addRecord()">記録する</button>
+          <button class="submit-btn" id="cancel-button" onclick="cancelEdit()" style="display:none; background-color: #64748b; margin-top: 8px;">キャンセル</button>
+          <div id="status"></div>
         </div>
-      </div>
-    </div>
+      </td>
 
-    <div class="card" style="width: 100%; box-sizing: border-box;">
-      <h3 id="form-title">収支の入力</h3>
-      <div class="form-group">
-        <label for="date">日付</label>
-        <input type="date" id="date">
-      </div>
-
-      <div class="form-group">
-        <label for="item">項目</label>
-        <input type="text" id="item" placeholder="例: 食費、お小遣い">
-      </div>
-
-      <div class="inline-group">
-        <div class="form-group">
-          <label for="income">収入</label>
-          <input type="number" id="income" value="0" min="0">
+      <td class="right-col">
+        <div class="card" style="width: 100%;">
+          <table class="history-header">
+            <tr>
+              <td><h3 style="margin:0; border-left:4px solid var(--primary-color); padding-left:8px;">履歴一覧</h3></td>
+              <td style="text-align: right;"><a href="dashboard.html" class="analysis-btn">グラフ分析 📈</a></td>
+            </tr>
+          </table>
+          
+          <div class="table-container">
+            <table id="history-table" class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 15%;">日付</th>
+                  <th style="width: 15%;">元</th>
+                  <th style="width: 15%;">収入</th>
+                  <th style="width: 15%;">支出</th>
+                  <th style="width: 20%;">用途 / 内容</th>
+                  <th style="width: 20%; text-align: center;">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="expense">支出</label>
-          <input type="number" id="expense" value="0" min="0">
-        </div>
-      </div>
-
-      <button class="submit-btn" id="submit-button" onclick="addRecord()">記録する</button>
-      <button class="submit-btn" id="cancel-button" onclick="cancelEdit()" style="display:none; background-color: #64748b; margin-top: 8px;">キャンセル</button>
-      <div id="status"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="history-header">
-      <h3>履歴一覧</h3>
-      <a href="dashboard.html" class="analysis-btn">グラフ分析 📈</a>
-    </div>
-    
-    <div class="table-container">
-      <table id="history-table">
-        <thead>
-          <tr>
-            <th style="min-width: 100px;">日付</th>
-            <th>項目</th>
-            <th>収入</th>
-            <th>支出</th>
-            <th style="min-width: 100px; text-align: center;">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
+      </td>
+    </tr>
+  </table>
 </div>
 
 <script>
@@ -352,16 +445,13 @@
     document.getElementById('display-user').innerText = userId;
     
     const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
+    document.getElementById('date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const localCache = localStorage.getItem(`cache_${userId}`);
     if (localCache) {
       cachedData = JSON.parse(localCache);
       updateDashboardAndTable();
-      fetchNews(); // キャッシュがある場合も裏でお知らせを最新にする
+      fetchNews();
     } else {
       fetchDataAndCalculate(true);
     }
@@ -374,79 +464,60 @@
     }
   }
 
-  // 💡 新設：infoシートからお知らせデータを引っ張ってくる処理
+  // 💡 自由入力欄の表示・非表示切り替え
+  function toggleInput(prefix) {
+    const select = document.getElementById(`${prefix}-select`);
+    const textInput = document.getElementById(`${prefix}-text`);
+    if (select.value === '__other__') {
+      textInput.style.display = 'block';
+      textInput.focus();
+    } else {
+      textInput.style.display = 'none';
+      textInput.value = '';
+    }
+  }
+
   async function fetchNews() {
     const banner = document.getElementById('news-banner');
     try {
       const response = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          id: userId,
-          password: password,
-          cmd: 'csv',
-          option: 'export',
-          sheet: 'info' // 💡 infoという名前のシートを読み込む
-        })
+        body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: 'info' })
       });
-
       const csvText = await response.text();
       if (csvText.includes('Sheet not found') || csvText.trim() === '') {
         banner.style.display = 'none';
         return;
       }
-
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
-      if (lines.length <= 1) {
-        banner.style.display = 'none';
-        return;
-      }
+      if (lines.length <= 1) { banner.style.display = 'none'; return; }
 
-      // 最新の1件（一番下の行）を取得
       const latestNewsRow = lines[lines.length - 1].split(',');
       if (latestNewsRow.length >= 2) {
-        const newsDate = latestNewsRow[0];
-        const newsContent = latestNewsRow[1];
-        
-        banner.innerText = `📢 ${newsContent}`;
+        banner.innerText = `📢 ${latestNewsRow[1]}`;
         banner.style.display = 'block';
-        
-        // クリックしたときにポップアップで日付付きの全文が見られるようにする
-        banner.onclick = function() {
-          alert(`【配信日: ${newsDate}】\n\n${newsContent}`);
-        };
+        banner.onclick = function() { alert(`【配信日: ${latestNewsRow[0]}】\n\n${latestNewsRow[1]}`); };
       }
     } catch (err) {
-      console.error('お知らせの取得に失敗:', err);
+      console.error(err);
       banner.style.display = 'none';
     }
   }
 
   async function fetchDataAndCalculate(forceUpdate = false) {
     const statusDiv = document.getElementById('status');
-    if (forceUpdate) {
-      statusDiv.className = '';
-      statusDiv.innerText = 'データを更新中...';
-    }
+    if (forceUpdate) { statusDiv.className = ''; statusDiv.innerText = 'データを更新中...'; }
 
     try {
-      // 最初にお知らせも並行して取得
       fetchNews();
-
       const response = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          id: userId,
-          password: password,
-          cmd: 'csv',
-          option: 'export',
-          sheet: userId
-        })
+        body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: userId })
       });
 
       const csvText = await response.text();
-      
       if (csvText.includes('Sheet not found')) {
         statusDiv.className = 'error';
         statusDiv.innerText = 'シートが存在しません。ユーザー名のシートを作成してください。';
@@ -455,7 +526,6 @@
 
       const lines = csvText.split('\n').filter(line => line.trim() !== '');
       cachedData = lines.map(line => line.split(','));
-
       localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
 
       if (forceUpdate) {
@@ -463,9 +533,7 @@
         statusDiv.innerText = '最新の状態に更新しました。';
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
       }
-
       updateDashboardAndTable();
-
     } catch (err) {
       console.error(err);
       statusDiv.className = 'error';
@@ -473,56 +541,100 @@
     }
   }
 
-  function updateDashboardAndTable() {
-    let totalIncome = 0;
-    let totalExpense = 0;
-    let thisMonthIncome = 0;
-    let thisMonthExpense = 0;
+  // 💡 履歴データから頻出ランキング順のプルダウンを組み立てる関数
+  function buildDynamicSelect(prefix, columnIndex, allRecords) {
+    const select = document.getElementById(`${prefix}-select`);
+    const textInput = document.getElementById(`${prefix}-text`);
+    
+    // 現在の選択値をキープ
+    const currentValue = select.value;
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; 
+    // カウント集計
+    const counts = {};
+    allRecords.forEach(r => {
+      const val = r.rawRow[columnIndex];
+      if (val && val.trim() !== '') {
+        counts[val] = (counts[val] || 0) + 1;
+      }
+    });
+
+    // 多い順にソート
+    const sortedOptions = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+
+    // プルダウンを初期化（「その他」は常に一番上）
+    select.innerHTML = '<option value="__other__">その他（自由入力）</option>';
+    sortedOptions.forEach(opt => {
+      const optionEl = document.createElement('option');
+      optionEl.value = opt;
+      optionEl.innerText = `${opt} (${counts[opt]}回)`;
+      select.appendChild(optionEl);
+    });
+
+    // 値の復元処理
+    if (currentValue && currentValue !== '__other__') {
+      if (sortedOptions.includes(currentValue)) {
+        select.value = currentValue;
+        textInput.style.display = 'none';
+      } else {
+        select.value = '__other__';
+        textInput.style.display = 'block';
+        textInput.value = currentValue;
+      }
+    } else if (select.value === '__other__' && textInput.value !== '') {
+      // 自由入力に何か入っている場合はそのまま
+    } else {
+      select.value = '__other__';
+      textInput.style.display = 'block';
+    }
+  }
+
+  function updateDashboardAndTable() {
+    let totalIncome = 0, totalExpense = 0, thisMonthIncome = 0, thisMonthExpense = 0;
+    const now = new Date(), currentYear = now.getFullYear(), currentMonth = now.getMonth() + 1; 
 
     const allRecords = [];
 
+    // ヘッダー(0行目)を飛ばしてA〜F列を集計
+    // 列：0=日付, 1=元, 2=収入, 3=支出, 4=用途, 5=内容
     for (let i = 1; i < cachedData.length; i++) {
       const row = cachedData[i];
-      if (row.length < 4) continue;
+      if (row.length < 4) continue; // 最低限のデータチェック
 
       const dateStr = row[0];
-      const item = row[1];
+      const origin = row[1] || '';
       const income = parseInt(row[2]) || 0;
       const expense = parseInt(row[3]) || 0;
+      const usage = row[4] || '';
+      const content = row[5] || '';
 
       totalIncome += income;
       totalExpense += expense;
 
       if (!dateStr) continue;
-
       const rowDate = new Date(dateStr);
-      const rowYear = rowDate.getFullYear();
-      const rowMonth = rowDate.getMonth() + 1;
-
-      if (rowYear === currentYear && rowMonth === currentMonth) {
+      if (rowDate.getFullYear() === currentYear && (rowDate.getMonth() + 1) === currentMonth) {
         thisMonthIncome += income;
         thisMonthExpense += expense;
       }
 
-      allRecords.push({ originalIndex: i, date: dateStr, item, income, expense });
+      allRecords.push({ originalIndex: i, date: dateStr, origin, income, expense, usage, content, rawRow: row });
     }
 
-    const currentBalance = totalIncome - totalExpense;
-    const monthlyNetBalance = thisMonthIncome - thisMonthExpense;
+    // ダッシュボード表示
+    document.getElementById('current-balance').innerText = `${(totalIncome - totalExpense).toLocaleString()}円`;
+    const net = thisMonthIncome - thisMonthExpense;
+    document.getElementById('monthly-expense').innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
 
-    document.getElementById('current-balance').innerText = `${currentBalance.toLocaleString()}円`;
-    const netText = monthlyNetBalance > 0 ? `+${monthlyNetBalance.toLocaleString()}` : monthlyNetBalance.toLocaleString();
-    document.getElementById('monthly-expense').innerText = `${netText}円`;
+    // 💡 3つのランキング形式プルダウンを動的に作成
+    buildDynamicSelect('origin', 1, allRecords); // 1列目: 元
+    buildDynamicSelect('usage', 4, allRecords);  // 4列目: 用途
+    buildDynamicSelect('content', 5, allRecords); // 5列目: 内容
 
+    // テーブル描画
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
     allRecords.sort((a, b) => b.date.localeCompare(a.date));
-
     const latest7 = allRecords.slice(0, 7);
     const olderRecords = allRecords.slice(7);
 
@@ -532,9 +644,13 @@
       
       tr.innerHTML = `
         <td style="font-size: 0.75rem; line-height: 1.2; color: #64748b;">${displayDate}</td>
-        <td>${row.item}</td>
+        <td style="font-weight:bold; color:#475569;">${row.origin}</td>
         <td class="income-text">${row.income > 0 ? row.income.toLocaleString() : ''}</td>
         <td class="expense-text">${row.expense > 0 ? row.expense.toLocaleString() : ''}</td>
+        <td>
+          <div style="font-weight:600; color:var(--primary-color);">${row.usage}</div>
+          <div style="font-size:0.75rem; color:#64748b;">${row.content}</div>
+        </td>
         <td style="text-align: center; white-space: nowrap;">
           <button class="action-btn edit-btn" onclick="startEdit(${row.originalIndex})">修正</button>
           <button class="action-btn delete-btn" onclick="deleteRecord(${row.originalIndex})">削除</button>
@@ -544,25 +660,28 @@
     });
 
     if (olderRecords.length > 0) {
-      let olderIncomeSum = 0;
-      let olderExpenseSum = 0;
-
-      olderRecords.forEach(row => {
-        olderIncomeSum += row.income;
-        olderExpenseSum += row.expense;
-      });
+      let olderIncomeSum = 0, olderExpenseSum = 0;
+      olderRecords.forEach(row => { olderIncomeSum += row.income; olderExpenseSum += row.expense; });
 
       const tr = document.createElement('tr');
       tr.className = 'summary-row';
       tr.innerHTML = `
-        <td>-</td>
-        <td>過去データの合算</td>
+        <td>-</td><td>-</td>
         <td class="income-text">${olderIncomeSum > 0 ? olderIncomeSum.toLocaleString() : ''}</td>
         <td class="expense-text">${olderExpenseSum > 0 ? olderExpenseSum.toLocaleString() : ''}</td>
-        <td></td>
+        <td>過去データの合算</td><td></td>
       `;
       tbody.appendChild(tr);
     }
+  }
+
+  // 値を取得するためのヘルパー（プルダウンがその他ならテキスト、それ以外ならセレクトの値）
+  function getInputValue(prefix) {
+    const select = document.getElementById(`${prefix}-select`);
+    if (select.value === '__other__') {
+      return document.getElementById(`${prefix}-text`).value.trim().replace(/,/g, '，');
+    }
+    return select.value;
   }
 
   function startEdit(index) {
@@ -570,22 +689,63 @@
     const row = cachedData[index];
 
     document.getElementById('date').value = row[0].split(' ')[0];
-    document.getElementById('item').value = row[1];
-    document.getElementById('income').value = row[2];
-    document.getElementById('expense').value = row[3];
+    
+    // 元のセット
+    const originSelect = document.getElementById('origin-select');
+    const originText = document.getElementById('origin-text');
+    if ([...originSelect.options].some(o => o.value === row[1])) {
+      originSelect.value = row[1];
+      originText.style.display = 'none';
+    } else {
+      originSelect.value = '__other__';
+      originText.style.display = 'block';
+      originText.value = row[1] || '';
+    }
+
+    document.getElementById('income').value = row[2] || 0;
+    document.getElementById('expense').value = row[3] || 0;
+
+    // 用途のセット
+    const usageSelect = document.getElementById('usage-select');
+    const usageText = document.getElementById('usage-text');
+    if ([...usageSelect.options].some(o => o.value === row[4])) {
+      usageSelect.value = row[4];
+      usageText.style.display = 'none';
+    } else {
+      usageSelect.value = '__other__';
+      usageText.style.display = 'block';
+      usageText.value = row[4] || '';
+    }
+
+    // 内容のセット
+    const contentSelect = document.getElementById('content-select');
+    const contentText = document.getElementById('content-text');
+    if ([...contentSelect.options].some(o => o.value === row[5])) {
+      contentSelect.value = row[5];
+      contentText.style.display = 'none';
+    } else {
+      contentSelect.value = '__other__';
+      contentText.style.display = 'block';
+      contentText.value = row[5] || '';
+    }
 
     document.getElementById('form-title').innerText = '収支の修正';
     document.getElementById('submit-button').innerText = '変更を保存する';
     document.getElementById('cancel-button').style.display = 'block';
-
     document.getElementById('form-title').scrollIntoView({ behavior: 'smooth' });
   }
 
   function cancelEdit() {
     editIndex = -1;
-    document.getElementById('item').value = '';
     document.getElementById('income').value = '0';
     document.getElementById('expense').value = '0';
+    
+    ['origin', 'usage', 'content'].forEach(p => {
+      document.getElementById(`${p}-select`).value = '__other__';
+      const txt = document.getElementById(`${p}-text`);
+      txt.style.display = 'block';
+      txt.value = '';
+    });
 
     document.getElementById('form-title').innerText = '収支の入力';
     document.getElementById('submit-button').innerText = '記録する';
@@ -594,129 +754,88 @@
 
   async function syncLocalDbToSpreadsheet() {
     const csvContent = cachedData.map(r => r.join(',')).join('\n');
-
     const response = await fetch(gasUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        id: userId,
-        password: password,
-        cmd: 'csv',
-        option: 'import',
-        sheet: userId,
-        value1: csvContent
-      })
+      body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'import', sheet: userId, value1: csvContent })
     });
-
-    const result = await response.text();
-    if (result !== 'OK') {
-      throw new Error(`Sync failed: ${result}`);
-    }
+    if (await response.text() !== 'OK') throw new Error('Sync failed');
   }
 
   async function deleteRecord(index) {
-    const itemDesc = cachedData[index][1];
-    if (!confirm(`「${itemDesc}」の記録を本当に削除しますか？`)) {
-      return;
-    }
-
+    if (!confirm(`この記録を本当に削除しますか？`)) return;
     const statusDiv = document.getElementById('status');
-    statusDiv.className = '';
-    statusDiv.innerText = '削除処理中...';
+    statusDiv.className = ''; statusDiv.innerText = '削除処理中...';
 
     try {
       cachedData.splice(index, 1);
       await syncLocalDbToSpreadsheet();
-
       localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
       updateDashboardAndTable();
-
-      statusDiv.className = 'success';
-      statusDiv.innerText = '削除が完了しました。';
+      statusDiv.className = 'success'; statusDiv.innerText = '削除が完了しました。';
       setTimeout(() => { statusDiv.innerText = ''; }, 2000);
-
     } catch (err) {
       console.error(err);
-      statusDiv.className = 'error';
-      statusDiv.innerText = '削除に失敗しました。';
+      statusDiv.className = 'error'; statusDiv.innerText = '削除に失敗しました。';
     }
   }
 
   async function addRecord() {
     const dateInput = document.getElementById('date').value;
-    const item = document.getElementById('item').value.trim();
+    const origin = getInputValue('origin');
     const income = parseInt(document.getElementById('income').value) || 0;
     const expense = parseInt(document.getElementById('expense').value) || 0;
+    const usage = getInputValue('usage');
+    const content = getInputValue('content');
     const statusDiv = document.getElementById('status');
 
-    if (!dateInput || !item) {
-      statusDiv.className = 'error';
-      statusDiv.innerText = '日付と項目を入力してください。';
+    if (!dateInput || (!origin && !usage)) {
+      statusDiv.className = 'error'; statusDiv.innerText = '日付、元、用途を入力してください。';
       return;
     }
 
     statusDiv.className = '';
     statusDiv.innerText = editIndex === -1 ? 'データを記録中...' : 'データを修正中...';
 
-    const safeItem = item.replace(/,/g, '，');
-
     try {
       if (editIndex === -1) {
-        const csvRow = `${dateInput},${safeItem},${income},${expense}`;
+        // 新規登録用のCSV行（A〜F列分、カンマ区切り）
+        const csvRow = `${dateInput},${origin},${income},${expense},${usage},${content}`;
         const response = await fetch(gasUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({
-            id: userId,
-            password: password,
-            cmd: 'enterline',
-            option: 'last',
-            sheet: userId,
-            value1: csvRow
-          })
+          body: JSON.stringify({ id: userId, password: password, cmd: 'enterline', option: 'last', sheet: userId, value1: csvRow })
         });
 
         const result = await response.text();
-
         if (result.startsWith('OK')) {
-          statusDiv.className = 'success';
-          statusDiv.innerText = '記録を完了しました。';
-          
+          statusDiv.className = 'success'; statusDiv.innerText = '記録を完了しました。';
           const addedRow = result.substring(3).split(','); 
           cachedData.push(addedRow);
           localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
           updateDashboardAndTable();
-
-          document.getElementById('item').value = '';
+          
           document.getElementById('income').value = '0';
           document.getElementById('expense').value = '0';
+          document.getElementById('origin-text').value = '';
+          document.getElementById('usage-text').value = '';
+          document.getElementById('content-text').value = '';
           setTimeout(() => { statusDiv.innerText = ''; }, 2000);
         } else {
-          statusDiv.className = 'error';
-          statusDiv.innerText = `記録に失敗しました: ${result}`;
+          statusDiv.className = 'error'; statusDiv.innerText = `記録に失敗しました: ${result}`;
         }
-
       } else {
         const originalTime = cachedData[editIndex][0].split(' ')[1] || '12:00:00';
-        const updatedDateTime = `${dateInput} ${originalTime}`;
-
-        cachedData[editIndex] = [updatedDateTime, safeItem, String(income), String(expense)];
-
+        cachedData[editIndex] = [`${dateInput} ${originalTime}`, origin, String(income), String(expense), usage, content];
         await syncLocalDbToSpreadsheet();
-
         localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
         updateDashboardAndTable();
-
-        statusDiv.className = 'success';
-        statusDiv.innerText = '修正が完了しました。';
-        
+        statusDiv.className = 'success'; statusDiv.innerText = '修正が完了しました。';
         cancelEdit();
         setTimeout(() => { statusDiv.innerText = ''; }, 2000);
       }
-
     } catch (err) {
-      statusDiv.className = 'error';
-      statusDiv.innerText = '通信エラーが発生しました。';
+      statusDiv.className = 'error'; statusDiv.innerText = '通信エラーが発生しました。';
       console.error(err);
     }
   }
