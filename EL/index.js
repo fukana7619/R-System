@@ -265,90 +265,83 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
   buildDynamicSelect('usage', 4, allRecords);
   buildDynamicSelect('content', 5, allRecords);
 
-  const tbody = document.querySelector('#history-table tbody');
-  tbody.innerHTML = '';
-
   filteredRecords.sort((a, b) => b.date.localeCompare(a.date));
 
-// ==========================================
-  // 💡 表示件数の動的自動計算ロジック（修正版）
   // ==========================================
-  let displayLimit = 5; // 縦並び（スマホ）の時は5件固定
+  // 💡 超高精度な実測フィッティングロジック
+  // ==========================================
+  const tbody = document.querySelector('#history-table tbody');
+  
+  const drawTable = (limit) => {
+    tbody.innerHTML = '';
+    const latestRecords = filteredRecords.slice(0, limit);
+    const olderRecords = filteredRecords.slice(limit);
 
-  // 画面幅が900px以上（横並びPCモード）のときのみ動的計算を行う
+    latestRecords.forEach(row => {
+      const tr = document.createElement('tr');
+      const displayDate = row.date.replace(' ', '<br>');
+      tr.innerHTML = `
+        <td style="font-size: 0.75rem; line-height: 1.2; color: #64748b;">${displayDate}</td>
+        <td style="font-weight:bold; color:#475569;">${row.origin}</td>
+        <td class="income-text">${row.income > 0 ? row.income.toLocaleString() : ''}</td>
+        <td class="expense-text">${row.expense > 0 ? row.expense.toLocaleString() : ''}</td>
+        <td>
+          <div style="font-weight:600; color:var(--primary-color);">${row.usage}</div>
+          <div style="font-size:0.75rem; color:#64748b;">${row.content}</div>
+        </td>
+        <td style="text-align: center; white-space: nowrap;">
+          <button class="action-btn edit-btn" onclick="startEdit(${row.originalIndex})">修正</button>
+          <button class="action-btn delete-btn" onclick="deleteRecord(${row.originalIndex})">削除</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (olderRecords.length > 0) {
+      let olderIncomeSum = 0, olderExpenseSum = 0;
+      olderRecords.forEach(row => { olderIncomeSum += row.income; olderExpenseSum += row.expense; });
+
+      const tr = document.createElement('tr');
+      tr.className = 'summary-row';
+      tr.innerHTML = `
+        <td>-</td><td>-</td>
+        <td class="income-text">${olderIncomeSum > 0 ? olderIncomeSum.toLocaleString() : ''}</td>
+        <td class="expense-text">${olderExpenseSum > 0 ? olderExpenseSum.toLocaleString() : ''}</td>
+        <td>過去データの合算</td><td></td>
+      `;
+      tbody.appendChild(tr);
+    }
+  };
+
+  // 1. 横並び（PC）かつ要素が存在するときのみ、動的限界値を探る
   if (window.innerWidth > 900) {
     const leftCol = document.querySelector('.left-col');
-    const tableContainer = document.querySelector('.table-container');
     const rightCard = document.querySelector('.right-col .card');
 
-    if (leftCol && tableContainer && rightCard) {
-      // 1. 左側カード全体の底辺Y座標
-      const leftBottom = leftCol.getBoundingClientRect().bottom;
-      
-      // 2. 右側テーブルコンテナの上辺Y座標
-      const containerTop = tableContainer.getBoundingClientRect().top;
+    if (leftCol && rightCard) {
+      // データを多く描画してみて、はみ出しをチェックするアプローチ
+      let testLimit = Math.min(filteredRecords.length, 25); 
+      drawTable(testLimit);
 
-      // 3. 右側カードの下側余白（padding-bottom + borderなど）を考慮
-      // getComputedStyleを使って正確なpaddingを取得
-      const rightCardStyle = window.getComputedStyle(rightCard);
-      const paddingBottom = parseFloat(rightCardStyle.paddingBottom) || 20;
+      // 左カードの底辺位置を取得
+      let leftBottom = leftCol.getBoundingClientRect().bottom;
+      // 右カードの底辺位置を取得
+      let rightBottom = rightCard.getBoundingClientRect().bottom;
 
-      // 履歴テーブル本体（thead+tbody）が使える純粋な最大高さを計算
-      const availableHeight = (leftBottom - containerTop) - paddingBottom;
-
-      // テーブルのヘッダー（thead）の実際の高さ: 約45px
-      // 「過去の合算」行（.summary-row）の実際の高さ: 約45px
-      // 合計で約90pxをあらかじめキープ
-      const reservedHeight = 90; 
-      const remainingHeight = availableHeight - reservedHeight;
-
-      // データ行の1行あたりの実際の高さ（日付の改行や用途/内容の2行表示を考慮すると約54px）
-      const rowHeight = 54; 
-
-      if (remainingHeight > 0) {
-        // 入る最大件数を計算（最低3件保証）
-        displayLimit = Math.max(3, Math.floor(remainingHeight / rowHeight));
+      // 右側が左側よりも下にはみ出している間、描画件数を1件ずつ減らす
+      while (rightBottom > leftBottom && testLimit > 3) {
+        testLimit--;
+        drawTable(testLimit);
+        // 再計算
+        leftBottom = leftCol.getBoundingClientRect().bottom;
+        rightBottom = rightCard.getBoundingClientRect().bottom;
       }
+    } else {
+      drawTable(5); // フォールバック
     }
-  }
-
-  const latestRecords = filteredRecords.slice(0, displayLimit);
-  const olderRecords = filteredRecords.slice(displayLimit);
-
-  latestRecords.forEach(row => {
-    const tr = document.createElement('tr');
-    const displayDate = row.date.replace(' ', '<br>');
-    
-    tr.innerHTML = `
-      <td style="font-size: 0.75rem; line-height: 1.2; color: #64748b;">${displayDate}</td>
-      <td style="font-weight:bold; color:#475569;">${row.origin}</td>
-      <td class="income-text">${row.income > 0 ? row.income.toLocaleString() : ''}</td>
-      <td class="expense-text">${row.expense > 0 ? row.expense.toLocaleString() : ''}</td>
-      <td>
-        <div style="font-weight:600; color:var(--primary-color);">${row.usage}</div>
-        <div style="font-size:0.75rem; color:#64748b;">${row.content}</div>
-      </td>
-      <td style="text-align: center; white-space: nowrap;">
-        <button class="action-btn edit-btn" onclick="startEdit(${row.originalIndex})">修正</button>
-        <button class="action-btn delete-btn" onclick="deleteRecord(${row.originalIndex})">削除</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  if (olderRecords.length > 0) {
-    let olderIncomeSum = 0, olderExpenseSum = 0;
-    olderRecords.forEach(row => { olderIncomeSum += row.income; olderExpenseSum += row.expense; });
-
-    const tr = document.createElement('tr');
-    tr.className = 'summary-row';
-    tr.innerHTML = `
-      <td>-</td><td>-</td>
-      <td class="income-text">${olderIncomeSum > 0 ? olderIncomeSum.toLocaleString() : ''}</td>
-      <td class="expense-text">${olderExpenseSum > 0 ? olderExpenseSum.toLocaleString() : ''}</td>
-      <td>過去データの合算</td><td></td>
-    `;
-    tbody.appendChild(tr);
+  } else {
+    // 2. 縦並び（スマホ等）のときは指示通り「5件固定＋合算」
+    drawTable(5);
   }
 }
 
