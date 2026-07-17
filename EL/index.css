@@ -293,3 +293,32 @@ table.data-table th {
   color: #991b1b !important;            /* 濃い赤 */
   border-color: #fecaca !important;     /* 赤の枠線 */
 }
+/* 💡 ローディング画面全体の暗幕 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(15, 23, 42, 0.4); /* 背景を少し暗い半透明に */
+  z-index: 9999; /* 一番手前に表示 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 💡 ぐるぐる回る円（スピナー）本体 */
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(255, 255, 255, 0.3); /* 全体の枠線（薄い白） */
+  border-top: 5px solid var(--primary-color);   /* 回転する先端の色（テーマカラーの深緑） */
+  border-radius: 50%; /* 綺麗な丸にする */
+  animation: spin 1s linear infinite; /* 無限に回転させる */
+}
+
+/* 💡 回転アニメーションの定義 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
