@@ -315,34 +315,34 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
 
   // 1. 横並び（PC）かつ要素が存在するときのみ、動的限界値を探る
   if (window.innerWidth > 900) {
-    const leftCol = document.querySelector('.left-col');
+    // 💡 修正ポイント：left-col内の「2つ目のカード（入力フォーム）」を基準ターゲットにする
+    const leftCards = document.querySelectorAll('.left-col .card');
+    const inputCard = leftCards[leftCards.length - 1]; // 2番目のカードを取得
     const rightCard = document.querySelector('.right-col .card');
 
-    if (leftCol && rightCard) {
-      // 余裕をもった多めの限界値で一旦仮描画してみる
+    if (inputCard && rightCard) {
+      // 余裕をもった多めの限界値で一旦仮描画
       let testLimit = Math.min(filteredRecords.length, 25); 
       drawTable(testLimit);
 
-      // 左側カード自体の底辺
-      let leftBottom = leftCol.getBoundingClientRect().bottom;
+      // 入力フォームカード（本物のコンテンツ）の底辺を取得
+      let leftBottom = inputCard.getBoundingClientRect().bottom;
 
-      // CSSのmargin-bottom（20px）によるズレを完全に防ぐため、
-      // 外部マージンを含めた右側の本当の底辺の位置を正確に計算する
+      // 右側カードのmargin-bottom（20px）による影響も含めて計算
       const rightCardStyle = window.getComputedStyle(rightCard);
       const marginBottom = parseFloat(rightCardStyle.marginBottom) || 0;
-
       let rightBottomWithMargin = rightCard.getBoundingClientRect().bottom + marginBottom;
 
-      // 右側（マージン込み）が左側の下端をはみ出している間、描画件数を1件ずつ削っていく
+      // 右側が左側の入力フォームの底辺をはみ出している間、描画件数を1件ずつ減らす
       while (rightBottomWithMargin > leftBottom && testLimit > 3) {
         testLimit--;
         drawTable(testLimit);
-        // 再計算して追従する
-        leftBottom = leftCol.getBoundingClientRect().bottom;
+        // 位置を再取得してループ判定
+        leftBottom = inputCard.getBoundingClientRect().bottom;
         rightBottomWithMargin = rightCard.getBoundingClientRect().bottom + marginBottom;
       }
     } else {
-      drawTable(5); // 万が一要素が取得できなかった場合のフォールバック
+      drawTable(5); 
     }
   } else {
     // 2. 縦並び（スマホ等）のときは「5件固定＋合算」
@@ -484,7 +484,7 @@ async function addRecord() {
         statusDiv.className = 'success'; statusDiv.innerText = '記録を完了しました。';
         const addedRow = result.substring(3).split(','); 
         cachedData.push(addedRow);
-        localStorage.setItem(`cache_${userId}`, JSON.stringify(addedRow)); // 同期のため更新
+        localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
         
         document.getElementById('income').value = '';
         document.getElementById('expense').value = '';
