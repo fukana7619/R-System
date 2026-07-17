@@ -76,6 +76,7 @@ body {
 .right-col {
   flex: 55; /* 55%相当 */
   min-width: 0;
+  height: 100%; /* 💡 追加：高さを左のカラムと完全に同期させる */
 }
 
 @media (max-width: 900px) {
