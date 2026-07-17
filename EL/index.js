@@ -319,28 +319,33 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
     const rightCard = document.querySelector('.right-col .card');
 
     if (leftCol && rightCard) {
-      // データを多く描画してみて、はみ出しをチェックするアプローチ
+      // 余裕をもった多めの限界値で一旦仮描画してみる
       let testLimit = Math.min(filteredRecords.length, 25); 
       drawTable(testLimit);
 
-      // 左カードの底辺位置を取得
+      // 左側カード自体の底辺
       let leftBottom = leftCol.getBoundingClientRect().bottom;
-      // 右カードの底辺位置を取得
-      let rightBottom = rightCard.getBoundingClientRect().bottom;
 
-      // 右側が左側よりも下にはみ出している間、描画件数を1件ずつ減らす
-      while (rightBottom > leftBottom && testLimit > 3) {
+      // CSSのmargin-bottom（20px）によるズレを完全に防ぐため、
+      // 外部マージンを含めた右側の本当の底辺の位置を正確に計算する
+      const rightCardStyle = window.getComputedStyle(rightCard);
+      const marginBottom = parseFloat(rightCardStyle.marginBottom) || 0;
+
+      let rightBottomWithMargin = rightCard.getBoundingClientRect().bottom + marginBottom;
+
+      // 右側（マージン込み）が左側の下端をはみ出している間、描画件数を1件ずつ削っていく
+      while (rightBottomWithMargin > leftBottom && testLimit > 3) {
         testLimit--;
         drawTable(testLimit);
-        // 再計算
+        // 再計算して追従する
         leftBottom = leftCol.getBoundingClientRect().bottom;
-        rightBottom = rightCard.getBoundingClientRect().bottom;
+        rightBottomWithMargin = rightCard.getBoundingClientRect().bottom + marginBottom;
       }
     } else {
-      drawTable(5); // フォールバック
+      drawTable(5); // 万が一要素が取得できなかった場合のフォールバック
     }
   } else {
-    // 2. 縦並び（スマホ等）のときは指示通り「5件固定＋合算」
+    // 2. 縦並び（スマホ等）のときは「5件固定＋合算」
     drawTable(5);
   }
 }
@@ -479,7 +484,7 @@ async function addRecord() {
         statusDiv.className = 'success'; statusDiv.innerText = '記録を完了しました。';
         const addedRow = result.substring(3).split(','); 
         cachedData.push(addedRow);
-        localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
+        localStorage.setItem(`cache_${userId}`, JSON.stringify(addedRow)); // 同期のため更新
         
         document.getElementById('income').value = '';
         document.getElementById('expense').value = '';
