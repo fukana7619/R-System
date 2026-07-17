@@ -48,6 +48,15 @@ function toggleInput(prefix) {
   }
 }
 
+// ウィンドウサイズが変更されたら、自動で履歴の表示件数を再計算して描画し直す
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    updateDashboardAndTable(false);
+  }, 100); // 頻繁な再描画を防ぐデバウンス処理
+});
+
 // ==========================================
 // 2. API（GAS）連携処理
 // ==========================================
@@ -260,10 +269,45 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
   tbody.innerHTML = '';
 
   filteredRecords.sort((a, b) => b.date.localeCompare(a.date));
-  const latest7 = filteredRecords.slice(0, 7);
-  const olderRecords = filteredRecords.slice(7);
 
-  latest7.forEach(row => {
+  // ==========================================
+  // 💡 表示件数の動的自動計算ロジック（縦表示は5件固定）
+  // ==========================================
+  let displayLimit = 5; // 縦並び（スマホ）の時は5件固定
+
+  // 画面幅が900px以上（横並びPCモード）のときのみ動的計算を行う
+  if (window.innerWidth > 900) {
+    const leftCol = document.querySelector('.left-col');
+    const rightCol = document.querySelector('.right-col');
+    const tableContainer = document.querySelector('.table-container');
+
+    if (leftCol && rightCol && tableContainer) {
+      // 左側エリアの底辺Y座標を取得
+      const leftBottom = leftCol.getBoundingClientRect().bottom;
+      // テーブルコンテナの開始位置（上辺Y座標）を取得
+      const containerTop = tableContainer.getBoundingClientRect().top;
+
+      // 履歴エリアに使える最大高さを計算
+      const availableHeight = leftBottom - containerTop;
+
+      // テーブルのヘッダー（約40px）と、「過去の合算」行（約40px）を差し引く
+      const reservedHeight = 80; 
+      const remainingHeight = availableHeight - reservedHeight;
+
+      // 履歴1行あたりのおおよその高さ
+      const rowHeight = 48; 
+
+      if (remainingHeight > 0) {
+        // 最低でも3件は表示するように安全弁をかけた上で上限を計算
+        displayLimit = Math.max(3, Math.floor(remainingHeight / rowHeight));
+      }
+    }
+  }
+
+  const latestRecords = filteredRecords.slice(0, displayLimit);
+  const olderRecords = filteredRecords.slice(displayLimit);
+
+  latestRecords.forEach(row => {
     const tr = document.createElement('tr');
     const displayDate = row.date.replace(' ', '<br>');
     
