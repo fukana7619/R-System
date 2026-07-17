@@ -270,35 +270,43 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
 
   filteredRecords.sort((a, b) => b.date.localeCompare(a.date));
 
-  // ==========================================
-  // 💡 表示件数の動的自動計算ロジック（縦表示は5件固定）
+// ==========================================
+  // 💡 表示件数の動的自動計算ロジック（修正版）
   // ==========================================
   let displayLimit = 5; // 縦並び（スマホ）の時は5件固定
 
   // 画面幅が900px以上（横並びPCモード）のときのみ動的計算を行う
   if (window.innerWidth > 900) {
     const leftCol = document.querySelector('.left-col');
-    const rightCol = document.querySelector('.right-col');
     const tableContainer = document.querySelector('.table-container');
+    const rightCard = document.querySelector('.right-col .card');
 
-    if (leftCol && rightCol && tableContainer) {
-      // 左側エリアの底辺Y座標を取得
+    if (leftCol && tableContainer && rightCard) {
+      // 1. 左側カード全体の底辺Y座標
       const leftBottom = leftCol.getBoundingClientRect().bottom;
-      // テーブルコンテナの開始位置（上辺Y座標）を取得
+      
+      // 2. 右側テーブルコンテナの上辺Y座標
       const containerTop = tableContainer.getBoundingClientRect().top;
 
-      // 履歴エリアに使える最大高さを計算
-      const availableHeight = leftBottom - containerTop;
+      // 3. 右側カードの下側余白（padding-bottom + borderなど）を考慮
+      // getComputedStyleを使って正確なpaddingを取得
+      const rightCardStyle = window.getComputedStyle(rightCard);
+      const paddingBottom = parseFloat(rightCardStyle.paddingBottom) || 20;
 
-      // テーブルのヘッダー（約40px）と、「過去の合算」行（約40px）を差し引く
-      const reservedHeight = 80; 
+      // 履歴テーブル本体（thead+tbody）が使える純粋な最大高さを計算
+      const availableHeight = (leftBottom - containerTop) - paddingBottom;
+
+      // テーブルのヘッダー（thead）の実際の高さ: 約45px
+      // 「過去の合算」行（.summary-row）の実際の高さ: 約45px
+      // 合計で約90pxをあらかじめキープ
+      const reservedHeight = 90; 
       const remainingHeight = availableHeight - reservedHeight;
 
-      // 履歴1行あたりのおおよその高さ
-      const rowHeight = 48; 
+      // データ行の1行あたりの実際の高さ（日付の改行や用途/内容の2行表示を考慮すると約54px）
+      const rowHeight = 54; 
 
       if (remainingHeight > 0) {
-        // 最低でも3件は表示するように安全弁をかけた上で上限を計算
+        // 入る最大件数を計算（最低3件保証）
         displayLimit = Math.max(3, Math.floor(remainingHeight / rowHeight));
       }
     }
