@@ -36,8 +36,29 @@
     }
     .header-right {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
+    }
+    /* 💡 新設：お知らせ表示エリアのスタイル */
+    .news-banner {
+      display: none; /* 初期状態は非表示 */
+      background-color: #ffedd5; /* 薄いオレンジ */
+      color: #9a3412;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      max-width: 300px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border: 1px solid #fed7aa;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.9; }
+      50% { opacity: 1; }
+      100% { opacity: 0.9; }
     }
     .logout-btn {
       padding: 6px 12px;
@@ -97,7 +118,7 @@
     .analysis-btn {
       display: inline-block;
       padding: 5px 10px;
-      background-color: #3b82f6; /* 青 */
+      background-color: #3b82f6;
       color: white;
       text-decoration: none;
       font-size: 0.8rem;
@@ -206,7 +227,6 @@
       font-style: italic;
       color: #64748b;
     }
-
     .action-btn {
       padding: 4px 8px;
       border: none;
@@ -245,6 +265,7 @@
 <div class="header">
   <h1>収支簿</h1>
   <div class="header-right">
+    <div id="news-banner" class="news-banner" title="クリックで全表示">お知らせを取得中...</div>
     <button class="refresh-btn" onclick="fetchDataAndCalculate(true)">最新の状態に更新</button>
     <button class="logout-btn" onclick="logout()">ログアウト</button>
   </div>
@@ -340,6 +361,7 @@
     if (localCache) {
       cachedData = JSON.parse(localCache);
       updateDashboardAndTable();
+      fetchNews(); // キャッシュがある場合も裏でお知らせを最新にする
     } else {
       fetchDataAndCalculate(true);
     }
@@ -352,6 +374,54 @@
     }
   }
 
+  // 💡 新設：infoシートからお知らせデータを引っ張ってくる処理
+  async function fetchNews() {
+    const banner = document.getElementById('news-banner');
+    try {
+      const response = await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          id: userId,
+          password: password,
+          cmd: 'csv',
+          option: 'export',
+          sheet: 'info' // 💡 infoという名前のシートを読み込む
+        })
+      });
+
+      const csvText = await response.text();
+      if (csvText.includes('Sheet not found') || csvText.trim() === '') {
+        banner.style.display = 'none';
+        return;
+      }
+
+      const lines = csvText.split('\n').filter(line => line.trim() !== '');
+      if (lines.length <= 1) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      // 最新の1件（一番下の行）を取得
+      const latestNewsRow = lines[lines.length - 1].split(',');
+      if (latestNewsRow.length >= 2) {
+        const newsDate = latestNewsRow[0];
+        const newsContent = latestNewsRow[1];
+        
+        banner.innerText = `📢 ${newsContent}`;
+        banner.style.display = 'block';
+        
+        // クリックしたときにポップアップで日付付きの全文が見られるようにする
+        banner.onclick = function() {
+          alert(`【配信日: ${newsDate}】\n\n${newsContent}`);
+        };
+      }
+    } catch (err) {
+      console.error('お知らせの取得に失敗:', err);
+      banner.style.display = 'none';
+    }
+  }
+
   async function fetchDataAndCalculate(forceUpdate = false) {
     const statusDiv = document.getElementById('status');
     if (forceUpdate) {
@@ -360,6 +430,9 @@
     }
 
     try {
+      // 最初にお知らせも並行して取得
+      fetchNews();
+
       const response = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -410,10 +483,8 @@
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; 
 
-    // 💡 履歴の全生データを集計するための配列
     const allRecords = [];
 
-    // ヘッダー行を避けてデータを格納
     for (let i = 1; i < cachedData.length; i++) {
       const row = cachedData[i];
       if (row.length < 4) continue;
@@ -432,7 +503,6 @@
       const rowYear = rowDate.getFullYear();
       const rowMonth = rowDate.getMonth() + 1;
 
-      // 今月の集計
       if (rowYear === currentYear && rowMonth === currentMonth) {
         thisMonthIncome += income;
         thisMonthExpense += expense;
@@ -441,7 +511,6 @@
       allRecords.push({ originalIndex: i, date: dateStr, item, income, expense });
     }
 
-    // 現在の残高 ＆ 今月の収支合計の算出
     const currentBalance = totalIncome - totalExpense;
     const monthlyNetBalance = thisMonthIncome - thisMonthExpense;
 
@@ -449,18 +518,14 @@
     const netText = monthlyNetBalance > 0 ? `+${monthlyNetBalance.toLocaleString()}` : monthlyNetBalance.toLocaleString();
     document.getElementById('monthly-expense').innerText = `${netText}円`;
 
-    // テーブル描画の準備
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
-    // 💡 最新順にソート（日付文字列で降順ソート）
     allRecords.sort((a, b) => b.date.localeCompare(a.date));
 
-    // 💡 最新の7件を切り出し、残りを合算用に回す
     const latest7 = allRecords.slice(0, 7);
     const olderRecords = allRecords.slice(7);
 
-    // 1. 最新7件を1件ずつ個別テーブル表示
     latest7.forEach(row => {
       const tr = document.createElement('tr');
       const displayDate = row.date.replace(' ', '<br>');
@@ -478,7 +543,6 @@
       tbody.appendChild(tr);
     });
 
-    // 2. 8件目以降がある場合は、それらを1行に合算して表示
     if (olderRecords.length > 0) {
       let olderIncomeSum = 0;
       let olderExpenseSum = 0;
