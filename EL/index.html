@@ -103,7 +103,7 @@
       color: var(--text-color);
     }
     
-    /* 2コラムテーブルレイアウト用（Flex/Grid禁止のためtableを使用） */
+    /* 2コラムレイアウト用 */
     .layout-table {
       width: 100%;
       border-collapse: collapse;
@@ -164,7 +164,6 @@
       font-size: 0.95rem;
       background-color: #fff;
     }
-    /* プルダウンと自由入力が並ぶエリア */
     .input-row-table {
       width: 100%;
     }
@@ -175,7 +174,7 @@
       padding-left: 10px;
     }
     .dynamic-text-input {
-      display: none; /* 初期状態は非表示 */
+      display: none;
     }
 
     .inline-group-table {
@@ -464,7 +463,6 @@
     }
   }
 
-  // 💡 自由入力欄の表示・非表示切り替え
   function toggleInput(prefix) {
     const select = document.getElementById(`${prefix}-select`);
     const textInput = document.getElementById(`${prefix}-text`);
@@ -541,15 +539,12 @@
     }
   }
 
-  // 💡 履歴データから頻出ランキング順のプルダウンを組み立てる関数
   function buildDynamicSelect(prefix, columnIndex, allRecords) {
     const select = document.getElementById(`${prefix}-select`);
     const textInput = document.getElementById(`${prefix}-text`);
     
-    // 現在の選択値をキープ
     const currentValue = select.value;
 
-    // カウント集計
     const counts = {};
     allRecords.forEach(r => {
       const val = r.rawRow[columnIndex];
@@ -558,10 +553,8 @@
       }
     });
 
-    // 多い順にソート
     const sortedOptions = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
 
-    // プルダウンを初期化（「その他」は常に一番上）
     select.innerHTML = '<option value="__other__">その他（自由入力）</option>';
     sortedOptions.forEach(opt => {
       const optionEl = document.createElement('option');
@@ -570,7 +563,6 @@
       select.appendChild(optionEl);
     });
 
-    // 値の復元処理
     if (currentValue && currentValue !== '__other__') {
       if (sortedOptions.includes(currentValue)) {
         select.value = currentValue;
@@ -581,7 +573,7 @@
         textInput.value = currentValue;
       }
     } else if (select.value === '__other__' && textInput.value !== '') {
-      // 自由入力に何か入っている場合はそのまま
+      // 自由入力維持
     } else {
       select.value = '__other__';
       textInput.style.display = 'block';
@@ -594,11 +586,9 @@
 
     const allRecords = [];
 
-    // ヘッダー(0行目)を飛ばしてA〜F列を集計
-    // 列：0=日付, 1=元, 2=収入, 3=支出, 4=用途, 5=内容
     for (let i = 1; i < cachedData.length; i++) {
       const row = cachedData[i];
-      if (row.length < 4) continue; // 最低限のデータチェック
+      if (row.length < 4) continue;
 
       const dateStr = row[0];
       const origin = row[1] || '';
@@ -620,17 +610,14 @@
       allRecords.push({ originalIndex: i, date: dateStr, origin, income, expense, usage, content, rawRow: row });
     }
 
-    // ダッシュボード表示
     document.getElementById('current-balance').innerText = `${(totalIncome - totalExpense).toLocaleString()}円`;
     const net = thisMonthIncome - thisMonthExpense;
     document.getElementById('monthly-expense').innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
 
-    // 💡 3つのランキング形式プルダウンを動的に作成
-    buildDynamicSelect('origin', 1, allRecords); // 1列目: 元
-    buildDynamicSelect('usage', 4, allRecords);  // 4列目: 用途
-    buildDynamicSelect('content', 5, allRecords); // 5列目: 内容
+    buildDynamicSelect('origin', 1, allRecords);
+    buildDynamicSelect('usage', 4, allRecords);
+    buildDynamicSelect('content', 5, allRecords);
 
-    // テーブル描画
     const tbody = document.querySelector('#history-table tbody');
     tbody.innerHTML = '';
 
@@ -675,7 +662,6 @@
     }
   }
 
-  // 値を取得するためのヘルパー（プルダウンがその他ならテキスト、それ以外ならセレクトの値）
   function getInputValue(prefix) {
     const select = document.getElementById(`${prefix}-select`);
     if (select.value === '__other__') {
@@ -690,7 +676,6 @@
 
     document.getElementById('date').value = row[0].split(' ')[0];
     
-    // 元のセット
     const originSelect = document.getElementById('origin-select');
     const originText = document.getElementById('origin-text');
     if ([...originSelect.options].some(o => o.value === row[1])) {
@@ -702,10 +687,9 @@
       originText.value = row[1] || '';
     }
 
-    document.getElementById('income').value = row[2] || 0;
-    document.getElementById('expense').value = row[3] || 0;
+    document.getElementById('income').value = row[2] || '';
+    document.getElementById('expense').value = row[3] || '';
 
-    // 用途のセット
     const usageSelect = document.getElementById('usage-select');
     const usageText = document.getElementById('usage-text');
     if ([...usageSelect.options].some(o => o.value === row[4])) {
@@ -717,7 +701,6 @@
       usageText.value = row[4] || '';
     }
 
-    // 内容のセット
     const contentSelect = document.getElementById('content-select');
     const contentText = document.getElementById('content-text');
     if ([...contentSelect.options].some(o => o.value === row[5])) {
@@ -735,10 +718,11 @@
     document.getElementById('form-title').scrollIntoView({ behavior: 'smooth' });
   }
 
+  // 💡 修正キャンセル時のフォームリセット：0ではなく「空」にしてplaceholderを表示させる
   function cancelEdit() {
     editIndex = -1;
-    document.getElementById('income').value = '0';
-    document.getElementById('expense').value = '0';
+    document.getElementById('income').value = '';
+    document.getElementById('expense').value = '';
     
     ['origin', 'usage', 'content'].forEach(p => {
       document.getElementById(`${p}-select`).value = '__other__';
@@ -783,8 +767,11 @@
   async function addRecord() {
     const dateInput = document.getElementById('date').value;
     const origin = getInputValue('origin');
+    
+    // 💡 空欄で送信された場合は自動的に 0 として計算・保存する
     const income = parseInt(document.getElementById('income').value) || 0;
     const expense = parseInt(document.getElementById('expense').value) || 0;
+    
     const usage = getInputValue('usage');
     const content = getInputValue('content');
     const statusDiv = document.getElementById('status');
@@ -799,7 +786,6 @@
 
     try {
       if (editIndex === -1) {
-        // 新規登録用のCSV行（A〜F列分、カンマ区切り）
         const csvRow = `${dateInput},${origin},${income},${expense},${usage},${content}`;
         const response = await fetch(gasUrl, {
           method: 'POST',
@@ -815,8 +801,9 @@
           localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
           updateDashboardAndTable();
           
-          document.getElementById('income').value = '0';
-          document.getElementById('expense').value = '0';
+          // 💡 記録成功後のリセット処理：0ではなく「空」にして即入力できるようにする
+          document.getElementById('income').value = '';
+          document.getElementById('expense').value = '';
           document.getElementById('origin-text').value = '';
           document.getElementById('usage-text').value = '';
           document.getElementById('content-text').value = '';
