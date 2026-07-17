@@ -10,9 +10,22 @@ let cachedData = [];
 let editIndex = -1; 
 
 // ==========================================
+// 💡 ローディング画面の表示・非表示コントロール
+// ==========================================
+function showLoading() {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'flex';
+}
+
+function hideLoading() {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// ==========================================
 // 1. ライフサイクル & 初期化処理
 // ==========================================
-window.onload = function() {
+window.onload = async function() {
   document.getElementById('display-user').innerText = userId;
   
   const today = new Date();
@@ -26,7 +39,8 @@ window.onload = function() {
   }
 
   // 2. バックグラウンド（裏側）でデータを最新の状態に更新しにいく
-  fetchDataAndCalculate(false); 
+  // 初回ロード時は裏で静かに取るためローディングは出さない
+  await fetchDataAndCalculate(false, false); 
 };
 
 function logout() {
@@ -54,7 +68,7 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     updateDashboardAndTable(false);
-  }, 100); // 頻繁な再描画を防ぐデバウンス処理
+  }, 100); 
 });
 
 // ==========================================
@@ -84,13 +98,15 @@ async function fetchVersion() {
   }
 }
 
-async function fetchDataAndCalculate(showNotification = false) {
+// 💡 修正：引数に useSpinner（円を回すかどうか）を追加
+async function fetchDataAndCalculate(showNotification = false, useSpinner = true) {
   const statusDiv = document.getElementById('status');
   
   if (showNotification) { 
     statusDiv.className = ''; 
     statusDiv.innerText = 'データを更新中...'; 
   }
+  if (useSpinner) showLoading(); // 💡 円をぐるぐる回す
 
   try {
     await fetchVersion();
@@ -104,6 +120,7 @@ async function fetchDataAndCalculate(showNotification = false) {
     if (csvText.includes('Sheet not found')) {
       statusDiv.className = 'error';
       statusDiv.innerText = 'シートが存在しません。ユーザー名のシートを作成してください。';
+      hideLoading();
       return;
     }
 
@@ -111,7 +128,6 @@ async function fetchDataAndCalculate(showNotification = false) {
     cachedData = lines.map(line => line.split(','));
     localStorage.setItem(`cache_${userId}`, JSON.stringify(cachedData));
 
-    // 最新データで画面を再描画
     updateDashboardAndTable(true);
 
     if (showNotification) {
@@ -125,6 +141,8 @@ async function fetchDataAndCalculate(showNotification = false) {
       statusDiv.className = 'error';
       statusDiv.innerText = 'データの更新に失敗しました。';
     }
+  } finally {
+    hideLoading(); // 💡 通信が終わったら（成功でも失敗でも）円を消す
   }
 }
 
@@ -150,7 +168,7 @@ function buildDynamicSelect(prefix, columnIndex, allRecords) {
   sortedOptions.forEach(opt => {
     const optionEl = document.createElement('option');
     optionEl.value = opt;
-    optionEl.innerText = opt; // 💡 修正：「(何回)」の文字を削除してスッキリ化
+    optionEl.innerText = opt; 
     select.appendChild(optionEl);
   });
 
@@ -259,22 +277,18 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
 
   document.getElementById('current-balance').innerText = `${(totalIncome - totalExpense).toLocaleString()}円`;
   
-  // 💡 修正箇所：今月の収支合計の色変え判定ロジック
   const net = thisMonthIncome - thisMonthExpense;
   const monthlyExpenseEl = document.getElementById('monthly-expense');
-  // 親のダッシュボードボックスを取得
   const monthlyBox = monthlyExpenseEl.closest('.dash-box'); 
   
   monthlyExpenseEl.innerText = `${net > 0 ? '+' : ''}${net.toLocaleString()}円`;
 
   if (monthlyBox) {
-    // 一旦色変え用クラスをリセット
     monthlyBox.classList.remove('bg-income', 'bg-expense');
-    
     if (net > 0) {
-      monthlyBox.classList.add('bg-income');  // プラスなら緑
+      monthlyBox.classList.add('bg-income'); 
     } else if (net < 0) {
-      monthlyBox.classList.add('bg-expense'); // マイナスなら赤
+      monthlyBox.classList.add('bg-expense');
     }
   }
 
@@ -284,9 +298,6 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
 
   filteredRecords.sort((a, b) => b.date.localeCompare(a.date));
 
-  // ==========================================
-  // 💡 超高精度な実測フィッティングロジック
-  // ==========================================
   const tbody = document.querySelector('#history-table tbody');
   
   const drawTable = (limit) => {
@@ -330,7 +341,6 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
     }
   };
 
-  // 1. 横並び（PC）かつ要素が存在するときのみ、動的限界値を探る
   if (window.innerWidth > 900) {
     const leftCards = document.querySelectorAll('.left-col .card');
     const inputCard = leftCards[leftCards.length - 1]; 
@@ -449,6 +459,7 @@ async function deleteRecord(index) {
   if (!confirm(`この記録を本当に削除しますか？`)) return;
   const statusDiv = document.getElementById('status');
   statusDiv.className = ''; statusDiv.innerText = '削除処理中...';
+  showLoading(); // 💡 ぐるぐる表示
 
   try {
     cachedData.splice(index, 1);
@@ -460,6 +471,9 @@ async function deleteRecord(index) {
   } catch (err) {
     console.error(err);
     statusDiv.className = 'error'; statusDiv.innerText = '削除に失敗しました。';
+  } finally {
+     Kleid = -1;
+    hideLoading(); // 💡 ぐるぐる非表示
   }
 }
 
@@ -479,6 +493,7 @@ async function addRecord() {
 
   statusDiv.className = '';
   statusDiv.innerText = editIndex === -1 ? 'データを記録中...' : 'データを修正中...';
+  showLoading(); // 💡 ぐるぐる表示
 
   try {
     if (editIndex === -1) {
@@ -521,5 +536,7 @@ async function addRecord() {
   } catch (err) {
     statusDiv.className = 'error'; statusDiv.innerText = '通信エラーが発生しました。';
     console.error(err);
+  } finally {
+    hideLoading(); // 💡 ぐるぐる非表示
   }
 }
