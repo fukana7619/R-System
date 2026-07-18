@@ -6,10 +6,13 @@
   <title>収支簿 - ログイン</title>
   <style>
     :root {
-      --primary-color: #4f46e5;
-      --bg-color: #f3f4f6;
+      /* 💡 本体のテーマカラーである深緑に統一しました */
+      --primary-color: #0f766e;
+      --primary-hover: #0d615a;
+      --bg-color: #f8fafc;
       --card-bg: #ffffff;
-      --text-color: #1f2937;
+      --text-color: #0f172a;
+      --border-color: #e2e8f0;
     }
     body {
       font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -25,7 +28,8 @@
       background: var(--card-bg);
       padding: 30px;
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
       width: 90%;
       max-width: 400px;
     }
@@ -33,23 +37,34 @@
       margin-top: 0;
       text-align: center;
       color: var(--primary-color);
+      font-size: 1.4rem;
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
     }
     .form-group {
       margin-bottom: 15px;
     }
     label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 6px;
       font-weight: bold;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      color: #475569;
     }
     input {
       width: 100%;
       padding: 10px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border-color);
       border-radius: 6px;
       box-sizing: border-box;
       font-size: 1rem;
+      background-color: #fafafa;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      background-color: #ffffff;
     }
     button {
       width: 100%;
@@ -62,9 +77,10 @@
       font-weight: bold;
       cursor: pointer;
       transition: background 0.2s;
+      margin-top: 10px;
     }
     button:hover {
-      background-color: #4338ca;
+      background-color: var(--primary-hover);
     }
     #status {
       margin-top: 15px;
@@ -72,15 +88,15 @@
       font-weight: bold;
       font-size: 0.9rem;
     }
-    .success { color: #10b981; }
-    .error { color: #ef4444; }
+    .success { color: #0f766e; }
+    .error { color: #b91c1c; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <h2>🔑 収支簿 ログイン</h2>
-  <p style="font-size: 0.85rem; color: #6b7280; text-align: center; margin-bottom: 20px;">
+  <p style="font-size: 0.8rem; color: #64748b; text-align: center; margin-bottom: 20px; line-height: 1.4;">
     スプレッドシートの「ユーザーデータ」に登録したIDとパスワードを入力してください。
   </p>
   
@@ -100,10 +116,8 @@
 </div>
 
 <script>
-  // 💡 あなたのGASのURLをあらかじめ組み込んで固定します
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxYb_SOQDiw-k30HciJfRMQvIp66dhoddcJa7Rn7bipj_PTlS8K2UsHPJY3MhEiwMMAaA/exec";
 
-  // ページ読み込み時に、すでに保存されている情報があれば自動入力
   window.onload = function() {
     document.getElementById('userId').value = localStorage.getItem('user_id') || '';
     document.getElementById('password').value = localStorage.getItem('user_password') || '';
@@ -123,11 +137,10 @@
     statusDiv.className = '';
     statusDiv.innerText = '⏳ 接続テスト中...';
 
-    // GASにテストリクエストを送信して、ログインできるか確認
     try {
       const response = await fetch(GAS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // CORS回避
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
           id: userId,
           password: password,
@@ -138,8 +151,7 @@
       const result = await response.text();
 
       if (result === 'OK') {
-        // 成功したらLocalStorage（LocalDB）に保存
-        localStorage.setItem('gas_url', GAS_URL); // index.html側で使えるように保存
+        localStorage.setItem('gas_url', GAS_URL);
         localStorage.setItem('user_id', userId);
         localStorage.setItem('user_password', password);
 
@@ -147,7 +159,7 @@
         statusDiv.innerText = '🎉 ログイン成功！ 移動します...';
         
         setTimeout(() => {
-          location.href = 'index.html'; // メイン画面へリダイレクト
+          location.href = 'index.html';
         }, 1500);
 
       } else if (result === 'Authentication failed') {
