@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>詳細履歴 - 収支簿</title>
   <link rel="stylesheet" href="index.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="history.js" defer></script>
   
   <style>
-    /* 枠の中の各アイテム（チェックボックス＋文字）を横並びにする */
+    /* チェックボックスの崩れをピンポイントで直す */
     .checkbox-item {
       display: flex;
       align-items: center;
@@ -17,11 +18,69 @@
       font-size: 0.9rem;
       cursor: pointer;
     }
-    /* index.cssの width: 100% をチェックボックスだけ打ち消す */
     .checkbox-item input[type="checkbox"] {
       width: auto !important;
       margin: 0;
       cursor: pointer;
+    }
+
+    /* 📊 グラフエリアのサイズ定義 */
+    .chart-container {
+      position: relative;
+      height: 300px;
+      width: 100%;
+      margin-top: 15px;
+    }
+
+    /* 📁 折りたたみ（アコーディオン）用のスタイル */
+    .collapsible-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .collapsible-header::after {
+      content: '▼';
+      font-size: 0.8rem;
+      color: #64748b;
+      transition: transform 0.2s;
+    }
+    .collapsible-header.open::after {
+      transform: rotate(180deg);
+    }
+    .collapsible-content {
+      display: none; /* 既定では非表示（畳む） */
+      margin-top: 15px;
+    }
+    .collapsible-content.open {
+      display: block; /* 開いたときに表示 */
+    }
+
+    /* 🔄 index系列のぐるぐるローディング画面 */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid var(--border-color);
+      border-top: 5px solid var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -40,7 +99,6 @@
     <h3 style="margin-top: 0;">🔍 履歴の絞り込み条件</h3>
     
     <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 15px;">
-      
       <div style="flex: 1; min-width: 250px;">
         <label>📅 期間指定</label>
         <div style="display: flex; align-items: center; gap: 5px;">
@@ -58,57 +116,83 @@
           <span style="white-space: nowrap;">円以上のみ表示</span>
         </div>
       </div>
-
     </div>
 
     <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 15px;">
-      
       <div style="flex: 1; min-width: 200px;">
         <label>👛 決済手段（複数選択）</label>
-        <div id="origin-checkboxes" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: #fafafa;">
-          </div>
+        <div id="origin-checkboxes" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: #fafafa;"></div>
       </div>
 
       <div style="flex: 1; min-width: 200px;">
         <label>🏷️ 用途（複数選択）</label>
-        <div id="usage-checkboxes" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: #fafafa;">
-          </div>
+        <div id="usage-checkboxes" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: #fafafa;"></div>
       </div>
-
     </div>
 
     <div style="text-align: right; margin-top: 15px;">
-      <button class="submit-btn" style="width: auto; padding: 8px 30px;" onclick="applyFilters()">この条件で検索する</button>
+      <button class="submit-btn" style="width: auto; padding: 8px 30px;" onclick="applyFilters(true)">この条件で検索する</button>
     </div>
   </div>
 
-  <div class="card">
-    <table class="history-header">
-      <tr>
-        <td>
-          <h3 style="margin:0;">📋 該当データ一覧 (<span id="match-count">0</span>件)</h3>
-        </td>
-        <td style="text-align: right; font-size: 0.9rem; font-weight: bold; color: #475569;">
-          合計収入: <span id="sum-income" class="income-text">0円</span> | 
-          合計支出: <span id="sum-expense" class="expense-text">0円</span>
-        </td>
-      </tr>
-    </table>
+  <div class="card" id="graph-card">
+    <div class="collapsible-header" id="graph-header" onclick="toggleSection('graph')">
+      <h3 style="margin: 0; display: inline-block;">📊 月別収支の推移と統計</h3>
+    </div>
+    <div class="collapsible-content" id="graph-content">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 20px;">
+        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">1日平均支出(今月)</div>
+          <div style="font-weight: bold; font-size: 1.1rem;" id="day-avg">0円</div>
+        </div>
+        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">1ヶ月平均支出</div>
+          <div style="font-weight: bold; font-size: 1.1rem;" id="month-avg">0円</div>
+        </div>
+        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">今月の総収入</div>
+          <div style="font-weight: bold; font-size: 1.1rem; color: #0f766e;" id="month-total-income">0円</div>
+        </div>
+        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">今月の総支出</div>
+          <div style="font-weight: bold; font-size: 1.1rem; color: #b91c1c;" id="month-total-expense">0円</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+  </div>
 
-    <div class="table-container">
-      <table id="history-table" class="data-table">
-        <thead>
-          <tr>
-            <th style="width: 15%;">日付</th>
-            <th style="width: 20%;">決済手段</th>
-            <th style="width: 15%;">収入</th>
-            <th style="width: 15%;">支出</th>
-            <th style="width: 35%;">用途 / 内容</th>
-          </tr>
-        </thead>
-        <tbody>
-          </tbody>
-      </table>
+  <div class="card" id="list-card">
+    <div class="collapsible-header" id="list-header" onclick="toggleSection('list')">
+      <h3 style="margin: 0; display: inline-block;">📋 該当データ一覧 (<span id="match-count">0</span>件)</h3>
+    </div>
+    
+    <div class="collapsible-content" id="list-content">
+      <div style="text-align: right; font-size: 0.85rem; font-weight: bold; color: #475569; margin-bottom: 10px;">
+        合計収入: <span id="sum-income" class="income-text">0円</span> | 
+        合計支出: <span id="sum-expense" class="expense-text">0円</span>
+      </div>
+
+      <div class="table-container">
+        <table id="history-table" class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 15%;">日付</th>
+              <th style="width: 20%;">決済手段</th>
+              <th style="width: 15%;">収入</th>
+              <th style="width: 15%;">支出</th>
+              <th style="width: 35%;">用途 / 内容</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="load-more-container" style="text-align: center; margin-top: 15px; display: none;">
+        <button type="button" class="action-btn edit-btn" style="padding: 10px 40px; font-weight: bold;" onclick="loadMoreRecords()">追加の100件を表示する</button>
+      </div>
     </div>
   </div>
 
