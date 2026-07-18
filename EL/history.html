@@ -6,6 +6,24 @@
   <title>詳細履歴 - 収支簿</title>
   <link rel="stylesheet" href="index.css">
   <script src="history.js" defer></script>
+  
+  <style>
+    /* 枠の中の各アイテム（チェックボックス＋文字）を横並びにする */
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    /* index.cssの width: 100% をチェックボックスだけ打ち消す */
+    .checkbox-item input[type="checkbox"] {
+      width: auto !important;
+      margin: 0;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
 
