@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>詳細履歴 - かけいぼ</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <div class="navbar">
+    <div class="nav-title">📊 詳細履歴</div>
+    <div class="nav-links">
+      <a href="index.html" class="nav-btn">← 入力画面に戻る</a>
+    </div>
+  </div>
+
+  <div class="container main-layout" style="display: block; max-width: 1000px;">
+    
+    <div class="card" style="margin-bottom: 20px;">
+      <h2 style="margin-top: 0; color: var(--primary-color);">🔍 履歴の絞り込み条件</h2>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+        
+        <div>
+          <label class="form-label">📅 期間指定</label>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <input type="date" id="filter-start-date" class="form-input" style="padding: 6px;">
+            <span>〜</span>
+            <input type="date" id="filter-end-date" class="form-input" style="padding: 6px;">
+          </div>
+          <button type="button" class="action-btn edit-btn" style="margin-top: 8px; padding: 4px 10px; font-size: 0.8rem;" onclick="clearDateFilter()">全期間にする</button>
+        </div>
+
+        <div>
+          <label class="form-label">💰 金額での可視化（しきい値）</label>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <input type="number" id="filter-min-amount" class="form-input" placeholder="0" min="0">
+            <span>円以上のみ表示</span>
+          </div>
+          <span style="font-size: 0.75rem; color: #64748b;">※収入・支出のどちらかがこの金額以上のレコードを抜き出します。</span>
+        </div>
+
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+        
+        <div>
+          <label class="form-label">👛 決済手段（複数選択可）</label>
+          <div id="origin-checkboxes" style="max-height: 120px; overflow-y: auto; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; background: #f8fafc;">
+            </div>
+        </div>
+
+        <div>
+          <label class="form-label">🏷️ 用途（複数選択可）</label>
+          <div id="usage-checkboxes" style="max-height: 120px; overflow-y: auto; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; background: #f8fafc;">
+            </div>
+        </div>
+
+      </div>
+
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="submit-btn" style="width: auto; padding: 10px 30px;" onclick="applyFilters()">この条件で検索する</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2 style="margin: 0; color: var(--primary-color);">📋 該当データ一覧 (<span id="match-count">0</span>件)</h2>
+        <div style="font-weight: bold; font-size: 0.9rem; color: #475569;">
+          合計収入: <span id="sum-income" class="income-text">0円</span> | 
+          合計支出: <span id="sum-expense" class="expense-text">0円</span>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table id="history-table">
+          <thead>
+            <tr>
+              <th>日時</th>
+              <th>決済手段</th>
+              <th>収入</th>
+              <th>支出</th>
+              <th>用途・内容</th>
+            </tr>
+          </thead>
+          <tbody>
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script src="history.js"></script>
+</body>
+</html>
