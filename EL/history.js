@@ -7,10 +7,15 @@ if (!gasUrl || !userId || !password) {
 }
 
 let cachedData = []; 
-let chartInstance = null; // グラフの重複描画を防ぐための変数
+let chartInstance = null; 
+
+// 📄 100件分割表示用の変数
+let globalFilteredRecords = []; // 絞り込みを通過した全データを受け止める
+let currentDisplayedCount = 0;   // 現在画面に表示されている件数
+const PAGE_SIZE = 100;           // 1回あたりの表示件数
 
 // ==========================================
-// 💡 ローディング画面の表示・非表示
+// 💡 ローディング画面の制御
 // ==========================================
 function showLoading() {
   const overlay = document.getElementById('loading-overlay');
@@ -23,6 +28,23 @@ function hideLoading() {
 }
 
 // ==========================================
+// 📁 折りたたみの制御（開閉）
+// ==========================================
+function toggleSection(type, forceOpen = false) {
+  const header = document.getElementById(`${type}-header`);
+  const content = document.getElementById(`${type}-content`);
+  if (!header || !content) return;
+
+  if (forceOpen) {
+    header.classList.add('open');
+    content.classList.add('open');
+  } else {
+    header.classList.toggle('open');
+    content.classList.toggle('open');
+  }
+}
+
+// ==========================================
 // 1. 初期化処理（ページ読み込み時）
 // ==========================================
 window.onload = function() {
@@ -30,32 +52,26 @@ window.onload = function() {
   
   if (localCache) {
     cachedData = JSON.parse(localCache);
-    
-    // 1. 検索条件（チェックボックス等）の選択肢をデータから自動生成
     buildFilterOptions();
     
-    // 2. デフォルトで全データを検索・集計して表示
-    applyFilters();
+    // 💡 初回ロード時は既定の「畳んだ状態」のままデータ計算だけ行う
+    applyFilters(false);
   } else {
     alert("データがありません。収支簿ページ（index.html）で「最新の状態に更新」を一度押してください。");
     location.href = 'index.html';
   }
 };
 
-// 期間指定のリセット
 function clearDateFilter() {
   document.getElementById('filter-start-date').value = '';
   document.getElementById('filter-end-date').value = '';
 }
 
-// ==========================================
-// 2. フィルター選択肢（チェックボックス）の自動生成
-// ==========================================
+// フィルター選択肢自動生成
 function buildFilterOptions() {
   const origins = new Set();
   const usages = new Set();
 
-  // 2行目（インデックス1）からデータをスキャンして重複のないリストを作る
   for (let i = 1; i < cachedData.length; i++) {
     const row = cachedData[i];
     if (row.length < 4) continue;
@@ -63,126 +79,152 @@ function buildFilterOptions() {
     if (row[4]) usages.add(row[4].trim());
   }
 
-  // 決済手段のチェックボックス生成
   const originContainer = document.getElementById('origin-checkboxes');
   originContainer.innerHTML = '';
   origins.forEach(name => {
     const label = document.createElement('label');
-    label.className = 'checkbox-item'; // 💡 ここで新スタイルを適用！
+    label.className = 'checkbox-item';
     label.innerHTML = `<input type="checkbox" value="${name}" name="origin-check" checked> <span>${name}</span>`;
     originContainer.appendChild(label);
   });
 
-  // 用途のチェックボックス生成
   const usageContainer = document.getElementById('usage-checkboxes');
   usageContainer.innerHTML = '';
   usages.forEach(name => {
     const label = document.createElement('label');
-    label.className = 'checkbox-item'; // 💡 ここで新スタイルを適用！
+    label.className = 'checkbox-item';
     label.innerHTML = `<input type="checkbox" value="${name}" name="usage-check" checked> <span>${name}</span>`;
     usageContainer.appendChild(label);
   });
 }
 
 // ==========================================
-// 3. 検索・絞り込み ＆ 統計・グラフの連動処理
+// 3. 検索・絞り込みメインロジック
 // ==========================================
-function applyFilters() {
-  showLoading();
-
-  // --- HTMLから検索条件を取得 ---
-  const startDateStr = document.getElementById('filter-start-date').value;
-  const endDateStr = document.getElementById('filter-end-date').value;
-  const minAmount = parseInt(document.getElementById('filter-min-amount').value) || 0;
-
-  // チェックされている決済手段・用途のリストを作る
-  const checkedOrigins = Array.from(document.querySelectorAll('input[name="origin-check"]:checked')).map(el => el.value);
-  const checkedUsages = Array.from(document.querySelectorAll('input[name="usage-check"]:checked')).map(el => el.value);
-
-  // --- データ絞り込み＆集計の変数 ---
-  const filteredRecords = [];
-  let totalIncome = 0;
-  let totalExpense = 0;
-
-  // グラフ・統計用の月別集計コンテナ
-  const monthlyData = {};
-  let totalExpenseAllTime = 0;
-  let thisMonthIncome = 0;
-  let thisMonthExpense = 0;
-
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const currentDay = now.getDate();
-
-  // --- ループ処理 ---
-  for (let i = 1; i < cachedData.length; i++) {
-    const row = cachedData[i];
-    if (row.length < 4) continue;
-
-    const dateStr = row[0];
-    const origin = row[1] || '';
-    const income = parseInt(row[2]) || 0;
-    const expense = parseInt(row[3]) || 0;
-    const usage = row[4] || '';
-    const content = row[5] || '';
-
-    if (!dateStr) continue;
-
-    const rowDate = new Date(dateStr);
-    const rowYear = rowDate.getFullYear();
-    const rowMonth = rowDate.getMonth() + 1;
-    const monthKey = `${rowYear}-${String(rowMonth).padStart(2, '0')}`;
-
-    // 1. 決済手段の絞り込み
-    if (checkedOrigins.length > 0 && !checkedOrigins.includes(origin)) continue;
-
-    // 2. 用途の絞り込み
-    if (checkedUsages.length > 0 && !checkedUsages.includes(usage)) continue;
-
-    // 3. 期間の絞り込み
-    if (startDateStr && new Date(startDateStr) > rowDate) continue;
-    if (endDateStr) {
-      const endLimit = new Date(endDateStr);
-      endLimit.setHours(23, 59, 59, 999); // 選択された日の最後まで含める
-      if (rowDate > endLimit) continue;
-    }
-
-    // 4. 金額の絞り込み（収入か支出のどちらかがしきい値以上）
-    if (income < minAmount && expense < minAmount) continue;
-
-    // --- すべての条件をクリアしたデータのみ以下に進む ---
-    
-    // 一覧用
-    filteredRecords.push({ date: dateStr, origin, income, expense, usage, content });
-    totalIncome += income;
-    totalExpense += expense;
-
-    // 月別集計（グラフ用）
-    if (!monthlyData[monthKey]) {
-      monthlyData[monthKey] = { income: 0, expense: 0 };
-    }
-    monthlyData[monthKey].income += income;
-    monthlyData[monthKey].expense += expense;
-
-    // 全期間支出（月平均用）
-    totalExpenseAllTime += expense;
-
-    // 今月分の集計
-    if (rowYear === currentYear && rowMonth === currentMonth) {
-      thisMonthIncome += income;
-      thisMonthExpense += expense;
-    }
+function applyFilters(isUserClick = false) {
+  // ユーザーがボタンを押した場合はローディングの円を回す
+  if (isUserClick) {
+    showLoading();
   }
 
-  // --- 📝 1. 履歴テーブルの描画 ---
-  // 日付の新しい順に並び替え
-  filteredRecords.sort((a, b) => b.date.localeCompare(a.date));
+  // 非同期（setTimeout）にして、確実にローディング円の描画をブラウザに挟み込む
+  setTimeout(() => {
+    const startDateStr = document.getElementById('filter-start-date').value;
+    const endDateStr = document.getElementById('filter-end-date').value;
+    const minAmount = parseInt(document.getElementById('filter-min-amount').value) || 0;
 
+    const checkedOrigins = Array.from(document.querySelectorAll('input[name="origin-check"]:checked')).map(el => el.value);
+    const checkedUsages = Array.from(document.querySelectorAll('input[name="usage-check"]:checked')).map(el => el.value);
+
+    globalFilteredRecords = [];
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    const monthlyData = {};
+    let totalExpenseAllTime = 0;
+    let thisMonthIncome = 0;
+    let thisMonthExpense = 0;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentDay = now.getDate();
+
+    for (let i = 1; i < cachedData.length; i++) {
+      const row = cachedData[i];
+      if (row.length < 4) continue;
+
+      const dateStr = row[0];
+      const origin = row[1] || '';
+      const income = parseInt(row[2]) || 0;
+      const expense = parseInt(row[3]) || 0;
+      const usage = row[4] || '';
+      const content = row[5] || '';
+
+      if (!dateStr) continue;
+
+      const rowDate = new Date(dateStr);
+      const rowYear = rowDate.getFullYear();
+      const rowMonth = rowDate.getMonth() + 1;
+      const monthKey = `${rowYear}-${String(rowMonth).padStart(2, '0')}`;
+
+      if (checkedOrigins.length > 0 && !checkedOrigins.includes(origin)) continue;
+      if (checkedUsages.length > 0 && !checkedUsages.includes(usage)) continue;
+
+      if (startDateStr && new Date(startDateStr) > rowDate) continue;
+      if (endDateStr) {
+        const endLimit = new Date(endDateStr);
+        endLimit.setHours(23, 59, 59, 999);
+        if (rowDate > endLimit) continue;
+      }
+
+      if (income < minAmount && expense < minAmount) continue;
+
+      globalFilteredRecords.push({ date: dateStr, origin, income, expense, usage, content });
+      totalIncome += income;
+      totalExpense += expense;
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { income: 0, expense: 0 };
+      }
+      monthlyData[monthKey].income += income;
+      monthlyData[monthKey].expense += expense;
+
+      totalExpenseAllTime += expense;
+
+      if (rowYear === currentYear && rowMonth === currentMonth) {
+        thisMonthIncome += income;
+        thisMonthExpense += expense;
+      }
+    }
+
+    // 最新順に並び替え
+    globalFilteredRecords.sort((a, b) => b.date.localeCompare(a.date));
+
+    // 100件表示カウンターを初期化してテーブルをクリア
+    currentDisplayedCount = 0;
+    document.querySelector('#history-table tbody').innerHTML = '';
+
+    // 最初の100件を描画
+    loadMoreRecords();
+
+    // ヘッダー情報の更新
+    document.getElementById('match-count').innerText = globalFilteredRecords.length;
+    document.getElementById('sum-income').innerText = `${totalIncome.toLocaleString()}円`;
+    document.getElementById('sum-expense').innerText = `${totalExpense.toLocaleString()}円`;
+
+    // 統計情報の計算
+    const dayAvg = Math.round(thisMonthExpense / currentDay);
+    if (document.getElementById('day-avg')) document.getElementById('day-avg').innerText = `${dayAvg.toLocaleString()}円`;
+
+    const totalMonths = Object.keys(monthlyData).length || 1;
+    const monthAvg = Math.round(totalExpenseAllTime / totalMonths);
+    if (document.getElementById('month-avg')) document.getElementById('month-avg').innerText = `${monthAvg.toLocaleString()}円`;
+
+    if (document.getElementById('month-total-income')) document.getElementById('month-total-income').innerText = `${thisMonthIncome.toLocaleString()}円`;
+    if (document.getElementById('month-total-expense')) document.getElementById('month-total-expense').innerText = `${thisMonthExpense.toLocaleString()}円`;
+
+    // 📊 グラフ描画
+    renderChart(monthlyData);
+
+    // 💡 ユーザーが能動的に「検索する」を押した場合、アコーディオンを自動展開！
+    if (isUserClick) {
+      toggleSection('graph', true);
+      toggleSection('list', true);
+      hideLoading(); // 処理が終わったら円を消す
+    }
+  }, 100); // 100ミリ秒の猶予でローディング表示を確定させる
+}
+
+// ==========================================
+// 📄 安全に100件ずつデータを追加描画する関数
+// ==========================================
+function loadMoreRecords() {
   const tbody = document.querySelector('#history-table tbody');
-  tbody.innerHTML = '';
+  const nextLimit = Math.min(currentDisplayedCount + PAGE_SIZE, globalFilteredRecords.length);
 
-  filteredRecords.forEach(row => {
+  for (let i = currentDisplayedCount; i < nextLimit; i++) {
+    const row = globalFilteredRecords[i];
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="font-size: 0.75rem; color: #64748b;">${row.date}</td>
@@ -195,87 +237,69 @@ function applyFilters() {
       </td>
     `;
     tbody.appendChild(tr);
-  });
+  }
 
-  // 件数と合計金額の更新
-  document.getElementById('match-count').innerText = filteredRecords.length;
-  document.getElementById('sum-income').innerText = `${totalIncome.toLocaleString()}円`;
-  document.getElementById('sum-expense').innerText = `${totalExpense.toLocaleString()}円`;
+  currentDisplayedCount = nextLimit;
 
+  // まだ後ろに未表示データがあれば「追加ボタン」を出し、なければ隠す
+  const btnContainer = document.getElementById('load-more-container');
+  if (currentDisplayedCount < globalFilteredRecords.length) {
+    btnContainer.style.display = 'block';
+  } else {
+    btnContainer.style.display = 'none';
+  }
+}
 
-  // --- 🧮 2. 統計情報（旧dashboard）の計算と表示 ---
-  // 1. 今月の1日あたりの平均支出
-  const dayAvg = Math.round(thisMonthExpense / currentDay);
-  const dayAvgEl = document.getElementById('day-avg');
-  if (dayAvgEl) dayAvgEl.innerText = `${dayAvg.toLocaleString()}円`;
-
-  // 2. 1ヶ月あたりの平均支出
-  const totalMonths = Object.keys(monthlyData).length || 1;
-  const monthAvg = Math.round(totalExpenseAllTime / totalMonths);
-  const monthAvgEl = document.getElementById('month-avg');
-  if (monthAvgEl) monthAvgEl.innerText = `${monthAvg.toLocaleString()}円`;
-
-  // 3. 今月の総計
-  const mIncomeEl = document.getElementById('month-total-income');
-  const mExpenseEl = document.getElementById('month-total-expense');
-  if (mIncomeEl) mIncomeEl.innerText = `${thisMonthIncome.toLocaleString()}円`;
-  if (mExpenseEl) mExpenseEl.innerText = `${thisMonthExpense.toLocaleString()}円`;
-
-
-  // --- 📊 3. グラフ（旧dashboard）の描画 ---
+// グラフ描画サブ関数
+function renderChart(monthlyData) {
   const chartCanvas = document.getElementById('monthlyChart');
-  if (chartCanvas) {
-    const sortedMonthKeys = Object.keys(monthlyData).sort();
-    const labels = sortedMonthKeys.map(key => {
-      const [y, m] = key.split('-');
-      return `${parseInt(m)}月`;
-    });
-    const incomeDataset = sortedMonthKeys.map(key => monthlyData[key].income);
-    const expenseDataset = sortedMonthKeys.map(key => monthlyData[key].expense);
+  if (!chartCanvas) return;
 
-    const ctx = chartCanvas.getContext('2d');
-    
-    // すでにグラフが存在していたら一度破棄する（Chart.jsの仕様上のバグ回避）
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
+  const sortedMonthKeys = Object.keys(monthlyData).sort();
+  const labels = sortedMonthKeys.map(key => {
+    const [y, m] = key.split('-');
+    return `${parseInt(m)}月`;
+  });
+  const incomeDataset = sortedMonthKeys.map(key => monthlyData[key].income);
+  const expenseDataset = sortedMonthKeys.map(key => monthlyData[key].expense);
 
-    // 新しくグラフを作成
-    chartInstance = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: '収入',
-            data: incomeDataset,
-            backgroundColor: 'rgba(15, 118, 110, 0.7)',
-            borderColor: '#0f766e',
-            borderWidth: 1
-          },
-          {
-            label: '支出',
-            data: expenseDataset,
-            backgroundColor: 'rgba(185, 28, 28, 0.7)',
-            borderColor: '#b91c1c',
-            borderWidth: 1
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: function(value) { return value.toLocaleString() + '円'; }
-            }
+  const ctx = chartCanvas.getContext('2d');
+  if (chartInstance) {
+    chartInstance.destroy();
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '収入',
+          data: incomeDataset,
+          backgroundColor: 'rgba(15, 118, 110, 0.7)',
+          borderColor: '#0f766e',
+          borderWidth: 1
+        },
+        {
+          label: '支出',
+          data: expenseDataset,
+          backgroundColor: 'rgba(185, 28, 28, 0.7)',
+          borderColor: '#b91c1c',
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) { return value.toLocaleString() + '円'; }
           }
         }
       }
-    });
-  }
-
-  hideLoading();
+    }
+  });
 }
