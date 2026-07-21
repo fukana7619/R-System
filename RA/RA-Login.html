@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R-System Account - 認証</title>
+  <style>
+    :root {
+      --primary-color: #0f766e;
+      --primary-hover: #0d615a;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-color: #0f172a;
+      --border-color: #e2e8f0;
+    }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      width: 90%;
+      max-width: 400px;
+    }
+    h2 {
+      margin-top: 0;
+      text-align: center;
+      color: var(--primary-color);
+      font-size: 1.4rem;
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      font-size: 0.85rem;
+      color: #475569;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 1rem;
+      background-color: #fafafa;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      background-color: #ffffff;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: var(--primary-hover);
+    }
+    .switch-link {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 0.85rem;
+      color: var(--primary-color);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    #status {
+      margin-top: 15px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .success { color: #0f766e; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2 id="form-title">🔑 R-System ログイン</h2>
+
+  <div id="login-form">
+    <div class="form-group">
+      <label for="login-id">ユーザーID</label>
+      <input type="text" id="login-id" placeholder="例: jiro">
+    </div>
+    <div class="form-group">
+      <label for="login-pass">パスワード</label>
+      <input type="password" id="login-pass" placeholder="••••••••">
+    </div>
+    <button onclick="handleLogin()">ログイン</button>
+    <div class="switch-link" onclick="switchMode('register')">新規アカウント作成はこちら</div>
+  </div>
+
+  <div id="register-form" style="display: none;">
+    <div class="form-group">
+      <label for="reg-id">希望ユーザーID</label>
+      <input type="text" id="reg-id" placeholder="半角英数字">
+    </div>
+    <div class="form-group">
+      <label for="reg-email">メールアドレス（認証コード受信用）</label>
+      <input type="email" id="reg-email" placeholder="example@email.com">
+    </div>
+    <div class="form-group">
+      <label for="reg-pass">パスワード</label>
+      <input type="password" id="reg-pass" placeholder="••••••••">
+    </div>
+    <button onclick="handleRegister()">認証コードを送信する</button>
+    <div class="switch-link" onclick="switchMode('login')">すでにアカウントをお持ちの方</div>
+  </div>
+
+  <div id="otp-form" style="display: none;">
+    <p style="font-size:0.85rem; color:#64748b; text-align:center;">
+      入力されたメールアドレスに届いた<br><strong>6桁のワンタイムパスワード</strong>を入力してください。
+    </p>
+    <div class="form-group">
+      <label for="otp-code">認証コード（6桁）</label>
+      <input type="text" id="otp-code" placeholder="123456" maxlength="6" style="text-align:center; font-size:1.4rem; letter-spacing:4px;">
+    </div>
+    <button onclick="handleVerifyOTP()">認証を完了する</button>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script>
+  // 💡 GASのURLをセット
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbxYb_SOQDiw-k30HciJfRMQvIp66dhoddcJa7Rn7bipj_PTlS8K2UsHPJY3MhEiwMMAaA/exec";
+
+  let tempUserId = ""; // OTP認証用に一時保持するID
+
+  function switchMode(mode) {
+    document.getElementById('status').innerText = '';
+    document.getElementById('login-form').style.display = mode === 'login' ? 'block' : 'none';
+    document.getElementById('register-form').style.display = mode === 'register' ? 'block' : 'none';
+    document.getElementById('otp-form').style.display = mode === 'otp' ? 'block' : 'none';
+
+    if (mode === 'login') document.getElementById('form-title').innerText = '🔑 R-System ログイン';
+    if (mode === 'register') document.getElementById('form-title').innerText = '📝 アカウント新規登録';
+    if (mode === 'otp') document.getElementById('form-title').innerText = '✉️ メール認証';
+  }
+
+  // 1. ログイン処理
+  async function handleLogin() {
+    const id = document.getElementById('login-id').value.trim();
+    const pass = document.getElementById('login-pass').value.trim();
+    const status = document.getElementById('status');
+
+    if (!id || !pass) return showStatus('⚠️ IDとパスワードを入力してください', true);
+
+    showStatus('⏳ ログイン確認中...');
+
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ cmd: 'ra_login', id: id, password: pass })
+      });
+      const result = await res.text();
+
+      if (result === 'OK') {
+        // 💡 競合を防ぐため RA 共通キーで保存
+        localStorage.setItem('ra_user_id', id);
+        localStorage.setItem('ra_user_password', pass);
+        showStatus('🎉 ログイン成功！', false);
+        setTimeout(() => { location.href = '../index.html'; }, 1000);
+      } else if (result.includes('NOT_VERIFIED')) {
+        tempUserId = id;
+        showStatus('⚠️ メール認証が未完了です。認証コードを入力してください。', true);
+        setTimeout(() => switchMode('otp'), 1500);
+      } else {
+        showStatus('❌ IDまたはパスワードが間違っています', true);
+      }
+    } catch (e) {
+      showStatus('⚠️ 通信エラーが発生しました', true);
+    }
+  }
+
+  // 2. 新規登録処理（OTP送信）
+  async function handleRegister() {
+    const id = document.getElementById('reg-id').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const pass = document.getElementById('reg-pass').value.trim();
+
+    if (!id || !email || !pass) return showStatus('⚠️ すべての項目を入力してください', true);
+
+    showStatus('⏳ 認証メールを送信中...');
+
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ cmd: 'ra_register', id: id, email: email, password: pass })
+      });
+      const result = await res.text();
+
+      if (result === 'OK_OTP_SENT') {
+        tempUserId = id;
+        showStatus('✉️ 認証コードを送信しました！', false);
+        setTimeout(() => switchMode('otp'), 1000);
+      } else if (result.includes('EXISTS')) {
+        showStatus('❌ このIDはすでに使われています', true);
+      } else {
+        showStatus(`❌ エラー: ${result}`, true);
+      }
+    } catch (e) {
+      showStatus('⚠️ 通信エラーが発生しました', true);
+    }
+  }
+
+  // 3. OTP検証処理
+  async function handleVerifyOTP() {
+    const otp = document.getElementById('otp-code').value.trim();
+
+    if (!otp || otp.length !== 6) return showStatus('⚠️ 6桁のコードを入力してください', true);
+
+    showStatus('⏳ 認証コードを確認中...');
+
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ cmd: 'ra_verify_otp', id: tempUserId, otp: otp })
+      });
+      const result = await res.text();
+
+      if (result === 'OK_VERIFIED') {
+        showStatus('🎉 アカウント認証が完了しました！ログインしてください。', false);
+        setTimeout(() => switchMode('login'), 1500);
+      } else if (result.includes('EXPIRED')) {
+        showStatus('❌ 認証コードの期限が切れています。再度登録し直してください。', true);
+      } else {
+        showStatus('❌ 認証コードが正しくありません', true);
+      }
+    } catch (e) {
+      showStatus('⚠️ 通信エラーが発生しました', true);
+    }
+  }
+
+  function showStatus(msg, isError = false) {
+    const status = document.getElementById('status');
+    status.className = isError ? 'error' : 'success';
+    status.innerText = msg;
+  }
+</script>
+
+</body>
+</html>
