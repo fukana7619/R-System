@@ -5,10 +5,10 @@ const gasUrl = "https://script.google.com/macros/s/AKfycbyq390aNAlrVCuP6eujz4LQp
 const userId = localStorage.getItem('ra_user_id');
 const password = localStorage.getItem('ra_user_password');
 
-// 💡 認証チェック：未ログインの場合は RA-Login.html へ自分へのバックURL付きでリダイレクト
+// 💡 認証チェック：未ログインの場合は 1つ上の階層にある ../RA/RA-Login.html へリダイレクト
 if (!userId || !password) {
   const currentUrl = encodeURIComponent(window.location.href);
-  location.href = `./RA/RA-Login.html?backurl=${currentUrl}`;
+  location.href = `../RA/RA-Login.html?backurl=${currentUrl}`;
 }
 
 let cachedData = []; 
@@ -55,7 +55,7 @@ function logout() {
     localStorage.removeItem('ra_user_id');
     localStorage.removeItem('ra_user_password');
     const currentUrl = encodeURIComponent(window.location.href);
-    location.href = `./RA/RA-Login.html?backurl=${currentUrl}`;
+    location.href = `../RA/RA-Login.html?backurl=${currentUrl}`;
   }
 }
 
