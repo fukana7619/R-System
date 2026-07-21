@@ -150,10 +150,27 @@
 </div>
 
 <script>
-  // 💡 指定していただいた新しいGAS URL
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyq390aNAlrVCuP6eujz4LQpJCew8GHYR9eCzhCSmp6m6cqKSLmzHu2lsxKzoc5zBfS/exec";
 
   let tempUserId = ""; // OTP認証用に一時保持するID
+
+  // URLからパラメータを取得する便利関数
+  function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+  }
+
+  // ログイン成功時の移動先を判定・リダイレクトする関数
+  function redirectAfterLogin() {
+    const backUrl = getQueryParam('backurl');
+    if (backUrl) {
+      // 💡 backurl が指定されていれば解読してジャンプ
+      location.href = decodeURIComponent(backUrl);
+    } else {
+      // 💡 パラメータが無ければ同階層の RA-Settings.html へジャンプ
+      location.href = 'RA-Settings.html';
+    }
+  }
 
   function switchMode(mode) {
     document.getElementById('status').innerText = '';
@@ -184,11 +201,12 @@
       const result = await res.text();
 
       if (result === 'OK') {
-        // RA共通キーでLocalStorageに保存
         localStorage.setItem('ra_user_id', id);
         localStorage.setItem('ra_user_password', pass);
-        showStatus('🎉 ログイン成功！', false);
-        setTimeout(() => { location.href = '../index.html'; }, 1000);
+        showStatus('🎉 ログイン成功！転送します...', false);
+
+        setTimeout(redirectAfterLogin, 1000);
+
       } else if (result.includes('NOT_VERIFIED')) {
         tempUserId = id;
         showStatus('⚠️ メール認証が未完了です。認証コードを入力してください。', true);
