@@ -1,9 +1,14 @@
-const gasUrl = localStorage.getItem('gas_url');
-const userId = localStorage.getItem('user_id');
-const password = localStorage.getItem('user_password');
+// 💡 R-System 共通 GAS URL
+const gasUrl = "https://script.google.com/macros/s/AKfycbyq390aNAlrVCuP6eujz4LQpJCew8GHYR9eCzhCSmp6m6cqKSLmzHu2lsxKzoc5zBfS/exec";
 
-if (!gasUrl || !userId || !password) {
-  location.href = 'user.html';
+// 💡 RA (R-System Account) からログイン情報を取得
+const userId = localStorage.getItem('ra_user_id');
+const password = localStorage.getItem('ra_user_password');
+
+// 💡 認証チェック：未ログインの場合は RA-Login.html へ自分へのバックURL付きでリダイレクト
+if (!userId || !password) {
+  const currentUrl = encodeURIComponent(window.location.href);
+  location.href = `./RA/RA-Login.html?backurl=${currentUrl}`;
 }
 
 let cachedData = []; 
@@ -35,20 +40,22 @@ window.onload = async function() {
   const localCache = localStorage.getItem(`cache_${userId}`);
   
   if (localCache) {
-    // キャッシュがあるなら「一瞬で」画面を組み立てて、裏で静かに同期（ぐるぐるは回さない）
+    // キャッシュがあるなら画面を組み立てて裏で静かに同期
     cachedData = JSON.parse(localCache);
     updateDashboardAndTable(true);
     await fetchDataAndCalculate(false, false); 
   } else {
-    // 💡 キャッシュがない（初回・ログアウト直後など）なら、絶対にデータが必要なのでぐるぐるを回して待たせる！
+    // キャッシュがないならスピナーを回して取得待機
     await fetchDataAndCalculate(false, true); 
   }
 };
 
 function logout() {
   if (confirm('ログアウトしますか？')) {
-    localStorage.clear();
-    location.href = 'user.html';
+    localStorage.removeItem('ra_user_id');
+    localStorage.removeItem('ra_user_password');
+    const currentUrl = encodeURIComponent(window.location.href);
+    location.href = `./RA/RA-Login.html?backurl=${currentUrl}`;
   }
 }
 
@@ -64,7 +71,7 @@ function toggleInput(prefix) {
   }
 }
 
-// ウィンドウサイズが変更されたら、自動で履歴の表示件数を再計算して描画し直す
+// ウィンドウサイズが変更されたら履歴表示件数を自動再計算
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
@@ -107,7 +114,7 @@ async function fetchDataAndCalculate(showNotification = false, useSpinner = true
     statusDiv.className = ''; 
     statusDiv.innerText = 'データを更新中...'; 
   }
-  if (useSpinner) showLoading(); // 指定されたときだけ円をぐるぐる回す
+  if (useSpinner) showLoading();
 
   try {
     await fetchVersion();
@@ -120,7 +127,7 @@ async function fetchDataAndCalculate(showNotification = false, useSpinner = true
     const csvText = await response.text();
     if (csvText.includes('Sheet not found')) {
       statusDiv.className = 'error';
-      statusDiv.innerText = 'シートが存在しません。ユーザー名のシートを作成してください。';
+      statusDiv.innerText = 'シートが存在しません。管理者へお問い合わせください。';
       hideLoading();
       return;
     }
@@ -143,7 +150,7 @@ async function fetchDataAndCalculate(showNotification = false, useSpinner = true
       statusDiv.innerText = 'データの更新に失敗しました。';
     }
   } finally {
-    hideLoading(); // 通信が終わったら円を消す
+    hideLoading();
   }
 }
 
