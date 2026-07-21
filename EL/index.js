@@ -1,5 +1,5 @@
-// 💡 R-System 共通 GAS URL
-const gasUrl = "https://script.google.com/macros/s/AKfycbyq390aNAlrVCuP6eujz4LQpJCew8GHYR9eCzhCSmp6m6cqKSLmzHu2lsxKzoc5zBfS/exec";
+// 💡 収支簿(EL)専用 GAS URL
+const gasUrl = "https://script.google.com/macros/s/AKfycbxYb_SOQDiw-k30HciJfRMQvIp66dhoddcJa7Rn7bipj_PTlS8K2UsHPJY3MhEiwMMAaA/exec";
 
 // 💡 RA (R-System Account) からログイン情報を取得
 const userId = localStorage.getItem('ra_user_id');
