@@ -94,6 +94,7 @@
       text-align: center;
       font-weight: bold;
       font-size: 0.9rem;
+      line-height: 1.4;
     }
     .success { color: #0f766e; }
     .error { color: #b91c1c; }
@@ -149,8 +150,8 @@
 </div>
 
 <script>
-  // 💡 GASのURLをセット
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxYb_SOQDiw-k30HciJfRMQvIp66dhoddcJa7Rn7bipj_PTlS8K2UsHPJY3MhEiwMMAaA/exec";
+  // 💡 指定していただいた新しいGAS URL
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyq390aNAlrVCuP6eujz4LQpJCew8GHYR9eCzhCSmp6m6cqKSLmzHu2lsxKzoc5zBfS/exec";
 
   let tempUserId = ""; // OTP認証用に一時保持するID
 
@@ -169,7 +170,6 @@
   async function handleLogin() {
     const id = document.getElementById('login-id').value.trim();
     const pass = document.getElementById('login-pass').value.trim();
-    const status = document.getElementById('status');
 
     if (!id || !pass) return showStatus('⚠️ IDとパスワードを入力してください', true);
 
@@ -184,7 +184,7 @@
       const result = await res.text();
 
       if (result === 'OK') {
-        // 💡 競合を防ぐため RA 共通キーで保存
+        // RA共通キーでLocalStorageに保存
         localStorage.setItem('ra_user_id', id);
         localStorage.setItem('ra_user_password', pass);
         showStatus('🎉 ログイン成功！', false);
