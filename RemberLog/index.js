@@ -1,16 +1,16 @@
-// 💡 おぼログ専用 GAS URL（必要に応じて書き換えてください）
-const gasUrl = "https://script.google.com/macros/s/YOUR_GAS_DEPLOYMENT_ID/exec";
+// 💡 おぼログ専用 GAS URL
+const gasUrl = "https://script.google.com/macros/s/AKfycbxowZsvBN-F13yUesQF5iFwAccdcfh_ByawUxWtwkeFrdyo9Yq9l6PZ3oXaZTz9pTHp/exec";
 
 // 💡 RA (R-System Account) からログイン情報を取得
 const userId = localStorage.getItem('ra_user_id');
 const password = localStorage.getItem('ra_user_password');
 
-// 💡 認証チェック：未ログインの場合は ../RA/RA-Login.html へリダイレクト
 if (!userId || !password) {
   const currentUrl = encodeURIComponent(window.location.href);
   location.href = `../RA/RA-Login.html?backurl=${currentUrl}`;
 }
 
+let currentDictId = "default"; // 現在選択されている辞書ID
 let cachedData = []; 
 let editIndex = -1; 
 
@@ -24,19 +24,11 @@ function hideLoading() {
   if (overlay) overlay.style.display = 'none';
 }
 
-// 1. 初期化処理
 window.onload = async function() {
   document.getElementById('display-user').innerText = userId;
-
-  // キャッシュ確認
-  const localCache = localStorage.getItem(`cache_obolog_${userId}`);
-  if (localCache) {
-    cachedData = JSON.parse(localCache);
-    updateDashboardAndTable(true);
-    await fetchDataAndCalculate(false, false); 
-  } else {
-    await fetchDataAndCalculate(false, true); 
-  }
+  
+  // 目次（MOKUJI）の読み込み後に単語データを取得
+  await fetchMokujiAndInit();
 };
 
 function logout() {
@@ -60,7 +52,63 @@ function toggleInput(prefix) {
   }
 }
 
-// 2. API（GAS）連携
+// MOKUJIから辞書一覧を取得してセレクトボックスを構築
+async function fetchMokujiAndInit() {
+  showLoading();
+  try {
+    const response = await fetch(gasUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: 'MOKUJI' })
+    });
+    const csvText = await response.text();
+    const lines = csvText.split('\n').filter(l => l.trim() !== '');
+    
+    const dictSelect = document.getElementById('dictionary-select');
+    dictSelect.innerHTML = '';
+
+    if (lines.length > 1) {
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+        const dictId = row[0];
+        const dictName = row[1] || dictId;
+        const opt = document.createElement('option');
+        opt.value = dictId;
+        opt.innerText = dictName;
+        dictSelect.appendChild(opt);
+      }
+      currentDictId = dictSelect.value;
+    } else {
+      // MOKUJIが空の場合はユーザーIDシートまたはデフォルトIDを適用
+      const opt = document.createElement('option');
+      opt.value = userId;
+      opt.innerText = `${userId}の単語帳`;
+      dictSelect.appendChild(opt);
+      currentDictId = userId;
+    }
+
+    // キャッシュ確認と読み込み
+    const localCache = localStorage.getItem(`cache_obolog_${currentDictId}`);
+    if (localCache) {
+      cachedData = JSON.parse(localCache);
+      updateDashboardAndTable(true);
+      await fetchDataAndCalculate(false, false);
+    } else {
+      await fetchDataAndCalculate(false, true);
+    }
+  } catch (err) {
+    console.error("MOKUJI load failed:", err);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function changeDictionary() {
+  currentDictId = document.getElementById('dictionary-select').value;
+  await fetchDataAndCalculate(true, true);
+}
+
+// 辞書データ（辞書IDシート）の取得
 async function fetchDataAndCalculate(showNotification = false, useSpinner = true) {
   const statusDiv = document.getElementById('status');
   
@@ -74,7 +122,7 @@ async function fetchDataAndCalculate(showNotification = false, useSpinner = true
     const response = await fetch(gasUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: 'おぼログ' })
+      body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: currentDictId })
     });
 
     const csvText = await response.text();
@@ -87,7 +135,7 @@ async function fetchDataAndCalculate(showNotification = false, useSpinner = true
 
     const lines = csvText.split('\n').filter(line => line.trim() !== '');
     cachedData = lines.map(line => line.split(','));
-    localStorage.setItem(`cache_obolog_${userId}`, JSON.stringify(cachedData));
+    localStorage.setItem(`cache_obolog_${currentDictId}`, JSON.stringify(cachedData));
 
     updateDashboardAndTable(true);
 
@@ -107,7 +155,6 @@ async function fetchDataAndCalculate(showNotification = false, useSpinner = true
   }
 }
 
-// 3. UI・フィルタ生成
 function buildDynamicSelect(prefix, columnIndex, allRecords) {
   const select = document.getElementById(`${prefix}-select`);
   const textInput = document.getElementById(`${prefix}-text`);
@@ -154,32 +201,9 @@ function buildDynamicSelect(prefix, columnIndex, allRecords) {
   }
 }
 
-function buildCategoryFilter(allRecords) {
-  const filterSelect = document.getElementById('category-filter');
-  const currentValue = filterSelect.value;
-
-  const categories = [];
-  allRecords.forEach(r => {
-    if (r.category && !categories.includes(r.category)) {
-      categories.push(r.category);
-    }
-  });
-
-  filterSelect.innerHTML = '<option value="__all__">✨ 全てのカテゴリ</option>';
-  categories.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c;
-    opt.innerText = `📂 ${c}`;
-    filterSelect.appendChild(opt);
-  });
-
-  filterSelect.value = categories.includes(currentValue) ? currentValue : '__all__';
-}
-
 function updateDashboardAndTable(shouldRebuildFilter = false) {
   const allRecords = [];
 
-  // 1行目はヘッダーなので index = 1 からループ
   for (let i = 1; i < cachedData.length; i++) {
     const row = cachedData[i];
     if (row.length < 3) continue;
@@ -196,16 +220,8 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
     allRecords.push({ originalIndex: i, date: dateStr, word, meaning, category, status, memo, rawRow: row });
   }
 
-  if (shouldRebuildFilter) {
-    buildCategoryFilter(allRecords);
-  }
-
-  const selectedCategory = document.getElementById('category-filter').value;
-  const filteredRecords = allRecords.filter(r => selectedCategory === '__all__' || r.category === selectedCategory);
-
-  // 集計計算
-  const totalCount = filteredRecords.length;
-  const learnedCount = filteredRecords.filter(r => r.status === '習得済み' || r.status === '覚えた').length;
+  const totalCount = allRecords.length;
+  const learnedCount = allRecords.filter(r => r.status === '習得済み' || r.status === '覚えた').length;
   const rate = totalCount > 0 ? Math.round((learnedCount / totalCount) * 100) : 0;
 
   document.getElementById('total-count').innerText = `${totalCount}語`;
@@ -213,11 +229,10 @@ function updateDashboardAndTable(shouldRebuildFilter = false) {
 
   buildDynamicSelect('category', 3, allRecords);
 
-  // テーブル描画
   const tbody = document.querySelector('#history-table tbody');
   tbody.innerHTML = '';
 
-  filteredRecords.forEach(row => {
+  allRecords.forEach(row => {
     const tr = document.createElement('tr');
     const isLearned = row.status === '習得済み' || row.status === '覚えた';
     const statusBadge = isLearned 
@@ -249,7 +264,6 @@ function getInputValue(prefix) {
   return select.value;
 }
 
-// 4. 追加・編集・削除・同期処理
 function startEdit(index) {
   editIndex = index;
   const row = cachedData[index];
@@ -296,7 +310,7 @@ async function syncLocalDbToSpreadsheet() {
   const response = await fetch(gasUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'import', sheet: 'おぼログ', value1: csvContent })
+    body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'import', sheet: currentDictId, value1: csvContent })
   });
   if (await response.text() !== 'OK') throw new Error('Sync failed');
 }
@@ -310,7 +324,7 @@ async function deleteRecord(index) {
   try {
     cachedData.splice(index, 1);
     await syncLocalDbToSpreadsheet();
-    localStorage.setItem(`cache_obolog_${userId}`, JSON.stringify(cachedData));
+    localStorage.setItem(`cache_obolog_${currentDictId}`, JSON.stringify(cachedData));
     updateDashboardAndTable(true);
     statusDiv.className = 'success'; statusDiv.innerText = '削除が完了しました。';
     setTimeout(() => { statusDiv.innerText = ''; }, 2000);
@@ -342,12 +356,11 @@ async function addRecord() {
 
   try {
     if (editIndex === -1) {
-      // 日付は空で送信し、GAS側で日本時間タイムスタンプ補完（1列目）
       const csvRow = `,${word},${meaning},${category},${statusVal},${memo}`;
       const response = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ id: userId, password: password, cmd: 'enterline', option: 'last', sheet: 'おぼログ', value1: csvRow })
+        body: JSON.stringify({ id: userId, password: password, cmd: 'enterline', option: 'last', sheet: currentDictId, value1: csvRow })
       });
 
       const result = await response.text();
@@ -355,7 +368,7 @@ async function addRecord() {
         statusDiv.className = 'success'; statusDiv.innerText = '登録を完了しました。';
         const addedRow = result.substring(3).split(','); 
         cachedData.push(addedRow);
-        localStorage.setItem(`cache_obolog_${userId}`, JSON.stringify(cachedData));
+        localStorage.setItem(`cache_obolog_${currentDictId}`, JSON.stringify(cachedData));
         
         document.getElementById('word').value = '';
         document.getElementById('meaning').value = '';
@@ -372,7 +385,7 @@ async function addRecord() {
       const originalTime = cachedData[editIndex][0] || '';
       cachedData[editIndex] = [originalTime, word, meaning, category, statusVal, memo];
       await syncLocalDbToSpreadsheet();
-      localStorage.setItem(`cache_obolog_${userId}`, JSON.stringify(cachedData));
+      localStorage.setItem(`cache_obolog_${currentDictId}`, JSON.stringify(cachedData));
       
       statusDiv.className = 'success'; statusDiv.innerText = '修正が完了しました。';
       cancelEdit();
