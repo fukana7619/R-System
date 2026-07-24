@@ -3,17 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>おぼログ - 単語帳</title>
+  <title>おぼログ - ホーム</title>
   <link rel="stylesheet" href="index.css">
   <script src="index.js" defer></script>
 </head>
 <body>
 
 <div class="header">
-  <h1>📖 おぼログ</h1>
+  <h1>📖 おぼログ Dashboard</h1>
   <div class="header-right">
-    <div id="version-tag" class="version-display" style="display:none;">Ver -.-.-</div>
-    <button class="refresh-btn" onclick="fetchDataAndCalculate(true)">最新の状態に更新</button>
+    <button class="refresh-btn" onclick="syncAllData()">最新データの同期</button>
     <button class="logout-btn" onclick="logout()">ログアウト</button>
   </div>
 </div>
@@ -21,105 +20,49 @@
 <div class="main-layout">
   <div class="left-col">
     <div class="card">
-      <table class="user-filter-table">
-        <tr>
-          <td style="width: 40%; font-size: 0.85rem; color: #64748b;">
-            ユーザー: <strong><span id="display-user">...</span></strong>
-          </td>
-          <td style="width: 60%; text-align: right; font-size: 0.85rem; color: #475569;">
-            <label style="display:inline; margin-right:5px;">辞書選択:</label>
-            <select id="dictionary-select" class="filter-select" onchange="changeDictionary()">
-              </select>
-          </td>
-        </tr>
-      </table>
-      
-      <table class="dashboard-table" style="margin-top: 10px;">
-        <tr>
-          <td>
-            <div class="dash-box">
-              <div class="dash-title">登録単語数</div>
-              <div class="dash-value" id="total-count">0語</div>
-            </div>
-          </td>
-          <td>
-            <div class="dash-box">
-              <div class="dash-title">習得率（達成度）</div>
-              <div class="dash-value" id="learned-rate">0%</div>
-            </div>
-          </td>
-        </tr>
-      </table>
+      <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">
+        ユーザー: <strong><span id="display-user">...</span></strong>
+      </div>
+      <div class="form-group">
+        <label for="dictionary-select">学習する単語帳 (ISBN)</label>
+        <select id="dictionary-select" onchange="onDictionaryChange()">
+          </select>
+      </div>
+      <button class="submit-btn" style="margin-top: 8px; background-color: #10b981;" onclick="startQuiz()">
+        🚀 この単語帳で学習を始める
+      </button>
     </div>
 
     <div class="card">
-      <h3 id="form-title">単語の登録</h3>
-      
-      <div class="form-group">
-        <label for="word">単語 / 用語</label>
-        <input type="text" id="word" placeholder="例: apple">
+      <h3>📊 学習アナリティクス</h3>
+      <div class="dash-box" style="margin-bottom: 8px;">
+        <div class="dash-title">総学習単語数</div>
+        <div class="dash-value" id="total-learned-count">0語</div>
       </div>
-
-      <div class="form-group">
-        <label for="meaning">意味 / 訳</label>
-        <input type="text" id="meaning" placeholder="例: りんご">
+      <div class="dash-box" style="margin-bottom: 8px;">
+        <div class="dash-title">選択中単語帳の達成度</div>
+        <div class="dash-value" id="current-progress-rate">0%</div>
       </div>
-
-      <div class="form-group">
-        <label for="category-select">カテゴリ</label>
-        <table class="input-row-table">
-          <tr>
-            <td>
-              <select id="category-select" onchange="toggleInput('category')">
-                <option value="__other__">その他（自由入力）</option>
-              </select>
-            </td>
-            <td id="category-text-cell" class="text-input-cell">
-              <input type="text" id="category-text" class="dynamic-text-input" placeholder="例: 名詞, 動詞, IT用語">
-            </td>
-          </tr>
-        </table>
+      <div class="dash-box">
+        <div class="dash-title">連続学習日数</div>
+        <div class="dash-value" id="streak-days">0日</div>
       </div>
-
-      <div class="form-group">
-        <label for="status-select">学習状況</label>
-        <select id="status-select">
-          <option value="未習得">🔴 未習得</option>
-          <option value="習得済み">🟢 覚えた（習得済み）</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="memo">補足 / 例文</label>
-        <input type="text" id="memo" placeholder="例: An apple a day keeps the doctor away.">
-      </div>
-
-      <button class="submit-btn" id="submit-button" onclick="addRecord()">登録する</button>
-      <button class="submit-btn" id="cancel-button" onclick="cancelEdit()" style="display:none; background-color: #64748b; margin-top: 8px;">キャンセル</button>
-      <div id="status"></div>
     </div>
   </div>
 
   <div class="right-col">
     <div class="card">
-      <table class="history-header">
-        <tr>
-          <td><h3 style="margin:0; border-left:4px solid var(--primary-color, #3b82f6); padding-left:8px;">単語一覧</h3></td>
-          <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
-            <a href="card.html" class="refresh-btn" style="text-decoration: none; background-color: #3b82f6; font-size: 0.85rem; padding: 6px 12px;">🎴 暗記カードモード</a>
-          </td>
-        </tr>
-      </table>
+      <h3 id="book-title">単語帳の概要</h3>
+      <p id="book-description" style="font-size: 0.9rem; color: #64748b; margin-bottom: 12px;">データ取得中...</p>
       
-      <div class="table-container">
-        <table id="history-table" class="data-table">
+      <h4>収録単語一覧 (プレビュー)</h4>
+      <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+        <table id="word-preview-table" class="data-table">
           <thead>
             <tr>
-              <th style="width: 25%;">単語</th>
-              <th style="width: 25%;">意味</th>
-              <th style="width: 20%;">カテゴリ</th>
-              <th style="width: 15%; text-align: center;">状態</th>
-              <th style="width: 15%; text-align: center;">操作</th>
+              <th>単語</th>
+              <th>意味</th>
+              <th>カテゴリ</th>
             </tr>
           </thead>
           <tbody>
