@@ -10,7 +10,7 @@
 <body>
 
 <div class="header">
-  <h1>📖 おぼログ Dashboard</h1>
+  <h1>📖 おぼログ</h1>
   <div class="header-right">
     <button class="refresh-btn" onclick="syncAllData()">最新データの同期</button>
     <button class="logout-btn" onclick="logout()">ログアウト</button>
@@ -20,31 +20,29 @@
 <div class="main-layout">
   <div class="left-col">
     <div class="card">
-      <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">
-        ユーザー: <strong><span id="display-user">...</span></strong>
+      <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">現在の学習コース</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 id="current-course-title" style="font-size: 1.1rem; margin: 0;">コースを選択してください</h2>
+        <button class="action-btn edit-btn" onclick="openCourseModal()" style="padding: 6px 10px;">コース変更 🔄</button>
       </div>
-      <div class="form-group">
-        <label for="dictionary-select">学習する単語帳 (ISBN)</label>
-        <select id="dictionary-select" onchange="onDictionaryChange()">
-          </select>
-      </div>
-      <button class="submit-btn" style="margin-top: 8px; background-color: #10b981;" onclick="startQuiz()">
-        🚀 この単語帳で学習を始める
+
+      <button class="submit-btn" style="background-color: #10b981; font-size: 1rem; padding: 12px;" onclick="startQuiz()">
+        🚀 学習をはじめる
       </button>
     </div>
 
     <div class="card">
-      <h3>📊 学習アナリティクス</h3>
+      <h3>📊 あなたの学習状況</h3>
       <div class="dash-box" style="margin-bottom: 8px;">
-        <div class="dash-title">総学習単語数</div>
+        <div class="dash-title">覚えた単語数</div>
         <div class="dash-value" id="total-learned-count">0語</div>
       </div>
       <div class="dash-box" style="margin-bottom: 8px;">
-        <div class="dash-title">選択中単語帳の達成度</div>
+        <div class="dash-title">コースの達成度</div>
         <div class="dash-value" id="current-progress-rate">0%</div>
       </div>
       <div class="dash-box">
-        <div class="dash-title">連続学習日数</div>
+        <div class="dash-title">連続学習記録</div>
         <div class="dash-value" id="streak-days">0日</div>
       </div>
     </div>
@@ -53,10 +51,10 @@
   <div class="right-col">
     <div class="card">
       <h3 id="book-title">単語帳の概要</h3>
-      <p id="book-description" style="font-size: 0.9rem; color: #64748b; margin-bottom: 12px;">データ取得中...</p>
+      <p id="book-description" style="font-size: 0.9rem; color: #64748b; margin-bottom: 12px;">コースを選択するとプレビューが表示されます。</p>
       
-      <h4>収録単語一覧 (プレビュー)</h4>
-      <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+      <h4>収録単語一覧</h4>
+      <div class="table-container" style="max-height: 420px; overflow-y: auto;">
         <table id="word-preview-table" class="data-table">
           <thead>
             <tr>
@@ -70,6 +68,17 @@
         </table>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="course-modal" class="loading-overlay" style="display: none;">
+  <div class="card" style="width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; background: #fff; padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h3 style="margin: 0; border: none; padding: 0;">🎯 コースを選択</h3>
+      <button onclick="closeCourseModal()" style="border: none; background: none; font-size: 1.2rem; cursor: pointer;">✖</button>
+    </div>
+    <div id="course-list" style="display: flex; flex-direction: column; gap: 12px;">
+      </div>
   </div>
 </div>
 
