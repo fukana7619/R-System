@@ -27,10 +27,9 @@
             ユーザー: <strong><span id="display-user">...</span></strong>
           </td>
           <td style="width: 60%; text-align: right; font-size: 0.85rem; color: #475569;">
-            <label style="display:inline; margin-right:5px;">絞り込み:</label>
-            <select id="category-filter" class="filter-select" onchange="updateDashboardAndTable()">
-              <option value="__all__">✨ 全てのカテゴリ</option>
-            </select>
+            <label style="display:inline; margin-right:5px;">辞書選択:</label>
+            <select id="dictionary-select" class="filter-select" onchange="changeDictionary()">
+              </select>
           </td>
         </tr>
       </table>
@@ -76,7 +75,7 @@
               </select>
             </td>
             <td id="category-text-cell" class="text-input-cell">
-              <input type="text" id="category-text" class="dynamic-text-input" placeholder="例: 英単語, IT用語">
+              <input type="text" id="category-text" class="dynamic-text-input" placeholder="例: 名詞, 動詞, IT用語">
             </td>
           </tr>
         </table>
