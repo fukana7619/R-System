@@ -10,7 +10,7 @@ if (!userId || !password) {
 
 let currentIsbn = "";
 let mokujiData = [];
-let localProgress = {}; 
+let localProgress = {};
 
 function showLoading() {
   const overlay = document.getElementById('loading-overlay');
@@ -37,7 +37,7 @@ function logout() {
   }
 }
 
-// LocalDBからユーザー進捗JSONを取得
+// ユーザー進捗JSONの読み込み
 function loadLocalProgress() {
   const saved = localStorage.getItem(`progress_${userId}`);
   if (saved) {
@@ -49,7 +49,7 @@ function loadLocalProgress() {
   }
 }
 
-// 目次(MOKUJI)の取得とセレクトボックス初期化
+// 目次(MOKUJI)から全コース（単語帳）を取得
 async function initMokujiAndData() {
   showLoading();
   try {
@@ -61,10 +61,7 @@ async function initMokujiAndData() {
     const csvText = await response.text();
     const lines = csvText.split('\n').filter(l => l.trim() !== '');
 
-    const select = document.getElementById('dictionary-select');
-    select.innerHTML = '';
     mokujiData = [];
-
     if (lines.length > 1) {
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(',');
@@ -73,17 +70,19 @@ async function initMokujiAndData() {
         const desc = row[4] || '';
 
         mokujiData.push({ isbn, name, desc });
-
-        const opt = document.createElement('option');
-        opt.value = isbn;
-        opt.innerText = `${name} (ISBN: ${isbn})`;
-        select.appendChild(opt);
       }
-      currentIsbn = select.value;
+    }
+
+    // 最後に選択していたコース、または先頭のコースをセット
+    const savedIsbn = localStorage.getItem(`selected_isbn_${userId}`);
+    if (savedIsbn && mokujiData.some(b => b.isbn === savedIsbn)) {
+      currentIsbn = savedIsbn;
+    } else if (mokujiData.length > 0) {
+      currentIsbn = mokujiData[0].isbn;
     }
 
     if (currentIsbn) {
-      await loadWordBookData(currentIsbn);
+      await selectCourse(currentIsbn);
     }
   } catch (err) {
     console.error("MOKUJI取得エラー:", err);
@@ -92,7 +91,15 @@ async function initMokujiAndData() {
   }
 }
 
-// 選択されたISBNの単語帳データをLocalDBまたはGASから読み込む
+// コースの選択＆データ読込
+async function selectCourse(isbn) {
+  currentIsbn = isbn;
+  localStorage.setItem(`selected_isbn_${userId}`, isbn);
+  closeCourseModal();
+  await loadWordBookData(isbn);
+}
+
+// 単語帳データのロード (LocalDBキャッシュ優先)
 async function loadWordBookData(isbn) {
   showLoading();
   const cacheKey = `book_${isbn}`;
@@ -119,7 +126,7 @@ async function loadWordBookData(isbn) {
       }
       localStorage.setItem(cacheKey, JSON.stringify(words));
     } catch (e) {
-      console.error("単語取得失敗:", e);
+      console.error("単語データ読み込み失敗:", e);
     }
   }
 
@@ -127,20 +134,16 @@ async function loadWordBookData(isbn) {
   hideLoading();
 }
 
-async function onDictionaryChange() {
-  currentIsbn = document.getElementById('dictionary-select').value;
-  await loadWordBookData(currentIsbn);
-}
-
-// ダッシュボード・アナリティクス表示の更新
+// UI描画の更新
 function updateDashboardUI(isbn, words) {
   const book = mokujiData.find(b => b.isbn === isbn);
   if (book) {
+    document.getElementById('current-course-title').innerText = book.name;
     document.getElementById('book-title').innerText = book.name;
     document.getElementById('book-description').innerText = book.desc || '説明なし';
   }
 
-  // テーブル描画
+  // プレビューテーブル描画
   const tbody = document.querySelector('#word-preview-table tbody');
   tbody.innerHTML = '';
   words.forEach(w => {
@@ -153,7 +156,7 @@ function updateDashboardUI(isbn, words) {
     tbody.appendChild(tr);
   });
 
-  // 進捗アナリティクス計算
+  // 進捗度計算
   const progress = localProgress[isbn] || { learnedCount: 0, streak: 0 };
   const totalWords = words.length;
   const rate = totalWords > 0 ? Math.round((progress.learnedCount / totalWords) * 100) : 0;
@@ -163,15 +166,56 @@ function updateDashboardUI(isbn, words) {
   document.getElementById('streak-days').innerText = `${progress.streak || 0}日`;
 }
 
-// 最新データの完全同期（手動更新）
+// モーダル表示ロジック（Duolingo風コース一覧リスト生成）
+function openCourseModal() {
+  const container = document.getElementById('course-list');
+  container.innerHTML = '';
+
+  mokujiData.forEach(book => {
+    const progress = localProgress[book.isbn] || { learnedCount: 0 };
+    const card = document.createElement('div');
+    card.style.cssText = `
+      border: 2px solid ${book.isbn === currentIsbn ? '#3b82f6' : '#e2e8f0'};
+      background: ${book.isbn === currentIsbn ? '#eff6ff' : '#fff'};
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: border-color 0.2s;
+    `;
+    card.onclick = () => selectCourse(book.isbn);
+
+    card.innerHTML = `
+      <div>
+        <div style="font-weight: bold; color: #1e293b;">📖 ${book.name}</div>
+        <div style="font-size: 0.75rem; color: #64748b;">ISBN: ${book.isbn}</div>
+      </div>
+      <div style="text-align: right;">
+        <span style="font-weight: bold; color: #3b82f6;">${progress.learnedCount || 0}語クリア</span>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById('course-modal').style.display = 'flex';
+}
+
+function closeCourseModal() {
+  document.getElementById('course-modal').style.display = 'none';
+}
+
 async function syncAllData() {
   localStorage.clear();
   await initMokujiAndData();
   alert("最新データを同期しました！");
 }
 
-// クイズ（学習画面）への遷移
 function startQuiz() {
-  if (!currentIsbn) return;
+  if (!currentIsbn) {
+    alert("コースを選択してください");
+    return;
+  }
   location.href = `card.html?isbn=${currentIsbn}`;
 }
