@@ -1,49 +1,102 @@
-/* Duolingoカラー */
+/* Duolingo風カラーパレット */
 :root {
   --duo-green: #58cc02;
   --duo-green-dark: #46a302;
   --duo-red: #ff4b4b;
-  --duo-red-dark: #d33131;
+  --duo-red-dark: #ea2b2b;
   --duo-blue: #1cb0f6;
+  --duo-blue-dark: #1899d6;
   --duo-gray: #e5e5e5;
+  --duo-gray-dark: #cecece;
+  --duo-text: #3c3c3c;
 }
 
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #ffffff;
+  color: var(--duo-text);
+}
+
+/* 全体コンテナ */
 .quiz-container {
   max-width: 600px;
   margin: 0 auto;
-  padding: 20px;
-  height: 100vh;
+  padding: 20px 20px 120px; /* 下部にフィードバックパネル用の余白を確保 */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
+/* ヘッダーエリア */
 .header {
   display: flex;
   align-items: center;
-  gap: 15px;
-  background: none;
-  box-shadow: none;
+  gap: 16px;
+  padding: 10px 0 20px;
 }
 
+.exit-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #afafaf;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0 5px;
+}
+.exit-btn:hover { color: var(--duo-text); }
+
+/* プログレスバー */
 .quiz-progress-bar-track {
   flex-grow: 1;
   height: 16px;
   background: var(--duo-gray);
   border-radius: 10px;
+  overflow: hidden;
+  position: relative;
 }
 
 .quiz-progress-bar-fill {
   height: 100%;
+  width: 0%;
   background: var(--duo-green);
   border-radius: 10px;
   transition: width 0.3s cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-.question-header { margin: 40px 0; }
-#question-type-label { font-size: 1.2rem; color: #4b4b4b; margin-bottom: 10px; }
-.question-word { font-size: 2.5rem; font-weight: bold; color: #1cb0f6; }
+.quiz-streak {
+  font-weight: bold;
+  color: #ff9600;
+  font-size: 1.1rem;
+}
 
-/* 4択ボタン */
+/* クイズ表示部分 */
+.question-header { 
+  margin: 20px 0 30px; 
+}
+
+#question-type-label { 
+  font-size: 1.2rem; 
+  font-weight: bold;
+  color: #4b4b4b; 
+  margin-bottom: 12px; 
+}
+
+.question-word { 
+  font-size: 2.2rem; 
+  font-weight: 800; 
+  color: var(--duo-blue); 
+  word-break: break-word;
+}
+
+/* 4択ボタン（ぷっくりデザイン） */
 .choice-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -52,55 +105,183 @@
 
 .choice-btn {
   background: white;
-  border: 2px solid var(--duo-gray);
-  border-bottom: 5px solid var(--duo-gray);
-  border-radius: 15px;
-  padding: 15px;
+  border: 2px solid var(--duo-gray-dark);
+  border-bottom: 5px solid var(--duo-gray-dark);
+  border-radius: 16px;
+  padding: 16px 20px;
   font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--duo-text);
   text-align: left;
   cursor: pointer;
   transition: all 0.1s;
 }
 
-.choice-btn:hover { background: #f7f7f7; }
-.choice-btn:active { border-bottom-width: 2px; transform: translateY(3px); }
+.choice-btn:hover { 
+  background: #f7f7f7; 
+}
 
-/* 入力エリア */
+.choice-btn:active { 
+  border-bottom-width: 2px; 
+  transform: translateY(3px); 
+}
+
+/* タイピング入力 */
 .typing-container input {
   width: 100%;
-  padding: 15px;
-  font-size: 1.5rem;
-  border: 2px solid var(--duo-gray);
-  border-radius: 15px;
+  padding: 16px 20px;
+  font-size: 1.3rem;
+  font-weight: bold;
+  border: 2px solid var(--duo-gray-dark);
+  border-bottom-width: 4px;
+  border-radius: 16px;
   background: #f7f7f7;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.typing-container input:focus {
+  background: white;
+  border-color: var(--duo-blue);
 }
 
 /* フィードバックパネル */
 .feedback-panel {
   position: fixed;
-  bottom: -150px;
+  bottom: -180px;
   left: 0;
   width: 100%;
-  padding: 30px;
+  padding: 24px;
+  transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 100;
+  border-top: 2px solid transparent;
+}
+
+.feedback-panel.correct { 
+  background: #d7ffb8; 
+  border-color: #b8f28b;
+  bottom: 0; 
+}
+
+.feedback-panel.incorrect { 
+  background: #ffdfe0; 
+  border-color: #ffc1c3;
+  bottom: 0; 
+}
+
+.feedback-content-wrapper {
+  max-width: 600px;
+  margin: 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: bottom 0.3s ease;
-  z-index: 100;
 }
 
-.feedback-panel.correct { background: #d7ffb8; bottom: 0; color: #58a700; }
-.feedback-panel.incorrect { background: #ffdfe0; bottom: 0; color: #ea2b2b; }
+.feedback-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-.next-btn {
-  padding: 15px 40px;
-  border-radius: 15px;
-  border: none;
+.feedback-panel.correct #feedback-message {
+  color: #58a700;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.feedback-panel.incorrect #feedback-message {
+  color: var(--duo-red-dark);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+#correct-answer-display {
+  font-size: 1rem;
   font-weight: bold;
+  color: var(--duo-red-dark);
+}
+
+/* 次へボタン */
+.next-btn {
+  padding: 14px 36px;
+  border-radius: 16px;
+  border: none;
+  font-weight: 800;
   font-size: 1.1rem;
   cursor: pointer;
-  box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.1s;
 }
 
-.correct .next-btn { background: var(--duo-green); color: white; }
-.incorrect .next-btn { background: var(--duo-red); color: white; }
+.correct .next-btn { 
+  background: var(--duo-green); 
+  border-bottom: 4px solid var(--duo-green-dark);
+  color: white; 
+}
+
+.incorrect .next-btn { 
+  background: var(--duo-red); 
+  border-bottom: 4px solid var(--duo-red-dark);
+  color: white; 
+}
+
+.next-btn:active {
+  border-bottom-width: 0px;
+  transform: translateY(4px);
+}
+
+/* リザルト画面 */
+.summary-container {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.summary-container h1 {
+  font-size: 2rem;
+  color: #ffc800;
+  margin-bottom: 30px;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.stat-card {
+  border: 2px solid var(--duo-gray);
+  border-radius: 16px;
+  padding: 20px;
+  width: 140px;
+}
+
+.stat-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--duo-blue);
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #a0a0a0;
+  font-weight: bold;
+}
+
+.finish-btn {
+  width: 100%;
+  padding: 16px;
+  background: var(--duo-green);
+  border: none;
+  border-bottom: 4px solid var(--duo-green-dark);
+  border-radius: 16px;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.finish-btn:active {
+  border-bottom-width: 0px;
+  transform: translateY(4px);
+}
