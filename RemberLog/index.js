@@ -49,17 +49,31 @@ function loadLocalProgress() {
   }
 }
 
-// 目次(MOKUJI)から全コース（単語帳）を取得
+// GASからCSVデータを取得する共通関数
+async function fetchCsvFromGas(sheetName) {
+  const response = await fetch(gasUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: sheetName })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`通信エラー (${response.status})`);
+  }
+  
+  const text = await response.text();
+  if (text.startsWith("Authentication failed") || text.startsWith("Error")) {
+    throw new Error(text);
+  }
+  
+  return text.split('\n').filter(l => l.trim() !== '');
+}
+
+// 目次(MOKUJI)の取得
 async function initMokujiAndData() {
   showLoading();
   try {
-    const response = await fetch(gasUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: 'MOKUJI' })
-    });
-    const csvText = await response.text();
-    const lines = csvText.split('\n').filter(l => l.trim() !== '');
+    const lines = await fetchCsvFromGas('MOKUJI');
 
     mokujiData = [];
     if (lines.length > 1) {
@@ -73,7 +87,6 @@ async function initMokujiAndData() {
       }
     }
 
-    // 最後に選択していたコース、または先頭のコースをセット
     const savedIsbn = localStorage.getItem(`selected_isbn_${userId}`);
     if (savedIsbn && mokujiData.some(b => b.isbn === savedIsbn)) {
       currentIsbn = savedIsbn;
@@ -86,12 +99,12 @@ async function initMokujiAndData() {
     }
   } catch (err) {
     console.error("MOKUJI取得エラー:", err);
+    alert(`データ取得に失敗しました: ${err.message}`);
   } finally {
     hideLoading();
   }
 }
 
-// コースの選択＆データ読込
 async function selectCourse(isbn) {
   currentIsbn = isbn;
   localStorage.setItem(`selected_isbn_${userId}`, isbn);
@@ -99,7 +112,7 @@ async function selectCourse(isbn) {
   await loadWordBookData(isbn);
 }
 
-// 単語帳データのロード (LocalDBキャッシュ優先)
+// 単語帳データのロード (安全化 & エラー通知)
 async function loadWordBookData(isbn) {
   showLoading();
   const cacheKey = `book_${isbn}`;
@@ -110,13 +123,7 @@ async function loadWordBookData(isbn) {
     words = JSON.parse(localBook);
   } else {
     try {
-      const response = await fetch(gasUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ id: userId, password: password, cmd: 'csv', option: 'export', sheet: isbn })
-      });
-      const csvText = await response.text();
-      const lines = csvText.split('\n').filter(l => l.trim() !== '');
+      const lines = await fetchCsvFromGas(isbn);
 
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(',');
@@ -127,6 +134,7 @@ async function loadWordBookData(isbn) {
       localStorage.setItem(cacheKey, JSON.stringify(words));
     } catch (e) {
       console.error("単語データ読み込み失敗:", e);
+      alert(`単語データの読み込みに失敗しました: ${e.message}`);
     }
   }
 
@@ -134,39 +142,86 @@ async function loadWordBookData(isbn) {
   hideLoading();
 }
 
-// UI描画の更新
+// UI描画の更新（XSS対策・textContentベースに改善）
 function updateDashboardUI(isbn, words) {
   const book = mokujiData.find(b => b.isbn === isbn);
   if (book) {
     document.getElementById('current-course-title').innerText = book.name;
-    document.getElementById('book-title').innerText = book.name;
-    document.getElementById('book-description').innerText = book.desc || '説明なし';
   }
 
-  // プレビューテーブル描画
-  const tbody = document.querySelector('#word-preview-table tbody');
-  tbody.innerHTML = '';
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+  
+  const courseProgress = localProgress[isbn] || { learnedCount: 0, streak: 0, wordLogs: {} };
+  const wordLogs = courseProgress.wordLogs || {};
+
+  const recentWords = [];
   words.forEach(w => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><strong>${w.word}</strong></td>
-      <td>${w.meaning}</td>
-      <td><span style="font-size:0.8rem; background:#f1f5f9; padding:2px 8px; border-radius:12px;">${w.category}</span></td>
-    `;
-    tbody.appendChild(tr);
+    const log = wordLogs[w.id];
+    if (log && log.lastLearned) {
+      const learnedDate = new Date(log.lastLearned);
+      if (learnedDate >= sevenDaysAgo) {
+        recentWords.push({
+          ...w,
+          lastLearned: log.lastLearned,
+          isCorrect: log.isCorrect
+        });
+      }
+    }
   });
 
-  // 進捗度計算
-  const progress = localProgress[isbn] || { learnedCount: 0, streak: 0 };
-  const totalWords = words.length;
-  const rate = totalWords > 0 ? Math.round((progress.learnedCount / totalWords) * 100) : 0;
+  recentWords.sort((a, b) => new Date(b.lastLearned) - new Date(a.lastLearned));
 
-  document.getElementById('total-learned-count').innerText = `${progress.learnedCount || 0}語`;
+  const tbody = document.querySelector('#recent-words-table tbody');
+  tbody.innerHTML = '';
+
+  if (recentWords.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td colspan="4" style="text-align: center; color: #94a3b8; padding: 24px;">
+        直近7日間の学習データがありません。<br>「学習をはじめる」からクイズに挑戦してみましょう！
+      </td>
+    `;
+    tbody.appendChild(tr);
+  } else {
+    recentWords.forEach(w => {
+      const tr = document.createElement('tr');
+      
+      const tdWord = document.createElement('td');
+      const strong = document.createElement('strong');
+      strong.textContent = w.word;
+      tdWord.appendChild(strong);
+
+      const tdMeaning = document.createElement('td');
+      tdMeaning.style.color = '#475569';
+      tdMeaning.textContent = w.meaning;
+
+      const tdDate = document.createElement('td');
+      tdDate.style.cssText = 'text-align: center; font-size:0.8rem; color:#64748b;';
+      tdDate.textContent = w.lastLearned.split('T')[0] || w.lastLearned.split(' ')[0];
+
+      const tdStatus = document.createElement('td');
+      tdStatus.style.textAlign = 'center';
+      tdStatus.innerHTML = w.isCorrect 
+        ? '<span style="color:#10b981; font-weight:bold;">⭕ クリア</span>' 
+        : '<span style="color:#ef4444; font-weight:bold;">❌ 要復習</span>';
+
+      tr.appendChild(tdWord);
+      tr.appendChild(tdMeaning);
+      tr.appendChild(tdDate);
+      tr.appendChild(tdStatus);
+      tbody.appendChild(tr);
+    });
+  }
+
+  const totalWords = words.length;
+  const rate = totalWords > 0 ? Math.round((courseProgress.learnedCount / totalWords) * 100) : 0;
+
+  document.getElementById('total-learned-count').innerText = `${courseProgress.learnedCount || 0}語`;
   document.getElementById('current-progress-rate').innerText = `${rate}%`;
-  document.getElementById('streak-days').innerText = `${progress.streak || 0}日`;
+  document.getElementById('streak-days').innerText = `${courseProgress.streak || 0}日`;
 }
 
-// モーダル表示ロジック（Duolingo風コース一覧リスト生成）
 function openCourseModal() {
   const container = document.getElementById('course-list');
   container.innerHTML = '';
@@ -187,15 +242,24 @@ function openCourseModal() {
     `;
     card.onclick = () => selectCourse(book.isbn);
 
-    card.innerHTML = `
-      <div>
-        <div style="font-weight: bold; color: #1e293b;">📖 ${book.name}</div>
-        <div style="font-size: 0.75rem; color: #64748b;">ISBN: ${book.isbn}</div>
-      </div>
-      <div style="text-align: right;">
-        <span style="font-weight: bold; color: #3b82f6;">${progress.learnedCount || 0}語クリア</span>
-      </div>
-    `;
+    const leftDiv = document.createElement('div');
+    const titleDiv = document.createElement('div');
+    titleDiv.style.cssText = 'font-weight: bold; color: #1e293b;';
+    titleDiv.textContent = `📖 ${book.name}`;
+    
+    const isbnDiv = document.createElement('div');
+    isbnDiv.style.cssText = 'font-size: 0.75rem; color: #64748b;';
+    isbnDiv.textContent = `ISBN: ${book.isbn}`;
+    
+    leftDiv.appendChild(titleDiv);
+    leftDiv.appendChild(isbnDiv);
+
+    const rightDiv = document.createElement('div');
+    rightDiv.style.textAlign = 'right';
+    rightDiv.innerHTML = `<span style="font-weight: bold; color: #3b82f6;">${progress.learnedCount || 0}語クリア</span>`;
+
+    card.appendChild(leftDiv);
+    card.appendChild(rightDiv);
     container.appendChild(card);
   });
 
@@ -206,10 +270,14 @@ function closeCourseModal() {
   document.getElementById('course-modal').style.display = 'none';
 }
 
+// 単語帳キャッシュのみを削除する安全な同期関数
 async function syncAllData() {
-  localStorage.clear();
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('book_'))
+    .forEach(k => localStorage.removeItem(k));
+
   await initMokujiAndData();
-  alert("最新データを同期しました！");
+  alert("最新の単語帳データを同期しました！");
 }
 
 function startQuiz() {
