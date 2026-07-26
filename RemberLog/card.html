@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>おぼログ - 学習</title>
+  <title>おぼログ - 学習モード</title>
   <link rel="stylesheet" href="index.css">
   <link rel="stylesheet" href="card.css">
   <script src="card.js" defer></script>
@@ -11,58 +11,53 @@
 <body>
 
 <div class="quiz-container">
-
   <div class="header">
-    <button class="refresh-btn" onclick="exitQuiz()">← 戻る</button>
-    <div class="quiz-title" id="quiz-course-title">単語カード</div>
-    <div class="quiz-progress-text" id="quiz-progress-text">0 / 0</div>
-  </div>
-
-  <div class="quiz-progress-bar-track">
-    <div class="quiz-progress-bar-fill" id="quiz-progress-fill"></div>
+    <button class="exit-btn" onclick="exitQuiz()">✕</button>
+    <div class="quiz-progress-bar-track">
+      <div class="quiz-progress-bar-fill" id="quiz-progress-fill"></div>
+    </div>
+    <div class="quiz-streak"><i class="fa-solid fa-fire"></i> <span id="quiz-streak-count">0</span></div>
   </div>
 
   <div id="quiz-area">
-    <div class="flashcard-wrap">
-      <div class="flashcard" id="flashcard" onclick="flipCard()" role="button" tabindex="0" aria-label="タップして意味を見る">
-        <div class="flashcard-face flashcard-front">
-          <span class="category-badge" id="card-category" style="display:none;"></span>
-          <div class="flashcard-word" id="card-word"></div>
-          <div class="flashcard-hint">🔽 タップして意味を見る</div>
-        </div>
-        <div class="flashcard-face flashcard-back">
-          <div class="flashcard-meaning" id="card-meaning"></div>
-          <div class="flashcard-memo" id="card-memo" style="display:none;"></div>
-        </div>
-      </div>
+    <div class="question-header">
+      <h2 id="question-type-label">意味を選んでください</h2>
+      <div class="question-word" id="display-word">...</div>
     </div>
 
-    <div class="quiz-actions" id="quiz-actions" style="visibility:hidden;">
-      <button class="quiz-btn quiz-btn-unknown" onclick="answerCard(false)">❌ わからない</button>
-      <button class="quiz-btn quiz-btn-known" onclick="answerCard(true)">✅ 覚えた</button>
+    <div id="choice-area" class="choice-grid" style="display:none;">
+      </div>
+
+    <div id="typing-area" class="typing-container" style="display:none;">
+      <input type="text" id="typing-input" placeholder="スペルを入力..." autocomplete="off">
     </div>
   </div>
 
-  <div id="quiz-summary" class="card" style="display:none;">
-    <h2>🎉 お疲れさまでした！</h2>
+  <div id="feedback-panel" class="feedback-panel">
+    <div class="feedback-content">
+      <div id="feedback-icon"></div>
+      <div class="feedback-text">
+        <div id="feedback-message">正解です！</div>
+        <div id="correct-answer-display"></div>
+      </div>
+    </div>
+    <button id="next-btn" class="next-btn" onclick="nextQuestion()">次へ</button>
+  </div>
+
+  <div id="quiz-summary" class="summary-container" style="display:none;">
+    <h1>レッスン完了！</h1>
     <div class="summary-stats">
-      <div class="dash-box">
-        <div class="dash-title">今回覚えた</div>
-        <div class="dash-value" id="summary-session-count">0語</div>
+      <div class="stat-card">
+        <div class="stat-val" id="summary-score">0</div>
+        <div class="stat-label">獲得XP</div>
       </div>
-      <div class="dash-box">
-        <div class="dash-title">累計</div>
-        <div class="dash-value" id="summary-total-count">0語</div>
-      </div>
-      <div class="dash-box">
-        <div class="dash-title">連続学習</div>
-        <div class="dash-value" id="summary-streak">0日</div>
+      <div class="stat-card">
+        <div class="stat-val" id="summary-accuracy">0%</div>
+        <div class="stat-label">正解率</div>
       </div>
     </div>
-    <button class="submit-btn" id="retry-mistakes-btn" style="background-color:#f59e0b; display:none;" onclick="retryMistakes()">苦手な単語だけもう一度</button>
-    <button class="submit-btn" style="background-color:#64748b; margin-top:8px;" onclick="location.href='index.html'">ホームに戻る</button>
+    <button class="finish-btn" onclick="saveAndExit()">保存して終了</button>
   </div>
-
 </div>
 
 <div id="loading-overlay" class="loading-overlay" style="display:none;">
