@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>無限素数計算機</title>
+  <title>無限素数計算機（メモリ軽量化版）</title>
   <style>
     body {
       font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -13,29 +13,12 @@
       background-color: #f4f7f6;
       color: #333;
     }
-    h1 {
-      font-size: 24px;
-      color: #2c3e50;
-    }
-    .input-group {
-      margin-bottom: 15px;
-    }
-    input {
-      padding: 8px 12px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      width: 120px;
-    }
+    h1 { font-size: 24px; color: #2c3e50; }
+    .input-group { margin-bottom: 15px; }
+    input { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 120px; }
     button {
-      padding: 9px 16px;
-      font-size: 14px;
-      font-weight: bold;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 3px;
-      transition: background-color 0.2s;
+      padding: 9px 16px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px;
+      cursor: pointer; margin: 3px; transition: background-color 0.2s;
     }
     .btn-main { background-color: #27ae60; color: white; }
     .btn-main:hover { background-color: #219150; }
@@ -47,57 +30,29 @@
     .btn-gas:hover { background-color: #732d91; }
 
     .control-panel {
-      background: #ffffff;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 15px;
-      margin: 15px 0;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      background: #ffffff; border: 1px solid #e0e0e0; border-radius: 6px;
+      padding: 15px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    .control-title {
-      font-weight: bold;
-      margin-bottom: 8px;
-      display: block;
-      color: #555;
-    }
+    .control-title { font-weight: bold; margin-bottom: 8px; display: block; color: #555; }
 
     .status-panel {
-      background: #1e1e1e;
-      color: #00ff66;
-      font-family: 'Courier New', Courier, monospace;
-      border-radius: 6px;
-      padding: 15px;
-      margin: 15px 0;
-      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+      background: #1e1e1e; color: #00ff66; font-family: 'Courier New', Courier, monospace;
+      border-radius: 6px; padding: 15px; margin: 15px 0; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
     }
-    .status-item {
-      font-size: 16px;
-      margin: 8px 0;
-    }
-    .status-value {
-      font-weight: bold;
-      color: #ffffff;
-    }
-    .highlight {
-      color: #ffcc00;
-    }
+    .status-item { font-size: 16px; margin: 8px 0; }
+    .status-value { font-weight: bold; color: #ffffff; }
+    .highlight { color: #ffcc00; }
 
     #output {
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      height: 200px;
-      overflow-y: scroll;
-      background: #ffffff;
-      word-break: break-all;
-      font-family: monospace;
-      line-height: 1.5;
+      padding: 12px; border: 1px solid #ccc; border-radius: 4px; height: 200px;
+      overflow-y: scroll; background: #ffffff; word-break: break-all; font-family: monospace; line-height: 1.5;
     }
+    .save-status { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
   </style>
 </head>
 <body>
 
-  <h1>無限素数計算機</h1>
+  <h1>無限素数計算機（軽量版）</h1>
   
   <div class="input-group">
     <label>開始数値: <input type="number" id="startInput" value="2"></label>
@@ -110,12 +65,11 @@
   </div>
 
   <div class="control-panel">
-    <span class="control-title">💾 データ保存・クラウド同期</span>
-    <button class="btn-sub" onclick="saveToLocal()">LocalDBに一時保存</button>
-    <button class="btn-sub" onclick="loadFromLocal()">LocalDBから再開</button>
-    <br style="margin-bottom: 5px;">
+    <span class="control-title">💾 手動同期 & 復元</span>
+    <button class="btn-sub" onclick="loadFromLocal(true)">LocalDBから復元</button>
     <button class="btn-gas" onclick="uploadToDrive()">Driveに送信 (GAS)</button>
     <button class="btn-gas" onclick="downloadFromDrive()">Driveから復元 (GAS)</button>
+    <div id="saveStatus" class="save-status">自動保存: 待機中</div>
   </div>
 
   <div class="status-panel">
@@ -124,28 +78,31 @@
     <div class="status-item">発見した素数の数 : <span id="primeCount" class="status-value highlight">0</span> 個</div>
   </div>
 
-  <h3>発見した素数リスト</h3>
+  <h3>直近発見した素数（最新50件を表示）</h3>
   <div id="output"></div>
 
   <script>
-    // 指定されたGAS Web App URL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwAOKBODP0nyN0aVLfXuCrHBvwsjM5FGVcpGQ6y7NdiwNzj0DzcRvtv5nlrh_5dFx_O/exec";
 
     let worker = null;
-    let primeList = [];
+    let totalPrimeCount = 0;
+    let recentPrimes = []; // メモリ対策：直近50件のみ配列で保持
     let isRunning = false;
-    
-    // 描画フレーム用データバッファ（描画周りの負荷低減用）
     let latestData = { target: 2, divisor: '-', progress: 0 };
+    
+    const MAX_RECENT = 50; // 画面表示用の最大件数
 
     // --- 1. IndexedDB (LocalDB) ---
     function openDB() {
       return new Promise((resolve, reject) => {
-        const req = indexedDB.open("PrimeCalculatorDB", 1);
+        const req = indexedDB.open("PrimeCalculatorDB", 2);
         req.onupgradeneeded = (e) => {
           const db = e.target.result;
           if (!db.objectStoreNames.contains("state")) {
             db.createObjectStore("state", { keyPath: "id" });
+          }
+          if (!db.objectStoreNames.contains("primes")) {
+            db.createObjectStore("primes", { autoIncrement: true });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -153,72 +110,87 @@
       });
     }
 
-    async function saveToLocal() {
+    // サイレント自動保存（ダイアログなし）
+    async function autoSaveProgress(newPrime = null) {
       try {
         const db = await openDB();
-        const tx = db.transaction("state", "readwrite");
-        const store = tx.objectStore("state");
+        const tx = db.transaction(["state", "primes"], "readwrite");
         
-        const saveData = {
+        // 進捗情報の更新
+        tx.objectStore("state").put({
           id: "current_progress",
           targetNum: latestData.target,
-          primeList: primeList,
+          totalCount: totalPrimeCount,
+          recentPrimes: recentPrimes,
           updatedAt: new Date().toISOString()
-        };
+        });
 
-        store.put(saveData);
-        alert(`LocalDBに一時保存しました！\n(次回開始数値: ${saveData.targetNum})`);
+        // 素数が新しく見つかったら個別にLocalDBへ追加保存
+        if (newPrime !== null) {
+          tx.objectStore("primes").add(newPrime);
+        }
+
+        document.getElementById('saveStatus').textContent = `自動保存済み: ${new Date().toLocaleTimeString()}`;
       } catch (err) {
-        alert("LocalDBへの保存に失敗しました: " + err);
+        console.error("AutoSave Error:", err);
       }
     }
 
-    async function loadFromLocal() {
+    // LocalDBからの復元
+    async function loadFromLocal(silent = false) {
       try {
         const db = await openDB();
         const tx = db.transaction("state", "readonly");
-        const store = tx.objectStore("state");
-        const req = store.get("current_progress");
+        const req = tx.objectStore("state").get("current_progress");
 
         req.onsuccess = () => {
           const data = req.result;
           if (data) {
             applyState(data);
-            alert(`LocalDBから復元しました！\n(判定数値: ${data.targetNum} から再開可能)`);
-          } else {
-            alert("LocalDBに保存データが見つかりません。");
+            if (!silent) console.log("LocalDBから復元しました");
           }
         };
       } catch (err) {
-        alert("LocalDBからの読み込みに失敗しました: " + err);
+        console.error("Load Error:", err);
       }
     }
 
     function applyState(data) {
       document.getElementById('startInput').value = data.targetNum;
-      primeList = data.primeList || [];
-      document.getElementById('primeCount').textContent = primeList.length;
-      document.getElementById('output').textContent = primeList.join(', ') + (primeList.length ? ', ' : '');
+      totalPrimeCount = data.totalCount || 0;
+      recentPrimes = data.recentPrimes || [];
+      
+      document.getElementById('primeCount').textContent = totalPrimeCount;
+      updateDisplayList();
+    }
+
+    // 画面表示更新（メモリ軽減のため直近のみ表示）
+    function updateDisplayList() {
+      const output = document.getElementById('output');
+      output.textContent = recentPrimes.join(', ');
+      output.scrollTop = output.scrollHeight;
     }
 
     // --- 2. Google Drive (GAS) 連携 ---
     async function uploadToDrive() {
       const saveData = {
         targetNum: latestData.target,
-        primeList: primeList,
+        totalCount: totalPrimeCount,
+        recentPrimes: recentPrimes,
         updatedAt: new Date().toISOString()
       };
 
       try {
+        document.getElementById('saveStatus').textContent = "Driveに送信中...";
         await fetch(GAS_URL, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(saveData)
         });
-        alert("Google Driveへ送信リクエストを行いました！");
+        document.getElementById('saveStatus').textContent = "Drive送信完了";
       } catch (err) {
-        alert("送信エラー: " + err);
+        document.getElementById('saveStatus').textContent = "Drive送信失敗";
       }
     }
 
@@ -227,14 +199,12 @@
         const res = await fetch(GAS_URL);
         const data = await res.json();
 
-        if (data.status === "not_found") {
-          alert("Drive上にバックアップファイルが見つかりません。");
-        } else if (data.targetNum) {
+        if (data.targetNum) {
           applyState(data);
-          alert(`Driveから復元成功！\n(判定数値: ${data.targetNum})`);
+          document.getElementById('saveStatus').textContent = "Driveから復元完了";
         }
       } catch (err) {
-        alert("復元取得エラー: " + err);
+        console.error("Drive Download Error:", err);
       }
     }
 
@@ -245,7 +215,6 @@
       document.getElementById('divisorNum').textContent = latestData.divisor;
       document.getElementById('progressNum').textContent = latestData.progress;
       
-      // 画面更新タイミングに合わせて描画（最高フレームレート維持）
       requestAnimationFrame(renderLoop);
     }
 
@@ -264,12 +233,25 @@
         const data = e.data;
         if (data.type === 'step') {
           latestData = data;
+          
+          // 1000個判定が進むごとに、サイレント自動保存（ダイアログなし）
+          if (data.target % 1000 === 0) {
+            autoSaveProgress();
+          }
         } else if (data.type === 'prime') {
-          primeList.push(data.number);
-          document.getElementById('primeCount').textContent = primeList.length;
-          const output = document.getElementById('output');
-          output.textContent += data.number + ', ';
-          output.scrollTop = output.scrollHeight;
+          totalPrimeCount++;
+          
+          // メモリ対策：配列の上限を固定し、超えたら古いものを削除
+          recentPrimes.push(data.number);
+          if (recentPrimes.length > MAX_RECENT) {
+            recentPrimes.shift();
+          }
+
+          document.getElementById('primeCount').textContent = totalPrimeCount;
+          updateDisplayList();
+
+          // 素数が見つかったタイミングでLocalDBへ即時書き込み
+          autoSaveProgress(data.number);
         }
       };
     }
@@ -280,6 +262,7 @@
         worker.terminate();
         worker = null;
       }
+      autoSaveProgress(); // 停止時にも保存
     }
   </script>
 </body>
