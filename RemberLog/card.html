@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>おぼログ - 学習モード</title>
-  <link rel="stylesheet" href="index.css">
   <link rel="stylesheet" href="card.css">
   <script src="card.js" defer></script>
 </head>
@@ -16,7 +15,7 @@
     <div class="quiz-progress-bar-track">
       <div class="quiz-progress-bar-fill" id="quiz-progress-fill"></div>
     </div>
-    <div class="quiz-streak"><i class="fa-solid fa-fire"></i> <span id="quiz-streak-count">0</span></div>
+    <div class="quiz-streak">🔥 <span id="quiz-streak-count">0</span></div>
   </div>
 
   <div id="quiz-area">
@@ -25,23 +24,11 @@
       <div class="question-word" id="display-word">...</div>
     </div>
 
-    <div id="choice-area" class="choice-grid" style="display:none;">
-      </div>
+    <div id="choice-area" class="choice-grid" style="display:none;"></div>
 
     <div id="typing-area" class="typing-container" style="display:none;">
       <input type="text" id="typing-input" placeholder="スペルを入力..." autocomplete="off">
     </div>
-  </div>
-
-  <div id="feedback-panel" class="feedback-panel">
-    <div class="feedback-content">
-      <div id="feedback-icon"></div>
-      <div class="feedback-text">
-        <div id="feedback-message">正解です！</div>
-        <div id="correct-answer-display"></div>
-      </div>
-    </div>
-    <button id="next-btn" class="next-btn" onclick="nextQuestion()">次へ</button>
   </div>
 
   <div id="quiz-summary" class="summary-container" style="display:none;">
@@ -60,8 +47,14 @@
   </div>
 </div>
 
-<div id="loading-overlay" class="loading-overlay" style="display:none;">
-  <div class="spinner"></div>
+<div id="feedback-panel" class="feedback-panel">
+  <div class="feedback-content-wrapper">
+    <div class="feedback-text">
+      <div id="feedback-message">正解です！</div>
+      <div id="correct-answer-display"></div>
+    </div>
+    <button id="next-btn" class="next-btn" onclick="nextQuestion()">次へ</button>
+  </div>
 </div>
 
 </body>
