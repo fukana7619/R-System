@@ -1,0 +1,200 @@
+/* card.css - おぼログ 学習（フラッシュカード）ページ専用スタイル */
+/* 色・カード・ボタンの基本トークンは index.css の :root 変数をそのまま使う */
+
+.quiz-container {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ヘッダー中央のタイトル・右の進捗テキスト（.header 自体は index.css を再利用） */
+.quiz-title {
+  flex: 1;
+  text-align: center;
+  padding: 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quiz-progress-text {
+  min-width: 48px;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* 全体の進捗バー */
+.quiz-progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  margin-bottom: 28px;
+  overflow: hidden;
+}
+
+.quiz-progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--primary-color);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* フラッシュカード本体 */
+.flashcard-wrap {
+  perspective: 1200px;
+  margin-bottom: 20px;
+}
+
+.flashcard {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+
+.flashcard:focus-visible {
+  outline: 3px solid var(--primary-color);
+  outline-offset: 4px;
+}
+
+.flashcard.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  backface-visibility: hidden;
+}
+
+.flashcard-back {
+  background: #eff6ff;
+  transform: rotateY(180deg);
+}
+
+.category-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: #f1f5f9;
+  border-radius: 12px;
+}
+
+.flashcard-word {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.flashcard-hint {
+  margin-top: 18px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.flashcard-meaning {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.flashcard-memo {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* 回答ボタン */
+.quiz-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.quiz-btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s ease, background-color 0.2s;
+}
+
+.quiz-btn:active {
+  transform: scale(0.97);
+}
+
+.quiz-btn-unknown {
+  background-color: #fee2e2;
+  color: var(--danger-color);
+}
+.quiz-btn-unknown:hover {
+  background-color: #fecaca;
+}
+
+.quiz-btn-known {
+  background-color: #d1fae5;
+  color: #047857;
+}
+.quiz-btn-known:hover {
+  background-color: #a7f3d0;
+}
+
+/* 完了サマリー画面（.card, .dash-box は index.css を再利用） */
+#quiz-summary {
+  margin-top: 32px;
+  text-align: center;
+}
+
+#quiz-summary h2 {
+  margin-bottom: 20px;
+  font-size: 1.3rem;
+  border: none;
+  padding: 0;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 480px) {
+  .flashcard {
+    min-height: 240px;
+  }
+  .flashcard-word {
+    font-size: 1.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flashcard,
+  .quiz-progress-bar-fill {
+    transition: none;
+  }
+}
