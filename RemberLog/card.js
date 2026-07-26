@@ -6,7 +6,7 @@ let quizQueue = [];
 let allWords = [];
 let currentIdx = 0;
 let correctCount = 0;
-let currentQuestionLog = {}; // 今回のログ記録用
+let currentQuestionLog = {}; // 今回のセッションの回答記録
 
 window.onload = async () => {
   const localData = localStorage.getItem(`book_${isbn}`);
@@ -17,10 +17,22 @@ window.onload = async () => {
   }
   
   allWords = JSON.parse(localData);
-  quizQueue = shuffle([...allWords]).slice(0, 10); // 10問出題
+  quizQueue = shuffle([...allWords]).slice(0, 10); // 10問抽出
+  
+  updateProgressBar(); // プログレスバーの初期化(0%)
   renderQuestion();
 };
 
+// プログレスバーの更新
+function updateProgressBar() {
+  const progress = (currentIdx / quizQueue.length) * 100;
+  const fillEl = document.getElementById('quiz-progress-fill');
+  if (fillEl) {
+    fillEl.style.width = `${progress}%`;
+  }
+}
+
+// 問題の描画
 function renderQuestion() {
   const q = quizQueue[currentIdx];
   const type = Math.random() > 0.5 ? 'choice' : 'typing';
@@ -83,7 +95,7 @@ function checkAnswer(isCorrect, answerText, wordId) {
   document.getElementById('feedback-message').textContent = isCorrect ? "正解です！" : "惜しい！";
   document.getElementById('correct-answer-display').textContent = isCorrect ? "" : `正解: ${answerText}`;
   
-  // 学習ログの保持
+  // 今日の日付で回答ログを記録
   currentQuestionLog[wordId] = {
     isCorrect: isCorrect,
     lastLearned: new Date().toISOString()
@@ -92,13 +104,13 @@ function checkAnswer(isCorrect, answerText, wordId) {
   if (isCorrect) correctCount++;
 }
 
+// 次の問題へ
 function nextQuestion() {
-  // フィードバックパネルを閉じる
+  // フィードバックパネルを引っ込める
   document.getElementById('feedback-panel').className = 'feedback-panel';
   
   currentIdx++;
-  const progress = (currentIdx / quizQueue.length) * 100;
-  document.getElementById('quiz-progress-fill').style.width = `${progress}%`;
+  updateProgressBar(); // 進捗バーを進める
 
   if (currentIdx < quizQueue.length) {
     renderQuestion();
@@ -107,14 +119,18 @@ function nextQuestion() {
   }
 }
 
+// レッスン完了画面表示
 function showSummary() {
   document.getElementById('quiz-area').style.display = 'none';
   document.getElementById('quiz-summary').style.display = 'block';
   document.getElementById('summary-score').textContent = correctCount * 10;
   document.getElementById('summary-accuracy').textContent = `${Math.round((correctCount / quizQueue.length) * 100)}%`;
+  
+  // 進捗バーをMAXに
+  document.getElementById('quiz-progress-fill').style.width = '100%';
 }
 
-// 保存処理の完成版
+// 進捗を保存してホームへ戻る
 async function saveAndExit() {
   const userId = localStorage.getItem('ra_user_id');
   if (!userId) {
@@ -125,13 +141,12 @@ async function saveAndExit() {
   const progressKey = `progress_${userId}`;
   const localProgress = JSON.parse(localStorage.getItem(progressKey)) || {};
   
-  // 現在のコース進捗を取得または初期化
   const courseProgress = localProgress[isbn] || { learnedCount: 0, streak: 1, wordLogs: {} };
   
-  // ログの統合
+  // ログのマージ
   courseProgress.wordLogs = { ...courseProgress.wordLogs, ...currentQuestionLog };
   
-  // クリアした単語数の再計算（1回でも正解した単語数）
+  // 過去一度でも正解した単語の総数をカウント
   const learnedSet = new Set(
     Object.keys(courseProgress.wordLogs).filter(id => courseProgress.wordLogs[id].isCorrect)
   );
@@ -139,19 +154,21 @@ async function saveAndExit() {
 
   localProgress[isbn] = courseProgress;
   
-  // LocalStorageへの保存
+  // LocalStorageに保存
   localStorage.setItem(progressKey, JSON.stringify(localProgress));
 
   // ホームに戻る
   location.href = 'index.html';
 }
 
+// 途中でやめる（✕ボタン）
 function exitQuiz() {
   if (confirm("学習を中断して戻りますか？")) {
     location.href = 'index.html';
   }
 }
 
+// 配列シャッフル関数
 function shuffle(array) {
   return array.sort(() => Math.random() - 0.5);
 }
