@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>無限素数ジェネレーター (CPU & GPU Hybrid)</title>
+  <title>無限素数ジェネレーター (Ultimate Custom)</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       padding: 20px;
-      max-width: 800px;
+      max-width: 850px;
       margin: 0 auto;
       background-color: #0f172a;
       color: #f8fafc;
     }
     h1 { color: #38bdf8; margin-bottom: 5px; text-align: center; }
-    p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 20px; text-align: center; }
+    p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 15px; text-align: center; }
 
     /* 免責事項 */
     .disclaimer {
@@ -24,7 +24,7 @@
       padding: 10px 15px;
       border-radius: 6px;
       font-size: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       text-align: center;
     }
 
@@ -33,20 +33,20 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 15px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
     .nav-card {
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 8px;
-      padding: 12px 15px;
+      padding: 10px 15px;
       text-decoration: none;
       color: inherit;
       transition: all 0.2s ease;
     }
     .nav-card:hover { border-color: #38bdf8; }
     .nav-card.gpu:hover { border-color: #a855f7; }
-    .nav-title { font-weight: bold; font-size: 14px; margin-bottom: 3px; }
+    .nav-title { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
     .nav-title.cpu { color: #38bdf8; }
     .nav-title.gpu { color: #c084fc; }
     .nav-desc { font-size: 11px; color: #94a3b8; }
@@ -67,7 +67,7 @@
       background: #0f172a;
       padding: 8px;
       border-radius: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       border: 1px solid #334155;
     }
     .engine-option {
@@ -82,11 +82,59 @@
     .engine-option.active-cpu { background: #0284c7; color: white; }
     .engine-option.active-gpu { background: #9333ea; color: white; }
 
-    .controls { display: flex; gap: 10px; margin-bottom: 15px; }
+    /* 詳細設定エリア（アコーディオン） */
+    details {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px 15px;
+      margin-bottom: 15px;
+    }
+    summary {
+      font-weight: bold;
+      color: #38bdf8;
+      cursor: pointer;
+      user-select: none;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 15px;
+      font-size: 13px;
+    }
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .setting-item label { color: #94a3b8; }
+    .setting-item input, .setting-item select {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    /* 警告・サイズ予測表示 */
+    .size-warning {
+      grid-column: span 2;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid #f59e0b;
+      color: #fbbf24;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .controls { display: flex; gap: 8px; margin-bottom: 15px; }
     button {
       flex: 1;
-      padding: 12px;
-      font-size: 15px;
+      padding: 10px;
+      font-size: 14px;
       font-weight: bold;
       cursor: pointer;
       border: none;
@@ -97,30 +145,32 @@
     }
     #startBtn { background-color: #38bdf8; color: #0f172a; }
     #startBtn:hover { background-color: #7dd3fc; }
+    #downloadBtn { background-color: #10b981; color: white; }
+    #downloadBtn:hover { background-color: #34d399; }
     #resetBtn { background-color: #ef4444; color: white; }
     #resetBtn:hover { background-color: #f87171; }
     button:disabled { opacity: 0.3; cursor: not-allowed; }
 
     .status-panel {
       background: #0f172a;
-      padding: 15px;
+      padding: 12px;
       border-radius: 6px;
       border: 1px solid #334155;
       margin-bottom: 15px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
-    .status-panel p { margin: 5px 0; font-size: 13px; color: #94a3b8; }
+    .status-panel p { margin: 3px 0; font-size: 13px; color: #94a3b8; }
     .status-panel span { color: #f8fafc; font-weight: bold; }
 
     #result {
-      height: 200px;
+      height: 180px;
       overflow-y: scroll;
       background: #090d16;
       color: #4ade80;
       font-family: monospace;
-      padding: 15px;
+      padding: 12px;
       border-radius: 6px;
       word-break: break-all;
       white-space: pre-wrap;
@@ -132,10 +182,10 @@
 <body>
 
   <h1>無限素数ジェネレーター</h1>
-  <p class="sub">CPU (Web Worker) & GPU (WebGPU) ハイブリッド対応</p>
+  <p class="sub">CPU & GPU ハイブリッド対応 (フルカスタム版)</p>
 
   <div class="disclaimer">
-    ⚠️ <strong>【免責事項】</strong> 当社は一切の責任を負いません。PCを限界突破させて壊したい場合は自己責任でご利用ください！
+    ⚠️ <strong>【免責事項】</strong> 当社は一切の責任を問われません。PCを限界突破させたい場合は各ユーザーで完全に自己責任にてご利用ください！
   </div>
 
   <div class="nav-benchmarks">
@@ -159,10 +209,51 @@
       </label>
     </div>
 
+    <details open>
+      <summary>⚙️ パラメータ・データ保存の詳細手入力設定</summary>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label for="savePolicy">💾 DB保存ポリシー:</label>
+          <select id="savePolicy">
+            <option value="all">素数を全件DB保存 (低速・データ重視)</option>
+            <option value="stateOnly" selected>状態(到達点)のみ保存 (推奨・軽量)</option>
+            <option value="none">DB保存なし (メモリのみ・最速)</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="saveInterval">⏱️ 保存インターバル (秒):</label>
+          <input type="number" id="saveInterval" value="1" min="0.1" step="0.1">
+        </div>
+
+        <div class="setting-item">
+          <label for="gpuThreads">⚡ GPU並列スレッド数 (WebGPU):</label>
+          <input type="number" id="gpuThreads" value="65536" step="256" min="256">
+        </div>
+
+        <div class="setting-item">
+          <label for="cpuBatch">💻 CPUバッチサイズ (Worker):</label>
+          <input type="number" id="cpuBatch" value="1000" min="100" step="100">
+        </div>
+
+        <div class="setting-item">
+          <label for="domLimit">🖥️ 画面描画保持文字数 (0でOFF):</label>
+          <input type="number" id="domLimit" value="3000" step="500" min="0">
+        </div>
+
+        <div class="size-warning" id="sizeEstimate">
+          💡 <strong>事前のデータサイズ提示（目安）:</strong><br>
+          ・「全件保存」の場合: 素数1,000,000件あたり **約8 MB 〜 12 MB** のストレージ容量を消費します。<br>
+          ・「状態のみ保存」の場合: 探索速度に関わらず **わずか数 KB** に固定されます。
+        </div>
+      </div>
+    </details>
+
     <div class="controls">
-      <button id="startBtn">計算開始 / 再開</button>
+      <button id="startBtn">計算開始</button>
       <button id="pauseBtn" disabled>一時停止</button>
-      <button id="resetBtn">データリセット</button>
+      <button id="downloadBtn">DBダウンロード</button>
+      <button id="resetBtn">リセット</button>
     </div>
 
     <div class="status-panel">
@@ -186,7 +277,7 @@
     let db = null;
     function initDB() {
       return new Promise((resolve) => {
-        const req = indexedDB.open("PrimeDatabaseHybrid", 1);
+        const req = indexedDB.open("PrimeDatabaseCustom", 1);
         req.onupgradeneeded = (e) => {
           const d = e.target.result;
           if (!d.objectStoreNames.contains("primes")) d.createObjectStore("primes", { autoIncrement: true });
@@ -216,10 +307,10 @@
       });
     }
 
-    function saveStateAndPrimes(primes, lastNum) {
-      if (!db) return;
+    function saveStateAndPrimes(primes, lastNum, policy) {
+      if (!db || policy === 'none') return;
       const tx = db.transaction(["primes", "state"], "readwrite");
-      if (primes.length > 0) {
+      if (policy === 'all' && primes.length > 0) {
         const pStore = tx.objectStore("primes");
         primes.forEach(p => pStore.add(p));
       }
@@ -237,6 +328,7 @@
 
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
     const resetBtn = document.getElementById('resetBtn');
     const statusEl = document.getElementById('status');
     const currentEl = document.getElementById('current');
@@ -245,6 +337,13 @@
     const speedEl = document.getElementById('speed');
     const memoryEl = document.getElementById('memory');
     const resultDiv = document.getElementById('result');
+
+    // カスタム入力エレメント
+    const savePolicyEl = document.getElementById('savePolicy');
+    const saveIntervalEl = document.getElementById('saveInterval');
+    const gpuThreadsEl = document.getElementById('gpuThreads');
+    const cpuBatchEl = document.getElementById('cpuBatch');
+    const domLimitEl = document.getElementById('domLimit');
 
     // トグル切替イベント
     const labelCpu = document.getElementById('labelCpu');
@@ -262,7 +361,7 @@
       });
     });
 
-    // --- モニタータイマー (1秒ごと) ---
+    // --- モニタータイマー ---
     setInterval(() => {
       if (performance.memory) {
         memoryEl.textContent = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
@@ -280,7 +379,7 @@
       opsInSec = 0;
     }, 1000);
 
-    // --- CPU モード (Worker) 実装 ---
+    // --- CPU モード ---
     let worker = null;
     const workerScript = `
       function checkPrime(num) {
@@ -303,31 +402,33 @@
         if (e.data.cmd === 'start') {
           isRunning = true;
           currentNumber = e.data.startNum;
-          loop();
+          loop(e.data.batch);
         } else if (e.data.cmd === 'stop') {
           isRunning = false;
         }
       };
 
-      function loop() {
+      function loop(batch) {
         if (!isRunning) return;
         let found = [];
         let totalOps = 0;
-        const BATCH = 1000;
 
-        for (let i = 0; i < BATCH; i++) {
+        for (let i = 0; i < batch; i++) {
           const res = checkPrime(currentNumber);
           totalOps += res.ops;
           if (res.isPrime) found.push(currentNumber);
           currentNumber++;
         }
 
-        postMessage({ primes: found, current: currentNumber, ops: totalOps, checked: BATCH });
-        if (isRunning) setTimeout(loop, 0);
+        postMessage({ primes: found, current: currentNumber, ops: totalOps, checked: batch });
+        if (isRunning) setTimeout(() => loop(batch), 0);
       }
     `;
 
     function runCpuMode() {
+      const batchSize = parseInt(cpuBatchEl.value) || 1000;
+      const policy = savePolicyEl.value;
+
       if (!worker) {
         const blob = new Blob([workerScript], { type: 'application/javascript' });
         worker = new Worker(URL.createObjectURL(blob));
@@ -342,14 +443,14 @@
           currentEl.textContent = currentNumber.toLocaleString();
           countEl.textContent = totalPrimeCount.toLocaleString();
 
-          saveStateAndPrimes(primes, currentNumber);
+          saveStateAndPrimes(primes, currentNumber, policy);
           appendPrimesToDom(primes);
         };
       }
-      worker.postMessage({ cmd: 'start', startNum: currentNumber });
+      worker.postMessage({ cmd: 'start', startNum: currentNumber, batch: batchSize });
     }
 
-    // --- GPU モード (WebGPU) 実装 ---
+    // --- GPU モード ---
     let gpuDevice = null, gpuPipeline = null;
     const wgslCode = `
       struct Uniforms { startNum : u32 };
@@ -392,10 +493,13 @@
         if (!ok) { stopCalculation(); return; }
       }
 
-      const TOTAL_THREADS = 65536;
+      const totalThreads = parseInt(gpuThreadsEl.value) || 65536;
+      const workgroups = Math.ceil(totalThreads / 256);
+      const policy = savePolicyEl.value;
+
       const uniformBuffer = gpuDevice.createBuffer({ size: 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      const opsBuffer = gpuDevice.createBuffer({ size: TOTAL_THREADS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-      const readBuffer = gpuDevice.createBuffer({ size: TOTAL_THREADS * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+      const opsBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+      const readBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
 
       while (isRunning) {
         gpuDevice.queue.writeBuffer(uniformBuffer, 0, new Uint32Array([currentNumber]));
@@ -411,36 +515,38 @@
         const pass = encoder.beginComputePass();
         pass.setPipeline(gpuPipeline);
         pass.setBindGroup(0, bindGroup);
-        pass.dispatchWorkgroups(256);
+        pass.dispatchWorkgroups(workgroups);
         pass.end();
 
-        encoder.copyBufferToBuffer(opsBuffer, 0, readBuffer, 0, TOTAL_THREADS * 4);
+        encoder.copyBufferToBuffer(opsBuffer, 0, readBuffer, 0, totalThreads * 4);
         gpuDevice.queue.submit([encoder.finish()]);
 
         await readBuffer.mapAsync(GPUMapMode.READ);
         const res = new Uint32Array(readBuffer.getMappedRange());
         let batchOps = 0;
-        for (let i = 0; i < TOTAL_THREADS; i++) batchOps += res[i];
+        for (let i = 0; i < totalThreads; i++) batchOps += res[i];
         readBuffer.unmap();
 
-        checkedInSec += TOTAL_THREADS;
+        checkedInSec += totalThreads;
         opsInSec += batchOps;
-        currentNumber += TOTAL_THREADS;
+        currentNumber += totalThreads;
 
         currentEl.textContent = currentNumber.toLocaleString();
-        saveStateAndPrimes([], currentNumber); // GPU爆速モードはステータスのみ保存
+        saveStateAndPrimes([], currentNumber, policy);
       }
     }
 
     // --- DOM描画補助 ---
-    const MAX_DOM = 3000;
     function appendPrimesToDom(primes) {
-      if (primes.length === 0) return;
+      const domLimit = parseInt(domLimitEl.value);
+      if (domLimit === 0 || primes.length === 0) return;
+
       const txt = primes.join(', ') + ', ';
       resultDiv.appendChild(document.createTextNode(txt));
       resultDiv.scrollTop = resultDiv.scrollHeight;
-      if (resultDiv.textContent.length > MAX_DOM) {
-        let trimmed = resultDiv.textContent.slice(-MAX_DOM);
+
+      if (resultDiv.textContent.length > domLimit) {
+        let trimmed = resultDiv.textContent.slice(-domLimit);
         const idx = trimmed.indexOf(',');
         if (idx !== -1) trimmed = trimmed.slice(idx + 2);
         resultDiv.textContent = trimmed;
@@ -481,12 +587,39 @@
 
     pauseBtn.addEventListener('click', stopCalculation);
 
+    // --- DBダウンロード機能 ---
+    downloadBtn.addEventListener('click', async () => {
+      await initDB();
+      if (!db) { alert("保存されたDBデータがありません。"); return; }
+
+      const tx = db.transaction(["primes", "state"], "readonly");
+      const pStore = tx.objectStore("primes");
+      const req = pStore.getAll();
+
+      req.onsuccess = () => {
+        const primes = req.result;
+        if (!primes || primes.length === 0) {
+          alert("保存されている素数データがありません。（※「状態のみ保存」モードの場合はダウンロード対象の個別素数は保存されません）");
+          return;
+        }
+
+        const csvContent = "data:text/csv;charset=utf-8," + primes.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `primes_export_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+    });
+
     resetBtn.addEventListener('click', async () => {
       if (confirm("全データを削除して初期化しますか？")) {
         stopCalculation();
         if (worker) { worker.terminate(); worker = null; }
         if (db) { db.close(); db = null; }
-        await indexedDB.deleteDatabase("PrimeDatabaseHybrid");
+        await indexedDB.deleteDatabase("PrimeDatabaseCustom");
         currentNumber = 2;
         totalPrimeCount = 0;
         currentEl.textContent = "2";
