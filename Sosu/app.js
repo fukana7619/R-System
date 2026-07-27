@@ -1,5 +1,6 @@
 // --- IndexedDB 共通処理 ---
 let db = null;
+
 function initDB() {
   return new Promise((resolve) => {
     const req = indexedDB.open("PrimeDatabaseCustom", 1);
@@ -9,40 +10,70 @@ function initDB() {
       if (!d.objectStoreNames.contains("state")) d.createObjectStore("state");
     };
     req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    req.onerror = () => { resolve(null); };
   });
 }
 
 function loadState() {
   return new Promise((resolve) => {
-    if (!db) return resolve({ current: 2, count: 0, settings: null });
+    if (!db) return resolve({ current: 2, count: 0, settings: null, lastSave: null });
     const tx = db.transaction(["primes", "state"], "readonly");
     const pStore = tx.objectStore("primes");
     const sStore = tx.objectStore("state");
     
-    let count = 0, current = 2, settings = null;
+    let count = 0, current = 2, settings = null, lastSave = null;
     const cReq = pStore.count();
     const sReq = sStore.get("currentNumber");
     const setReq = sStore.get("appSettings");
+    const saveTimeReq = sStore.get("lastSaveTime");
 
     tx.oncomplete = () => {
       count = cReq.result || 0;
       current = sReq.result || 2;
       settings = setReq.result || null;
-      resolve({ current, count, settings });
+      lastSave = saveTimeReq.result || null;
+      resolve({ current, count, settings, lastSave });
     };
-    tx.onerror = () => resolve({ current: 2, count: 0, settings: null });
+    tx.onerror = () => resolve({ current: 2, count: 0, settings: null, lastSave: null });
   });
 }
 
 function saveStateAndPrimes(primes, lastNum, policy) {
   if (!db) return;
   const tx = db.transaction(["primes", "state"], "readwrite");
-  if (policy === 'all' && primes.length > 0) {
+  if (policy === 'all' && primes && primes.length > 0) {
     const pStore = tx.objectStore("primes");
     primes.forEach(p => pStore.add(p));
   }
   if (policy !== 'none') {
     tx.objectStore("state").put(lastNum, "currentNumber");
+    const nowStr = new Date().toLocaleString('ja-JP');
+    tx.objectStore("state").put(nowStr, "lastSaveTime");
+    updateLastSaveUI(nowStr);
+  }
+}
+
+// 手動保存処理
+function triggerManualSave() {
+  if (!db) return alert("DBに接続されていません。");
+  const policy = savePolicyEl.value;
+  const tx = db.transaction(["state"], "readwrite");
+  tx.objectStore("state").put(currentNumber, "currentNumber");
+  const nowStr = new Date().toLocaleString('ja-JP');
+  tx.objectStore("state").put(nowStr, "lastSaveTime");
+  saveCurrentSettings();
+  updateLastSaveUI(nowStr);
+  
+  statusEl.textContent = "手動保存完了！";
+  setTimeout(() => {
+    if (isRunning) statusEl.textContent = selectedEngine.toUpperCase() + " で計算中...";
+    else statusEl.textContent = "一時停止中";
+  }, 1500);
+}
+
+function updateLastSaveUI(timeStr) {
+  if (lastSaveTextEl) {
+    lastSaveTextEl.textContent = timeStr || "未保存";
   }
 }
 
@@ -52,7 +83,6 @@ function saveCurrentSettings() {
   const settings = {
     engine: selectedEngine,
     savePolicy: savePolicyEl.value,
-    saveInterval: saveIntervalEl.value,
     gpuThreads: gpuThreadsInput.value,
     cpuBatch: cpuBatchEl.value,
     domLimit: domLimitEl.value
@@ -63,19 +93,24 @@ function saveCurrentSettings() {
 
 // --- 変数定義 ---
 let isRunning = false;
+let isStarting = false; // 重複起動防止用フラグ
 let selectedEngine = 'cpu';
 let currentNumber = 2;
 let totalPrimeCount = 0;
 
 let checkedInSec = 0;
 let opsInSec = 0;
-let maxSupportedGpuThreads = 16777216; // 初期値
+let maxSupportedGpuThreads = 16777216;
 
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
+const saveBtn = document.getElementById('saveBtn');
 const downloadBtn = document.getElementById('downloadBtn');
+const connectDbBtn = document.getElementById('connectDbBtn');
 const resetBtn = document.getElementById('resetBtn');
+
 const statusEl = document.getElementById('status');
+const lastSaveTextEl = document.getElementById('lastSaveText');
 const currentEl = document.getElementById('current');
 const countEl = document.getElementById('count');
 const scoreEl = document.getElementById('score');
@@ -85,7 +120,6 @@ const resultDiv = document.getElementById('result');
 
 // カスタム入力エレメント
 const savePolicyEl = document.getElementById('savePolicy');
-const saveIntervalEl = document.getElementById('saveInterval');
 const gpuThreadsInput = document.getElementById('gpuThreads');
 const cpuBatchEl = document.getElementById('cpuBatch');
 const domLimitEl = document.getElementById('domLimit');
@@ -116,7 +150,7 @@ async function detectDeviceLimits() {
   }
 }
 
-// 限界値オーバー時のリアルタイム警告制御 ＆ 設定自動保存
+// 限界値オーバー時のリアルタイム警告制御
 gpuThreadsInput.addEventListener('input', () => {
   const val = parseInt(gpuThreadsInput.value) || 0;
   if (val > maxSupportedGpuThreads) {
@@ -127,13 +161,12 @@ gpuThreadsInput.addEventListener('input', () => {
   saveCurrentSettings();
 });
 
-// 各設定入力値の変更時に自動保存
-[savePolicyEl, saveIntervalEl, cpuBatchEl, domLimitEl].forEach(el => {
+[savePolicyEl, cpuBatchEl, domLimitEl].forEach(el => {
   el.addEventListener('change', saveCurrentSettings);
   el.addEventListener('input', saveCurrentSettings);
 });
 
-// トグル切替イベント ＆ 設定自動保存
+// トグル切替イベント
 document.querySelectorAll('input[name="engine"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
     selectedEngine = e.target.value;
@@ -392,22 +425,31 @@ function appendPrimesToDom(primes) {
   }
 }
 
-// --- 制御ロジック ---
+// --- 制御ロジック（UI強化＆反応速度最適化） ---
 startBtn.addEventListener('click', async () => {
-  await initDB();
-  const state = await loadState();
-  if (!isRunning) {
-    currentNumber = state.current;
-    totalPrimeCount = state.count;
-    countEl.textContent = totalPrimeCount.toLocaleString();
-  }
+  if (isRunning || isStarting) return;
+  isStarting = true;
 
-  // 計算開始時に現在の設定をDBに保存
+  // 1. 即座にユーザーに処理中であることをフィードバック
+  statusEl.textContent = "⏳ 起動中...";
+  startBtn.textContent = "⏳ 起動処理中...";
+  startBtn.disabled = true;
+
+  if (!db) await initDB();
+  const state = await loadState();
+  
+  currentNumber = state.current;
+  totalPrimeCount = state.count;
+  countEl.textContent = totalPrimeCount.toLocaleString();
+
   saveCurrentSettings();
 
   isRunning = true;
+  isStarting = false;
+
+  // 2. 起動完了時のUI変化
+  startBtn.textContent = "▶ 計算開始";
   statusEl.textContent = selectedEngine.toUpperCase() + " で計算中...";
-  startBtn.disabled = true;
   pauseBtn.disabled = false;
   resetBtn.disabled = true;
 
@@ -419,8 +461,11 @@ startBtn.addEventListener('click', async () => {
 
 function stopCalculation() {
   isRunning = false;
+  isStarting = false;
   if (worker) worker.postMessage({ cmd: 'stop' });
+  
   statusEl.textContent = "一時停止中";
+  startBtn.textContent = "▶ 計算開始";
   startBtn.disabled = false;
   pauseBtn.disabled = true;
   resetBtn.disabled = false;
@@ -428,34 +473,62 @@ function stopCalculation() {
 }
 
 pauseBtn.addEventListener('click', stopCalculation);
+saveBtn.addEventListener('click', triggerManualSave);
 
-// --- DBダウンロード機能 ---
-downloadBtn.addEventListener('click', async () => {
+// --- DB手動再接続ボタン ---
+connectDbBtn.addEventListener('click', async () => {
+  statusEl.textContent = "🔌 DB再接続中...";
+  if (db) db.close();
   await initDB();
-  if (!db) { alert("保存されたDBデータがありません。"); return; }
+  const state = await loadState();
+  currentNumber = state.current;
+  totalPrimeCount = state.count;
+  currentEl.textContent = currentNumber.toLocaleString();
+  countEl.textContent = totalPrimeCount.toLocaleString();
+  updateLastSaveUI(state.lastSave);
+  statusEl.textContent = "DB再接続成功！";
+  setTimeout(() => { statusEl.textContent = "待機中"; }, 1500);
+});
+
+// --- JSON形式でのダウンロード機能 ---
+downloadBtn.addEventListener('click', async () => {
+  if (!db) await initDB();
+  if (!db) return alert("DB接続エラーが発生しました。");
+
+  statusEl.textContent = "📥 JSONデータ生成中...";
 
   const tx = db.transaction(["primes", "state"], "readonly");
   const pStore = tx.objectStore("primes");
   const req = pStore.getAll();
 
   req.onsuccess = () => {
-    const primes = req.result;
-    if (!primes || primes.length === 0) {
-      alert("保存されている素数データがありません。（※「状態のみ保存」モードの場合はダウンロード対象の個別素数は保存されません）");
-      return;
-    }
+    const primes = req.result || [];
+    
+    // JSON構造のデータ作成
+    const exportData = {
+      exportTimestamp: new Date().toISOString(),
+      exportDateFormatted: new Date().toLocaleString('ja-JP'),
+      engineUsed: selectedEngine,
+      totalPrimeCount: totalPrimeCount,
+      lastCalculatedNumber: currentNumber,
+      savedPrimesCount: primes.length,
+      primes: primes
+    };
 
-    const blob = new Blob([primes.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `primes_export_${Date.now()}.csv`);
+    link.setAttribute("download", `prime_benchmark_export_${Date.now()}.json`);
     document.body.appendChild(link);
     link.click();
     
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    statusEl.textContent = isRunning ? (selectedEngine.toUpperCase() + " で計算中...") : "待機中";
   };
 });
 
@@ -472,6 +545,7 @@ resetBtn.addEventListener('click', async () => {
     scoreEl.textContent = "0";
     speedEl.textContent = "0";
     resultDiv.textContent = "";
+    updateLastSaveUI("未保存");
     statusEl.textContent = "リセット完了";
   }
 });
@@ -485,7 +559,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentNumber = state.current;
   totalPrimeCount = state.count;
 
-  // 保存されているカスタム設定があればフォームに復元
   if (state.settings) {
     const s = state.settings;
     if (s.engine) {
@@ -501,7 +574,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     if (s.savePolicy !== undefined) savePolicyEl.value = s.savePolicy;
-    if (s.saveInterval !== undefined) saveIntervalEl.value = s.saveInterval;
     if (s.gpuThreads !== undefined) gpuThreadsInput.value = s.gpuThreads;
     if (s.cpuBatch !== undefined) cpuBatchEl.value = s.cpuBatch;
     if (s.domLimit !== undefined) domLimitEl.value = s.domLimit;
@@ -509,6 +581,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   currentEl.textContent = currentNumber.toLocaleString();
   countEl.textContent = totalPrimeCount.toLocaleString();
+  updateLastSaveUI(state.lastSave);
 
   const val = parseInt(gpuThreadsInput.value) || 0;
   if (val > maxSupportedGpuThreads) {
