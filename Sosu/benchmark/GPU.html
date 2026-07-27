@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPU 素数計算ベンチマーク (WebGPU)</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 30px 20px;
+      max-width: 700px;
+      margin: 0 auto;
+      background-color: #090d16;
+      color: #f8fafc;
+    }
+    h1 {
+      text-align: center;
+      color: #a855f7;
+      margin-bottom: 5px;
+    }
+    p.subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-top: 0;
+      margin-bottom: 25px;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    button {
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+    #startBtn {
+      background-color: #a855f7;
+      color: #ffffff;
+    }
+    #startBtn:hover { background-color: #c084fc; }
+    #startBtn:disabled { background-color: #334155; color: #64748b; cursor: not-allowed; }
+    
+    #stopBtn {
+      background-color: #ef4444;
+      color: white;
+    }
+    #stopBtn:hover { background-color: #f87171; }
+    #stopBtn:disabled { background-color: #334155; color: #64748b; cursor: not-allowed; }
+
+    /* GPUメインスコア表示 */
+    .score-card {
+      background: #131c31;
+      border: 1px solid #3b0764;
+      border-radius: 12px;
+      padding: 25px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15);
+    }
+    .score-card h2 {
+      margin: 0;
+      font-size: 14px;
+      color: #c084fc;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .score-value {
+      font-size: 56px;
+      font-weight: 800;
+      color: #38bdf8;
+      margin: 10px 0 0 0;
+      font-family: monospace;
+    }
+
+    /* メトリクス */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+    .metric-box {
+      background: #131c31;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .metric-label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    .metric-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #f1f5f9;
+      font-family: monospace;
+    }
+
+    #gpuName {
+      grid-column: span 2;
+      font-size: 14px;
+      color: #38bdf8;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>GPU 素数計算ベンチマーク</h1>
+  <p class="subtitle">WebGPU並列演算シェーダーによるGPU限界性能測定</p>
+  
+  <div class="controls">
+    <button id="startBtn">GPUテスト開始</button>
+    <button id="stopBtn" disabled>終了</button>
+  </div>
+
+  <div class="score-card">
+    <h2>Current GPU Score</h2>
+    <div class="score-value"><span id="currentScore">0</span> <span style="font-size: 24px;">pts</span></div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-box" id="gpuName">
+      <div class="metric-label">検出されたGPUデバイス</div>
+      <div id="deviceAdapter">確認中...</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">最高スコア (MAX)</div>
+      <div class="metric-value"><span id="maxScore">0</span> pts</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">最低スコア (MIN)</div>
+      <div class="metric-value"><span id="minScore">0</span> pts</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">現在探索中の範囲 (末尾)</div>
+      <div class="metric-value" id="currentNum">0</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">GPU処理スピード</div>
+      <div class="metric-value"><span id="speed">0</span> 万件/秒</div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. WebGPU Compute Shader (WGSL) ---
+    // GPUの数千スレッドに並列で実行させるコード
+    const shaderCode = `
+      struct Uniforms {
+        startNum : u32,
+      };
+
+      @group(0) @binding(0) var<uniform> uniforms : Uniforms;
+      @group(0) @binding(1) var<storage, read_write> opsBuffer : array<u32>;
+
+      // 各GPUスレッドで素数判定と計算ステップ数を算出
+      @compute @workgroup_size(256)
+      fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
+        let index = global_id.x;
+        let num = uniforms.startNum + index;
+
+        var ops : u32 = 1u;
+        if (num > 2u && num % 2u != 0u) {
+          ops = 2u;
+          let limit = u32(sqrt(f32(num)));
+          for (var i : u32 = 3u; i <= limit; i += 2u) {
+            ops += 1u;
+            if (num % i == 0u) {
+              break;
+            }
+          }
+        }
+        opsBuffer[index] = ops;
+      }
+    `;
+
+    // WebGPUの変数定義
+    let adapter = null;
+    let device = null;
+    let pipeline = null;
+    let isRunning = false;
+
+    // 1回のGPU呼び出しで同時に計算する件数（約6.5万並列）
+    const WORKGROUP_SIZE = 256;
+    const NUM_WORKGROUPS = 256;
+    const TOTAL_THREADS = WORKGROUP_SIZE * NUM_WORKGROUPS; // 65,536 件
+
+    let currentStartNum = 2;
+    let checkedInSec = 0;
+    let opsInSec = 0;
+
+    let maxScore = 0;
+    let minScore = Infinity;
+    let monitorTimer = null;
+    let isWarmup = true;
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const deviceAdapterEl = document.getElementById('deviceAdapter');
+
+    const currentScoreEl = document.getElementById('currentScore');
+    const maxScoreEl = document.getElementById('maxScore');
+    const minScoreEl = document.getElementById('minScore');
+    const currentNumEl = document.getElementById('currentNum');
+    const speedEl = document.getElementById('speed');
+
+    // WebGPU初期化
+    async function initWebGPU() {
+      if (!navigator.gpu) {
+        deviceAdapterEl.textContent = "お使いのブラウザはWebGPU非対応です。最新のChrome/Edge等をお使いください。";
+        startBtn.disabled = true;
+        return false;
+      }
+
+      adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        deviceAdapterEl.textContent = "GPUアダプターの取得に失敗しました。";
+        startBtn.disabled = true;
+        return false;
+      }
+
+      device = await adapter.requestDevice();
+      deviceAdapterEl.textContent = adapter.info?.description || "WebGPU Compatible Graphics Device";
+
+      // シェーダーパイプライン作成
+      const shaderModule = device.createShaderModule({ code: shaderCode });
+      pipeline = device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: shaderModule, entryPoint: 'main' }
+      });
+
+      return true;
+    }
+
+    // GPU演算メインループ
+    async function gpuLoop() {
+      if (!isRunning) return;
+
+      // メモリバッファ作成 (Uniform用 & 結果格納Storage用)
+      const uniformBuffer = device.createBuffer({
+        size: 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      });
+
+      const bufferSize = TOTAL_THREADS * 4; // 32bit integer * 65536
+      const opsBuffer = device.createBuffer({
+        size: bufferSize,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+      });
+
+      const readBuffer = device.createBuffer({
+        size: bufferSize,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
+      });
+
+      while (isRunning) {
+        // GPUへパラメータ書き込み
+        device.queue.writeBuffer(uniformBuffer, 0, new Uint32Array([currentStartNum]));
+
+        // バインドグループ構築
+        const bindGroup = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: uniformBuffer } },
+            { binding: 1, resource: { buffer: opsBuffer } }
+          ]
+        });
+
+        // コマンドエンコード＆送信
+        const commandEncoder = device.createCommandEncoder();
+        const passEncoder = commandEncoder.beginComputePass();
+        passEncoder.setPipeline(pipeline);
+        passEncoder.setBindGroup(0, bindGroup);
+        passEncoder.dispatchWorkgroups(NUM_WORKGROUPS);
+        passEncoder.end();
+
+        commandEncoder.copyBufferToBuffer(opsBuffer, 0, readBuffer, 0, bufferSize);
+        device.queue.submit([commandEncoder.finish()]);
+
+        // 結果をGPUからCPUへ同期（読み取り）
+        await readBuffer.mapAsync(GPUMapMode.READ);
+        const arrayBuffer = readBuffer.getMappedRange();
+        const resultArray = new Uint32Array(arrayBuffer);
+
+        // 演算回数を集計
+        let batchOps = 0;
+        for (let i = 0; i < TOTAL_THREADS; i++) {
+          batchOps += resultArray[i];
+        }
+
+        readBuffer.unmap();
+
+        checkedInSec += TOTAL_THREADS;
+        opsInSec += batchOps;
+        currentStartNum += TOTAL_THREADS;
+      }
+    }
+
+    // モニター用タイマー
+    function startMonitoring() {
+      isWarmup = true;
+      monitorTimer = setInterval(() => {
+        // 万件/秒 表示
+        const speedInTenThousand = (checkedInSec / 10000).toFixed(1);
+        speedEl.textContent = Number(speedInTenThousand).toLocaleString();
+        currentNumEl.textContent = currentStartNum.toLocaleString();
+
+        // GPUスコア計算 (10万演算 = 1pt)
+        if (opsInSec > 0) {
+          const rawScore = Math.round(opsInSec / 100000);
+          currentScoreEl.textContent = rawScore.toLocaleString();
+
+          if (!isWarmup) {
+            if (rawScore > maxScore) {
+              maxScore = rawScore;
+              maxScoreEl.textContent = maxScore.toLocaleString();
+            }
+            if (rawScore < minScore) {
+              minScore = rawScore;
+              minScoreEl.textContent = minScore.toLocaleString();
+            }
+          } else {
+            isWarmup = false;
+          }
+        }
+
+        checkedInSec = 0;
+        opsInSec = 0;
+      }, 1000);
+    }
+
+    function stopMonitoring() {
+      if (monitorTimer) {
+        clearInterval(monitorTimer);
+        monitorTimer = null;
+      }
+    }
+
+    // 開始
+    startBtn.addEventListener('click', async () => {
+      if (!device) {
+        const ok = await initWebGPU();
+        if (!ok) return;
+      }
+
+      maxScore = 0;
+      minScore = Infinity;
+      checkedInSec = 0;
+      opsInSec = 0;
+      currentStartNum = 2;
+
+      currentScoreEl.textContent = "0";
+      maxScoreEl.textContent = "0";
+      minScoreEl.textContent = "0";
+
+      isRunning = true;
+      startMonitoring();
+      gpuLoop();
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    });
+
+    // 停止
+    stopBtn.addEventListener('click', () => {
+      isRunning = false;
+      stopMonitoring();
+
+      if (minScore === Infinity) {
+        minScoreEl.textContent = "0";
+      }
+
+      speedEl.textContent = "0";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    });
+
+    // 起動時にWebGPUの有無を確認
+    initWebGPU();
+  </script>
+</body>
+</html>
