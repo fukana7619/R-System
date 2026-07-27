@@ -2,39 +2,140 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>無限素数ジェネレーター (タイプライター表示)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>無限素数ジェネレーター (LocalDB & Web Worker)</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    #result { 
-      max-height: 400px; 
-      overflow-y: scroll; 
-      border: 1px solid #ccc; 
-      padding: 10px; 
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #f4f4f9;
+    }
+    h1 { color: #333; }
+    .controls {
+      margin-bottom: 15px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .status-panel {
+      background: #fff;
+      padding: 10px 15px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      margin-bottom: 15px;
+    }
+    #result {
+      height: 300px;
+      overflow-y: scroll;
+      background: #1e1e1e;
+      color: #00ff66;
+      font-family: 'Courier New', Courier, monospace;
+      padding: 15px;
+      border-radius: 5px;
       word-break: break-all;
-      font-family: monospace; /* 等幅フォントで見やすく */
       white-space: pre-wrap;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
-  <h1>高速素数計算 (1文字ずつ描画)</h1>
-  <button id="startBtn">開始</button>
-  <button id="stopBtn" disabled>停止</button>
 
-  <p>探索中の数値: <span id="current">2</span></p>
-  <p>発見した素数の数: <span id="count">0</span></p>
+  <h1>無限素数ジェネレーター</h1>
+  
+  <div class="controls">
+    <button id="startBtn">開始</button>
+    <button id="stopBtn" disabled>停止</button>
+  </div>
+
+  <div class="status-panel">
+    <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
+    <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
+  </div>
+
   <div id="result"></div>
 
   <script>
+    // --- 1. Worker用のスクリプト文字列を定義 (Blobで1ファイル化するため) ---
+    const workerScript = `
+      let db = null;
+
+      // IndexedDB の初期化
+      const request = indexedDB.open("PrimeDatabase", 1);
+      request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        if (!db.objectStoreNames.contains("primes")) {
+          db.createObjectStore("primes", { autoIncrement: true });
+        }
+      };
+      request.onsuccess = (e) => {
+        db = e.target.result;
+      };
+
+      // 素数判定（奇数のみをチェックして高速化）
+      function isPrime(num) {
+        if (num <= 1) return false;
+        if (num === 2) return true;
+        if (num % 2 === 0) return false;
+        const sqrt = Math.sqrt(num);
+        for (let i = 3; i <= sqrt; i += 2) {
+          if (num % i === 0) return false;
+        }
+        return true;
+      }
+
+      let currentNumber = 2;
+
+      // IndexedDB への保存処理
+      function saveToDB(primes) {
+        if (!db || primes.length === 0) return;
+        const transaction = db.transaction(["primes"], "readwrite");
+        const store = transaction.objectStore("primes");
+        primes.forEach(prime => store.add(prime));
+      }
+
+      // ループ計算処理
+      function calculate() {
+        let foundPrimes = [];
+
+        // 1回につき1000回判定
+        for (let i = 0; i < 1000; i++) {
+          if (isPrime(currentNumber)) {
+            foundPrimes.push(currentNumber);
+          }
+          currentNumber++;
+        }
+
+        saveToDB(foundPrimes);
+
+        // 結果をメインスレッドへ通知
+        postMessage({
+          primes: foundPrimes,
+          current: currentNumber
+        });
+
+        setTimeout(calculate, 0);
+      }
+
+      onmessage = function(e) {
+        if (e.data === 'start') {
+          calculate();
+        }
+      };
+    `;
+
+    // --- 2. メインスレッド側の処理 ---
     let worker = null;
     let primeCount = 0;
-    
-    // 描画キュー用
     let renderBuffer = "";
     let typeInterval = null;
 
-    // 1文字の描画速度（ミリ秒）※数値を小さくすると速くなります
-    const SPEED_MS = 20;
+    const MAX_DOM_LENGTH = 3000; // 画面上に残す最大文字数 (メモリ溢れ防止)
+    const SPEED_MS = 15;         // タイピング描画スピード (ms)
 
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -42,29 +143,29 @@
     const countEl = document.getElementById('count');
     const resultDiv = document.getElementById('result');
 
-    // 1文字ずつ画面に流し込む処理
-    // index.html 内のタイピング処理部分の改善案
-
-    const MAX_CHAR_LENGTH = 1000; // 画面上に残す最大文字数
-    
+    // 1文字ずつタイプライター風に描画する関数
     function startTyping() {
       typeInterval = setInterval(() => {
         if (renderBuffer.length > 0) {
           const char = renderBuffer[0];
           renderBuffer = renderBuffer.slice(1);
-    
+
           resultDiv.appendChild(document.createTextNode(char));
           resultDiv.scrollTop = resultDiv.scrollHeight;
-    
-          // 画面上のテキストが長くなりすぎたら、古い文字を消してメモリを節約
-          if (resultDiv.textContent.length > MAX_CHAR_LENGTH) {
-            resultDiv.textContent = resultDiv.textContent.slice(-MAX_CHAR_LENGTH);
+
+          // DOM肥大化によるメモリ圧迫の防止処理
+          if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
+            resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
           }
         }
       }, SPEED_MS);
     }
+
+    // 開始ボタン
     startBtn.addEventListener('click', () => {
-      worker = new Worker('worker.js');
+      // Blobを作って外部ファイルなしでWorkerを起動可能にする
+      const blob = new Blob([workerScript], { type: 'application/javascript' });
+      worker = new Worker(URL.createObjectURL(blob));
 
       worker.onmessage = function(e) {
         const { primes, current } = e.data;
@@ -74,7 +175,6 @@
         currentEl.textContent = current.toLocaleString();
 
         if (primes.length > 0) {
-          // 文字列に変換してバッファに追加
           renderBuffer += primes.join(', ') + ', ';
         }
       };
@@ -86,6 +186,7 @@
       stopBtn.disabled = false;
     });
 
+    // 停止ボタン
     stopBtn.addEventListener('click', () => {
       if (worker) {
         worker.terminate();
