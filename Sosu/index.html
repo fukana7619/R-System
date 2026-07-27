@@ -3,287 +3,278 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>無限素数ジェネレーター (Ultimate Custom)</title>
+  <title>極限・素数ベンチマーク</title>
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 20px;
-      max-width: 850px;
-      margin: 0 auto;
-      background-color: #0f172a;
-      color: #f8fafc;
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-color: #f8fafc;
+      --accent-cpu: #38bdf8;
+      --accent-gpu: #a855f7;
+      --border-color: #334155;
     }
-    h1 { color: #38bdf8; margin-bottom: 5px; text-align: center; }
-    p.sub { color: #94a3b8; margin-top: 0; margin-bottom: 15px; text-align: center; }
 
-    /* 免責事項 */
-    .disclaimer {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid #ef4444;
-      color: #f87171;
-      padding: 10px 15px;
-      border-radius: 6px;
-      font-size: 12px;
-      margin-bottom: 15px;
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      letter-spacing: 1px;
+    }
+
+    /* エンジン切替トグル */
+    .engine-toggle {
+      display: flex;
+      background: #090d16;
+      border-radius: 12px;
+      padding: 6px;
+      border: 1px solid var(--border-color);
+      gap: 6px;
+    }
+
+    .engine-option {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .engine-option input { display: none; }
+
+    .engine-option.active-cpu {
+      background: var(--accent-cpu);
+      color: #000;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+
+    .engine-option.active-gpu {
+      background: var(--accent-gpu);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+    }
+
+    /* ダッシュボード */
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 15px;
       text-align: center;
     }
 
-    /* ベンチマークリンク */
-    .nav-benchmarks {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-bottom: 15px;
-    }
-    .nav-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 10px 15px;
-      text-decoration: none;
-      color: inherit;
-      transition: all 0.2s ease;
-    }
-    .nav-card:hover { border-color: #38bdf8; }
-    .nav-card.gpu:hover { border-color: #a855f7; }
-    .nav-title { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
-    .nav-title.cpu { color: #38bdf8; }
-    .nav-title.gpu { color: #c084fc; }
-    .nav-desc { font-size: 11px; color: #94a3b8; }
+    .card .label { font-size: 12px; color: #94a3b8; margin-bottom: 5px; }
+    .card .value { font-size: 22px; font-weight: bold; font-family: monospace; }
 
-    /* メインパネル */
-    .main-panel {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 20px;
-    }
-
-    /* モード選択トグル */
-    .engine-toggle {
+    /* コントロールパネル */
+    .controls {
       display: flex;
-      justify-content: center;
-      gap: 15px;
-      background: #0f172a;
-      padding: 8px;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      border: 1px solid #334155;
+      gap: 10px;
+      flex-wrap: wrap;
     }
-    .engine-option {
-      cursor: pointer;
-      font-weight: bold;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-    .engine-option input { display: none; }
-    .engine-option.active-cpu { background: #0284c7; color: white; }
-    .engine-option.active-gpu { background: #9333ea; color: white; }
 
-    /* 詳細設定エリア（アコーディオン） */
-    details {
-      background: #0f172a;
-      border: 1px solid #334155;
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px;
+      border: none;
       border-radius: 8px;
-      padding: 12px 15px;
-      margin-bottom: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s, opacity 0.2s;
     }
+
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #startBtn { background: #22c55e; color: #000; }
+    #pauseBtn { background: #eab308; color: #000; }
+    #saveBtn { background: #0284c7; color: #fff; }
+    #downloadBtn { background: #3b82f6; color: #fff; }
+    #connectDbBtn { background: #64748b; color: #fff; }
+    #resetBtn { background: #ef4444; color: #fff; }
+
+    /* 詳細設定アコーディオン */
+    details {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 15px;
+    }
+
     summary {
       font-weight: bold;
-      color: #38bdf8;
       cursor: pointer;
-      user-select: none;
+      padding: 5px 0;
+      color: #cbd5e1;
     }
+
     .settings-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
       margin-top: 15px;
-      font-size: 13px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border-color);
     }
+
     .setting-item {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
     }
-    .setting-item label { color: #94a3b8; }
+
+    .setting-item label { font-size: 12px; color: #94a3b8; }
     .setting-item input, .setting-item select {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #f8fafc;
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-family: monospace;
-    }
-
-    /* 警告・サイズ予測表示 */
-    .size-warning {
-      grid-column: span 2;
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid #f59e0b;
-      color: #fbbf24;
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-size: 12px;
-      margin-top: 5px;
-    }
-
-    .controls { display: flex; gap: 8px; margin-bottom: 15px; }
-    button {
-      flex: 1;
-      padding: 10px;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      border: none;
-      border-radius: 6px;
-      background-color: #334155;
-      color: #f8fafc;
-      transition: background-color 0.2s;
-    }
-    #startBtn { background-color: #38bdf8; color: #0f172a; }
-    #startBtn:hover { background-color: #7dd3fc; }
-    #downloadBtn { background-color: #10b981; color: white; }
-    #downloadBtn:hover { background-color: #34d399; }
-    #resetBtn { background-color: #ef4444; color: white; }
-    #resetBtn:hover { background-color: #f87171; }
-    button:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    .status-panel {
       background: #0f172a;
-      padding: 12px;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 8px;
       border-radius: 6px;
-      border: 1px solid #334155;
-      margin-bottom: 15px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
     }
-    .status-panel p { margin: 3px 0; font-size: 13px; color: #94a3b8; }
-    .status-panel span { color: #f8fafc; font-weight: bold; }
 
-    #result {
-      height: 180px;
-      overflow-y: scroll;
-      background: #090d16;
-      color: #4ade80;
+    /* 描画エリア */
+    .result-box {
+      background: #050811;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 15px;
+      height: 150px;
+      overflow-y: auto;
       font-family: monospace;
-      padding: 12px;
-      border-radius: 6px;
+      font-size: 12px;
+      color: #4ade80;
       word-break: break-all;
-      white-space: pre-wrap;
-      line-height: 1.5;
-      border: 1px solid #334155;
+    }
+
+    /* ステータスバー */
+    .status-bar {
+      font-size: 13px;
+      color: #38bdf8;
+      background: #090d16;
+      padding: 10px 15px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
     }
   </style>
 </head>
 <body>
 
-  <h1>無限素数ジェネレーター</h1>
-  <p class="sub">CPU & GPU ハイブリッド対応 (フルカスタム版)</p>
+<div class="container">
+  <h1>⚡ リアルタイム素数ベンチマーク ⚡</h1>
 
-  <div class="disclaimer">
-    ⚠️ <strong>【免責事項】</strong> 当社は一切の責任を問われません。PCを限界突破させたい場合は各ユーザーで完全に自己責任にてご利用ください！
+  <div class="engine-toggle">
+    <label class="engine-option active-cpu" id="labelCpu">
+      <input type="radio" name="engine" value="cpu" checked> 💻 CPU (Web Worker)
+    </label>
+    <label class="engine-option" id="labelGpu">
+      <input type="radio" name="engine" value="gpu"> ⚡ GPU (WebGPU)
+    </label>
   </div>
 
-  <div class="nav-benchmarks">
-    <a href="benchmark/CPU.html" class="nav-card">
-      <div class="nav-title cpu">CPU ベンチマーク 専能画面 →</div>
-      <div class="nav-desc">描画・DB完全なしでCPU単一コア限界測定</div>
-    </a>
-    <a href="benchmark/GPU.html" class="nav-card gpu">
-      <div class="nav-title gpu">GPU ベンチマーク 専能画面 →</div>
-      <div class="nav-desc">WebGPUによる数万並列処理の限界測定</div>
-    </a>
+  <div class="status-bar">
+    <div>ステータス: <span id="status" style="font-weight: bold; color: #fff;">待機中</span></div>
+    <div style="font-size: 11px; color: #94a3b8;">💾 最終保存日時: <span id="lastSaveText" style="color: #cbd5e1;">未保存</span></div>
   </div>
 
-  <div class="main-panel">
-    <div class="engine-toggle">
-      <label class="engine-option active-cpu" id="labelCpu">
-        <input type="radio" name="engine" value="cpu" checked> 💻 CPU モード (Worker)
-      </label>
-      <label class="engine-option" id="labelGpu">
-        <input type="radio" name="engine" value="gpu"> ⚡ GPU モード (WebGPU)
-      </label>
+  <div class="dashboard">
+    <div class="card">
+      <div class="label">現在の探索値</div>
+      <div class="value" id="current">2</div>
     </div>
-
-    <details open>
-      <summary>⚙️ パラメータ・データ保存の詳細手入力設定</summary>
-      <div class="settings-grid">
-        <div class="setting-item">
-          <label for="savePolicy">💾 DB保存ポリシー:</label>
-          <select id="savePolicy">
-            <option value="all">素数を全件DB保存 (低速・データ重視)</option>
-            <option value="stateOnly" selected>状態(到達点)のみ保存 (推奨・軽量)</option>
-            <option value="none">DB保存なし (メモリのみ・最速)</option>
-          </select>
-        </div>
-
-        <div class="setting-item">
-          <label for="saveInterval">⏱️ 保存インターバル (秒):</label>
-          <input type="number" id="saveInterval" value="1" min="0.1" step="0.1">
-        </div>
-
-        <div class="setting-item">
-          <label for="gpuThreads">⚡ GPU並列スレッド数 (WebGPU):</label>
-          <input type="number" id="gpuThreads" value="65536" step="256" min="256">
-          
-          <div style="font-size: 11px; color: #38bdf8; margin-top: 4px; line-height: 1.4;">
-            💻 この端末の理論上限: <span id="gpuLimitText">取得中...</span><br>
-            💡 <strong>推奨設定の目安:</strong><br>
-            ・<code>65,536</code> : 一番安定＆爆速（推奨）<br>
-            ・<code>262,144</code> : 高スコア狙い（やや高負荷）<br>
-            ・<code>1,048,576〜</code> : 限界挑戦（※OSのGPUリセットや画面ブラックアウト注意！）
-          </div>
-          
-          <div id="threadWarning" style="display: none; font-size: 11px; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 6px 8px; border-radius: 4px; margin-top: 6px;">
-            ⚠️ <strong>警告:</strong> 理論上限値を超えています！画面が数秒〜数分フリーズしたり、OSによってGPUが強制リセットされる可能性が高いです。(完全に自己責任で実行してください)
-          </div>
-        </div>
-
-        <div class="setting-item">
-          <label for="cpuBatch">💻 CPUバッチサイズ (Worker):</label>
-          <input type="number" id="cpuBatch" value="1000" min="100" step="100">
-        </div>
-
-        <div class="setting-item">
-          <label for="domLimit">🖥️ 画面描画保持文字数 (0でOFF):</label>
-          <input type="number" id="domLimit" value="3000" step="500" min="0">
-        </div>
-
-        <div class="size-warning" id="sizeEstimate">
-          💡 <strong>事前のデータサイズ提示（目安）:</strong><br>
-          ・「全件保存」の場合: 素数1,000,000件あたり **約8 MB 〜 12 MB** のストレージ容量を消費します。<br>
-          ・「状態のみ保存」の場合: 探索速度に関わらず **わずか数 KB** に固定されます。
-        </div>
-      </div>
-    </details>
-
-    <div class="controls">
-      <button id="startBtn">計算開始</button>
-      <button id="pauseBtn" disabled>一時停止</button>
-      <button id="downloadBtn">DBダウンロード</button>
-      <button id="resetBtn">リセット</button>
+    <div class="card">
+      <div class="label">発見した素数</div>
+      <div class="value" id="count">0</div>
     </div>
-
-    <div class="status-panel">
-      <div>
-        <p>ステータス: <span id="status">停止中</span></p>
-        <p>現在探索中の数値: <span id="current">2</span></p>
-        <p>発見した素数の総数: <span id="count">0</span></p>
-      </div>
-      <div>
-        <p>リアルタイムスコア: <span id="score">0</span> pts</p>
-        <p>処理速度: <span id="speed">0</span> 件/秒</p>
-        <p>JSメモリ使用量: <span id="memory">--</span> MB</p>
-      </div>
+    <div class="card">
+      <div class="label">処理速度 (数/秒)</div>
+      <div class="value" id="speed">0</div>
     </div>
-
-    <div id="result"></div>
+    <div class="card">
+      <div class="label">ベンチマークスコア</div>
+      <div class="value" id="score">0</div>
+    </div>
+    <div class="card">
+      <div class="label">JSメモリ使用量 (MB)</div>
+      <div class="value" id="memory">0.0</div>
+    </div>
   </div>
 
-  <script src="app.js"></script>
+  <div class="controls">
+    <button id="startBtn">▶ 計算開始</button>
+    <button id="pauseBtn" disabled>⏸ 一時停止</button>
+    <button id="saveBtn">💾 今すぐ手動保存</button>
+    <button id="downloadBtn">📥 JSON出力</button>
+    <button id="connectDbBtn">🔌 DB再接続</button>
+    <button id="resetBtn">🔄 初期化</button>
+  </div>
+
+  <details>
+    <summary>⚙️ パラメータ詳細設定</summary>
+    <div class="settings-grid">
+      <div class="setting-item">
+        <label for="savePolicy">💾 DB保存ポリシー:</label>
+        <select id="savePolicy">
+          <option value="stateOnly" selected>状態(到達点)のみ保存 (超高速・推奨)</option>
+          <option value="all">素数を全件DB保存 (低速・大容量)</option>
+          <option value="none">DB保存なし (メモリのみ)</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label for="gpuThreads">⚡ GPU並列スレッド数 (WebGPU):</label>
+        <input type="number" id="gpuThreads" value="65536" step="256" min="256">
+        <div style="font-size: 11px; color: #38bdf8; margin-top: 4px; line-height: 1.4;">
+          💻 この端末の理論上限: <span id="gpuLimitText">取得中...</span><br>
+          💡 <strong>推奨設定:</strong> <code>65,536</code> (安定) / <code>262,144</code> (高負荷)
+        </div>
+        <div id="threadWarning" style="display: none; font-size: 11px; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 6px 8px; border-radius: 4px; margin-top: 6px;">
+          ⚠️ <strong>警告:</strong> 理論上限値を超えています！画面フリーズやGPU強制リセット注意。
+        </div>
+      </div>
+      <div class="setting-item">
+        <label for="cpuBatch">💻 CPUバッチサイズ (個/ループ):</label>
+        <input type="number" id="cpuBatch" value="1000" step="100" min="100">
+      </div>
+      <div class="setting-item">
+        <label for="domLimit">🖥️ 画面描画保持文字数 (0でオフ):</label>
+        <input type="number" id="domLimit" value="3000" step="500" min="0">
+      </div>
+    </div>
+  </details>
+
+  <div class="result-box" id="result"></div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
