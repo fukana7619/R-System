@@ -2,268 +2,62 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>無限素数計算機（メモリ軽量化版）</title>
+  <title>無限素数ジェネレーター</title>
   <style>
-    body {
-      font-family: 'Helvetica Neue', Arial, sans-serif;
-      padding: 20px;
-      max-width: 650px;
-      margin: 0 auto;
-      background-color: #f4f7f6;
-      color: #333;
-    }
-    h1 { font-size: 24px; color: #2c3e50; }
-    .input-group { margin-bottom: 15px; }
-    input { padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; width: 120px; }
-    button {
-      padding: 9px 16px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px;
-      cursor: pointer; margin: 3px; transition: background-color 0.2s;
-    }
-    .btn-main { background-color: #27ae60; color: white; }
-    .btn-main:hover { background-color: #219150; }
-    .btn-stop { background-color: #e74c3c; color: white; }
-    .btn-stop:hover { background-color: #c0392b; }
-    .btn-sub { background-color: #3498db; color: white; }
-    .btn-sub:hover { background-color: #2980b9; }
-    .btn-gas { background-color: #8e44ad; color: white; }
-    .btn-gas:hover { background-color: #732d91; }
-
-    .control-panel {
-      background: #ffffff; border: 1px solid #e0e0e0; border-radius: 6px;
-      padding: 15px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .control-title { font-weight: bold; margin-bottom: 8px; display: block; color: #555; }
-
-    .status-panel {
-      background: #1e1e1e; color: #00ff66; font-family: 'Courier New', Courier, monospace;
-      border-radius: 6px; padding: 15px; margin: 15px 0; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-    }
-    .status-item { font-size: 16px; margin: 8px 0; }
-    .status-value { font-weight: bold; color: #ffffff; }
-    .highlight { color: #ffcc00; }
-
-    #output {
-      padding: 12px; border: 1px solid #ccc; border-radius: 4px; height: 200px;
-      overflow-y: scroll; background: #ffffff; word-break: break-all; font-family: monospace; line-height: 1.5;
-    }
-    .save-status { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+    body { font-family: sans-serif; padding: 20px; }
+    #result { max-height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; word-break: break-all; }
   </style>
 </head>
 <body>
-
-  <h1>無限素数計算機（軽量版）</h1>
-  
-  <div class="input-group">
-    <label>開始数値: <input type="number" id="startInput" value="2"></label>
-    <label>終了数値: <input type="number" id="endInput" placeholder="空欄で無限"></label>
-  </div>
-  
-  <div>
-    <button class="btn-main" onclick="startCalculation()">計算開始</button>
-    <button class="btn-stop" onclick="stopCalculation()">停止</button>
-  </div>
-
-  <div class="control-panel">
-    <span class="control-title">💾 手動同期 & 復元</span>
-    <button class="btn-sub" onclick="loadFromLocal(true)">LocalDBから復元</button>
-    <button class="btn-gas" onclick="uploadToDrive()">Driveに送信 (GAS)</button>
-    <button class="btn-gas" onclick="downloadFromDrive()">Driveから復元 (GAS)</button>
-    <div id="saveStatus" class="save-status">自動保存: 待機中</div>
-  </div>
-
-  <div class="status-panel">
-    <div class="status-item">判定中の数 (被除数) : <span id="targetNum" class="status-value">-</span></div>
-    <div class="status-item">試している数 (除数) : <span id="divisorNum" class="status-value">-</span> (<span id="progressNum" class="status-value highlight">0</span>%)</div>
-    <div class="status-item">発見した素数の数 : <span id="primeCount" class="status-value highlight">0</span> 個</div>
-  </div>
-
-  <h3>直近発見した素数（最新50件を表示）</h3>
-  <div id="output"></div>
+  <h1>無限素数計算アプリ</h1>
+  <button id="startBtn">開始</button>
+  <button id="stopBtn" disabled>停止</button>
+  <p>見つかった素数の数: <span id="count">0</span></p>
+  <div id="result"></div>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwAOKBODP0nyN0aVLfXuCrHBvwsjM5FGVcpGQ6y7NdiwNzj0DzcRvtv5nlrh_5dFx_O/exec";
-
-    let worker = null;
-    let totalPrimeCount = 0;
-    let recentPrimes = []; // メモリ対策：直近50件のみ配列で保持
     let isRunning = false;
-    let latestData = { target: 2, divisor: '-', progress: 0 };
-    
-    const MAX_RECENT = 50; // 画面表示用の最大件数
+    let currentNumber = 2;
+    let primeCount = 0;
+    let timeoutId = null;
 
-    // --- 1. IndexedDB (LocalDB) ---
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open("PrimeCalculatorDB", 2);
-        req.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains("state")) {
-            db.createObjectStore("state", { keyPath: "id" });
-          }
-          if (!db.objectStoreNames.contains("primes")) {
-            db.createObjectStore("primes", { autoIncrement: true });
-          }
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    }
-
-    // サイレント自動保存（ダイアログなし）
-    async function autoSaveProgress(newPrime = null) {
-      try {
-        const db = await openDB();
-        const tx = db.transaction(["state", "primes"], "readwrite");
-        
-        // 進捗情報の更新
-        tx.objectStore("state").put({
-          id: "current_progress",
-          targetNum: latestData.target,
-          totalCount: totalPrimeCount,
-          recentPrimes: recentPrimes,
-          updatedAt: new Date().toISOString()
-        });
-
-        // 素数が新しく見つかったら個別にLocalDBへ追加保存
-        if (newPrime !== null) {
-          tx.objectStore("primes").add(newPrime);
-        }
-
-        document.getElementById('saveStatus').textContent = `自動保存済み: ${new Date().toLocaleTimeString()}`;
-      } catch (err) {
-        console.error("AutoSave Error:", err);
+    // 素数判定関数
+    function isPrime(num) {
+      for (let i = 2, s = Math.sqrt(num); i <= s; i++) {
+        if (num % i === 0) return false;
       }
+      return num > 1;
     }
 
-    // LocalDBからの復元
-    async function loadFromLocal(silent = false) {
-      try {
-        const db = await openDB();
-        const tx = db.transaction("state", "readonly");
-        const req = tx.objectStore("state").get("current_progress");
-
-        req.onsuccess = () => {
-          const data = req.result;
-          if (data) {
-            applyState(data);
-            if (!silent) console.log("LocalDBから復元しました");
-          }
-        };
-      } catch (err) {
-        console.error("Load Error:", err);
-      }
-    }
-
-    function applyState(data) {
-      document.getElementById('startInput').value = data.targetNum;
-      totalPrimeCount = data.totalCount || 0;
-      recentPrimes = data.recentPrimes || [];
-      
-      document.getElementById('primeCount').textContent = totalPrimeCount;
-      updateDisplayList();
-    }
-
-    // 画面表示更新（メモリ軽減のため直近のみ表示）
-    function updateDisplayList() {
-      const output = document.getElementById('output');
-      output.textContent = recentPrimes.join(', ');
-      output.scrollTop = output.scrollHeight;
-    }
-
-    // --- 2. Google Drive (GAS) 連携 ---
-    async function uploadToDrive() {
-      const saveData = {
-        targetNum: latestData.target,
-        totalCount: totalPrimeCount,
-        recentPrimes: recentPrimes,
-        updatedAt: new Date().toISOString()
-      };
-
-      try {
-        document.getElementById('saveStatus').textContent = "Driveに送信中...";
-        await fetch(GAS_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveData)
-        });
-        document.getElementById('saveStatus').textContent = "Drive送信完了";
-      } catch (err) {
-        document.getElementById('saveStatus').textContent = "Drive送信失敗";
-      }
-    }
-
-    async function downloadFromDrive() {
-      try {
-        const res = await fetch(GAS_URL);
-        const data = await res.json();
-
-        if (data.targetNum) {
-          applyState(data);
-          document.getElementById('saveStatus').textContent = "Driveから復元完了";
-        }
-      } catch (err) {
-        console.error("Drive Download Error:", err);
-      }
-    }
-
-    // --- 3. 高速描画・計算処理 ---
-    function renderLoop() {
+    function calculateNext() {
       if (!isRunning) return;
-      document.getElementById('targetNum').textContent = latestData.target;
-      document.getElementById('divisorNum').textContent = latestData.divisor;
-      document.getElementById('progressNum').textContent = latestData.progress;
-      
-      requestAnimationFrame(renderLoop);
-    }
 
-    function startCalculation() {
-      stopCalculation();
-      const startNum = document.getElementById('startInput').value || 2;
-      const endNum = document.getElementById('endInput').value;
-
-      isRunning = true;
-      requestAnimationFrame(renderLoop);
-
-      worker = new Worker('worker.js');
-      worker.postMessage({ startNum, endNum });
-
-      worker.onmessage = function(e) {
-        const data = e.data;
-        if (data.type === 'step') {
-          latestData = data;
-          
-          // 1000個判定が進むごとに、サイレント自動保存（ダイアログなし）
-          if (data.target % 1000 === 0) {
-            autoSaveProgress();
-          }
-        } else if (data.type === 'prime') {
-          totalPrimeCount++;
-          
-          // メモリ対策：配列の上限を固定し、超えたら古いものを削除
-          recentPrimes.push(data.number);
-          if (recentPrimes.length > MAX_RECENT) {
-            recentPrimes.shift();
-          }
-
-          document.getElementById('primeCount').textContent = totalPrimeCount;
-          updateDisplayList();
-
-          // 素数が見つかったタイミングでLocalDBへ即時書き込み
-          autoSaveProgress(data.number);
-        }
-      };
-    }
-
-    function stopCalculation() {
-      isRunning = false;
-      if (worker) {
-        worker.terminate();
-        worker = null;
+      if (isPrime(currentNumber)) {
+        primeCount++;
+        document.getElementById('count').textContent = primeCount;
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML += currentNumber + ', ';
+        resultDiv.scrollTop = resultDiv.scrollHeight; // 自動スクロール
       }
-      autoSaveProgress(); // 停止時にも保存
+      currentNumber++;
+
+      // UIのフリーズを防ぐため、setTimeoutで非同期化
+      timeoutId = setTimeout(calculateNext, 10);
     }
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      isRunning = true;
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+      calculateNext();
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      isRunning = false;
+      clearTimeout(timeoutId);
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    });
   </script>
 </body>
 </html>
