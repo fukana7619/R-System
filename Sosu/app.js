@@ -434,5 +434,25 @@ resetBtn.addEventListener('click', async () => {
   }
 });
 
-// 初期化実行
-detectDeviceLimits();
+// --- ページ読み込み完了時の初期化処理 ---
+document.addEventListener('DOMContentLoaded', async () => {
+  // 1. 端末のGPU限界値を自動取得してUIに反映
+  await detectDeviceLimits();
+
+  // 2. 保存されている状態（到達点・カウント）をDBから読み込んで初期表示
+  await initDB();
+  const state = await loadState();
+  currentNumber = state.current;
+  totalPrimeCount = state.count;
+
+  currentEl.textContent = currentNumber.toLocaleString();
+  countEl.textContent = totalPrimeCount.toLocaleString();
+
+  // 3. 入力フォーム初期値での警告チェックを即座に実行
+  const val = parseInt(gpuThreadsInput.value) || 0;
+  if (val > maxSupportedGpuThreads) {
+    threadWarningEl.style.display = 'block';
+  } else {
+    threadWarningEl.style.display = 'none';
+  }
+});
