@@ -7,15 +7,6 @@
   <style>
     body {
       font-family: sans-serif;
-      padding: 20px;<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>無限素数ジェネレーター (LocalDB & Web Worker)</title>
-  <style>
-    body {
-      font-family: sans-serif;
       padding: 20px;
       max-width: 800px;
       margin: 0 auto;
@@ -98,11 +89,14 @@
 
       function initDB() {
         return new Promise((resolve, reject) => {
-          const request = indexedDB.open("PrimeDatabase", 1);
+          const request = indexedDB.open("PrimeDatabase", 2);
           request.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains("primes")) {
               db.createObjectStore("primes", { autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains("state")) {
+              db.createObjectStore("state");
             }
           };
           request.onsuccess = (e) => {
@@ -115,40 +109,35 @@
 
       function loadLastState() {
         return new Promise((resolve) => {
-          if (!db) return resolve({ lastPrime: 2, totalCount: 0 });
-          const transaction = db.transaction(["primes"], "readonly");
-          const store = transaction.objectStore("primes");
+          if (!db) return resolve({ current: 2, totalCount: 0 });
+          const transaction = db.transaction(["primes", "state"], "readonly");
+          const primeStore = transaction.objectStore("primes");
+          const stateStore = transaction.objectStore("state");
           
           let totalCount = 0;
-          let lastPrime = 2;
+          let savedCurrent = 2;
 
-          const countReq = store.count();
-          countReq.onsuccess = () => {
-            totalCount = countReq.result;
-            const cursorReq = store.openCursor(null, "prev");
-            cursorReq.onsuccess = (e) => {
-              const cursor = e.target.result;
-              if (cursor) {
-                lastPrime = cursor.value;
-                currentNumber = lastPrime + 1;
-              } else {
-                currentNumber = 2;
-              }
-              resolve({ lastPrime, totalCount });
-            };
-            cursorReq.onerror = () => resolve({ lastPrime: 2, totalCount: 0 });
+          const countReq = primeStore.count();
+          const stateReq = stateStore.get("currentNumber");
+
+          transaction.oncomplete = () => {
+            totalCount = countReq.result || 0;
+            savedCurrent = stateReq.result || 2;
+            currentNumber = savedCurrent;
+            resolve({ current: currentNumber, totalCount });
           };
-          countReq.onerror = () => resolve({ lastPrime: 2, totalCount: 0 });
+
+          transaction.onerror = () => resolve({ current: 2, totalCount: 0 });
         });
       }
 
-      // 素数判定＆実際に実行した割り算の回数を正確に計算
+      // 素数判定 ＆ 実行した演算（割り算）回数をカウント
       function checkPrimeWithOps(num) {
         if (num <= 1) return { isPrime: false, ops: 1 };
         if (num === 2) return { isPrime: true, ops: 1 };
         if (num % 2 === 0) return { isPrime: false, ops: 1 };
         
-        let ops = 2; // ループ前のチェック分
+        let ops = 2;
         const sqrt = Math.sqrt(num);
         for (let i = 3; i <= sqrt; i += 2) {
           ops++;
@@ -157,12 +146,15 @@
         return { isPrime: true, ops };
       }
 
-      function saveToDB(primes) {
+      function saveToDB(primes, lastChecked) {
         return new Promise((resolve) => {
-          if (!db || primes.length === 0) return resolve();
-          const transaction = db.transaction(["primes"], "readwrite");
-          const store = transaction.objectStore("primes");
-          primes.forEach(prime => store.add(prime));
+          if (!db) return resolve();
+          const transaction = db.transaction(["primes", "state"], "readwrite");
+          const primeStore = transaction.objectStore("primes");
+          const stateStore = transaction.objectStore("state");
+
+          primes.forEach(prime => primeStore.add(prime));
+          stateStore.put(lastChecked, "currentNumber");
           
           transaction.oncomplete = () => resolve();
           transaction.onerror = () => resolve();
@@ -185,7 +177,7 @@
           currentNumber++;
         }
 
-        await saveToDB(foundPrimes);
+        await saveToDB(foundPrimes, currentNumber);
 
         postMessage({
           type: 'progress',
@@ -203,10 +195,10 @@
       onmessage = async function(e) {
         if (e.data === 'start') {
           if (!db) await initDB();
-          const { lastPrime, totalCount } = await loadLastState();
+          const { current, totalCount } = await loadLastState();
           postMessage({
             type: 'init',
-            current: currentNumber,
+            current: current,
             totalCount: totalCount
           });
 
@@ -214,17 +206,6 @@
           calculate();
         } else if (e.data === 'pause') {
           isRunning = false;
-        } else if (e.data === 'reset') {
-          isRunning = false;
-          if (db) {
-            db.close();
-            db = null;
-          }
-          const deleteReq = indexedDB.deleteDatabase("PrimeDatabase");
-          deleteReq.onsuccess = () => {
-            currentNumber = 2;
-            postMessage({ type: 'reset_complete' });
-          };
         }
       };
     `;
@@ -236,7 +217,6 @@
 
     let checkedCountInSec = 0;
     let totalOpsInSec = 0;
-    let currentExploringNum = 2;
 
     const MAX_DOM_LENGTH = 5000;
 
@@ -253,7 +233,7 @@
 
     // --- モニター＆スコア計算ルーチン (1秒毎) ---
     setInterval(() => {
-      // メモリ表示
+      // メモリ表示 (Chrome系対応)
       if (performance.memory) {
         const usedHeapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
         memoryEl.textContent = usedHeapMB;
@@ -261,10 +241,10 @@
         memoryEl.textContent = "非対応";
       }
 
-      // スピード（件/秒）更新
+      // 処理速度（件/秒）更新
       speedEl.textContent = checkedCountInSec.toLocaleString();
 
-      // CPUスコアの計算： 1秒間に実際に実行した演算(割り算)のステップ数 ÷ 10,000
+      // CPUスコア計算： 1秒間に実行した累積計算回数 ÷ 10,000
       if (totalOpsInSec > 0) {
         const realScore = Math.round(totalOpsInSec / 10000);
         scoreEl.textContent = realScore.toLocaleString();
@@ -272,7 +252,7 @@
         scoreEl.textContent = "0";
       }
 
-      // 毎秒リセット
+      // 1秒ごとに集計変数をリセット
       checkedCountInSec = 0;
       totalOpsInSec = 0;
     }, 1000);
@@ -288,9 +268,8 @@
 
           if (data.type === 'init') {
             primeCount = data.totalCount;
-            currentExploringNum = data.current;
             countEl.textContent = primeCount.toLocaleString();
-            currentEl.textContent = currentExploringNum.toLocaleString();
+            currentEl.textContent = data.current.toLocaleString();
             return;
           }
 
@@ -298,8 +277,7 @@
             const { primes, current, checkedCount, opsCount } = data;
             
             checkedCountInSec += checkedCount;
-            totalOpsInSec += opsCount; // 実際に動いた計算回数を加算
-            currentExploringNum = current;
+            totalOpsInSec += opsCount;
 
             primeCount += primes.length;
             countEl.textContent = primeCount.toLocaleString();
@@ -310,26 +288,14 @@
               resultDiv.appendChild(document.createTextNode(textToAdd));
               resultDiv.scrollTop = resultDiv.scrollHeight;
 
+              // DOMのトリミング処理
               if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
-                resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+                let trimmed = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+                const firstComma = trimmed.indexOf(',');
+                if (firstComma !== -1) trimmed = trimmed.slice(firstComma + 2);
+                resultDiv.textContent = trimmed;
               }
             }
-          }
-
-          if (data.type === 'reset_complete') {
-            primeCount = 0;
-            checkedCountInSec = 0;
-            totalOpsInSec = 0;
-            currentExploringNum = 2;
-            speedEl.textContent = "0";
-            scoreEl.textContent = "0";
-            countEl.textContent = "0";
-            currentEl.textContent = "2";
-            resultDiv.textContent = "";
-            statusEl.textContent = "データをリセットしました";
-            startBtn.disabled = false;
-            pauseBtn.disabled = true;
-            resetBtn.disabled = false;
           }
         };
       }
@@ -359,352 +325,37 @@
 
     resetBtn.addEventListener('click', () => {
       if (confirm("これまでに保存した素数データをすべて削除しますか？")) {
-        initWorker();
-        worker.postMessage('reset');
         statusEl.textContent = "リセット中...";
         startBtn.disabled = true;
         pauseBtn.disabled = true;
         resetBtn.disabled = true;
-      }
-    });
-  </script>
-</body>
-</html>
-      max-width: 800px;
-      margin: 0 auto;
-      background-color: #f4f4f9;
-    }
-    h1 { color: #333; }
-    .controls { margin-bottom: 15px; }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      margin-right: 10px;
-    }
-    #resetBtn {
-      background-color: #ff4d4d;
-      color: white;
-      border: none;
-      border-radius: 4px;
-    }
-    #resetBtn:hover { background-color: #cc0000; }
-    #resetBtn:disabled { background-color: #ccc; }
-    
-    .status-panel {
-      background: #fff;
-      padding: 15px;
-      border-radius: 5px;
-      border: 1px solid #ddd;
-      margin-bottom: 15px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .status-panel p { margin: 5px 0; }
-    
-    #result {
-      height: 300px;
-      overflow-y: scroll;
-      background: #1e1e1e;
-      color: #00ff66;
-      font-family: 'Courier New', Courier, monospace;
-      padding: 15px;
-      border-radius: 5px;
-      word-break: break-all;
-      white-space: pre-wrap;
-      line-height: 1.5;
-    }
-  </style>
-</head>
-<body>
 
-  <h1>無限素数ジェネレーター</h1>
-  
-  <div class="controls">
-    <button id="startBtn">開始 / 再開</button>
-    <button id="pauseBtn" disabled>一時停止</button>
-    <button id="resetBtn">データリセット</button>
-  </div>
-
-  <div class="status-panel">
-    <div>
-      <p>ステータス: <strong><span id="status">停止中</span></strong></p>
-      <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
-      <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
-    </div>
-    <div>
-      <p>CPUスコア: <strong><span id="score">0</span> pts</strong></p>
-      <p>処理速度: <strong><span id="speed">0</span> 件/秒</strong></p>
-      <p>JSメモリ: <strong><span id="memory">--</span> MB</strong></p>
-    </div>
-  </div>
-
-  <div id="result"></div>
-
-  <script>
-    // --- 1. Worker用のスクリプト文字列を定義 ---
-    const workerScript = `
-      let db = null;
-      let currentNumber = 2;
-      let isRunning = false;
-
-      function initDB() {
-        return new Promise((resolve, reject) => {
-          const request = indexedDB.open("PrimeDatabase", 1);
-          request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains("primes")) {
-              db.createObjectStore("primes", { autoIncrement: true });
-            }
-          };
-          request.onsuccess = (e) => {
-            db = e.target.result;
-            resolve(db);
-          };
-          request.onerror = (e) => reject(e);
-        });
-      }
-
-      function loadLastState() {
-        return new Promise((resolve) => {
-          if (!db) return resolve({ lastPrime: 2, totalCount: 0 });
-          const transaction = db.transaction(["primes"], "readonly");
-          const store = transaction.objectStore("primes");
-          
-          let totalCount = 0;
-          let lastPrime = 2;
-
-          const countReq = store.count();
-          countReq.onsuccess = () => {
-            totalCount = countReq.result;
-            const cursorReq = store.openCursor(null, "prev");
-            cursorReq.onsuccess = (e) => {
-              const cursor = e.target.result;
-              if (cursor) {
-                lastPrime = cursor.value;
-                currentNumber = lastPrime + 1;
-              } else {
-                currentNumber = 2;
-              }
-              resolve({ lastPrime, totalCount });
-            };
-            cursorReq.onerror = () => resolve({ lastPrime: 2, totalCount: 0 });
-          };
-          countReq.onerror = () => resolve({ lastPrime: 2, totalCount: 0 });
-        });
-      }
-
-      function isPrime(num) {
-        if (num <= 1) return false;
-        if (num === 2) return true;
-        if (num % 2 === 0) return false;
-        const sqrt = Math.sqrt(num);
-        for (let i = 3; i <= sqrt; i += 2) {
-          if (num % i === 0) return false;
+        if (worker) {
+          worker.terminate();
+          worker = null;
         }
-        return true;
-      }
-
-      function saveToDB(primes) {
-        return new Promise((resolve) => {
-          if (!db || primes.length === 0) return resolve();
-          const transaction = db.transaction(["primes"], "readwrite");
-          const store = transaction.objectStore("primes");
-          primes.forEach(prime => store.add(prime));
-          
-          transaction.oncomplete = () => resolve();
-          transaction.onerror = () => resolve();
-        });
-      }
-
-      async function calculate() {
-        if (!isRunning) return;
-
-        let foundPrimes = [];
-        const BATCH_SIZE = 1000;
-
-        for (let i = 0; i < BATCH_SIZE; i++) {
-          if (isPrime(currentNumber)) {
-            foundPrimes.push(currentNumber);
-          }
-          currentNumber++;
+        if (workerUrl) {
+          URL.revokeObjectURL(workerUrl);
+          workerUrl = null;
         }
 
-        await saveToDB(foundPrimes);
-
-        postMessage({
-          type: 'progress',
-          primes: foundPrimes,
-          current: currentNumber,
-          checkedCount: BATCH_SIZE
-        });
-
-        if (isRunning) {
-          setTimeout(calculate, 0);
-        }
-      }
-
-      onmessage = async function(e) {
-        if (e.data === 'start') {
-          if (!db) await initDB();
-          const { lastPrime, totalCount } = await loadLastState();
-          postMessage({
-            type: 'init',
-            current: currentNumber,
-            totalCount: totalCount
-          });
-
-          isRunning = true;
-          calculate();
-        } else if (e.data === 'pause') {
-          isRunning = false;
-        } else if (e.data === 'reset') {
-          isRunning = false;
-          if (db) {
-            db.close();
-            db = null;
-          }
-          const deleteReq = indexedDB.deleteDatabase("PrimeDatabase");
-          deleteReq.onsuccess = () => {
-            currentNumber = 2;
-            postMessage({ type: 'reset_complete' });
-          };
-        }
-      };
-    `;
-
-    // --- 2. メインスレッド側の処理 ---
-    let worker = null;
-    let workerUrl = null;
-    let primeCount = 0;
-
-    let checkedCountInSec = 0;
-    let currentExploringNum = 2;
-
-    const MAX_DOM_LENGTH = 5000;
-
-    const startBtn = document.getElementById('startBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const statusEl = document.getElementById('status');
-    const currentEl = document.getElementById('current');
-    const countEl = document.getElementById('count');
-    const resultDiv = document.getElementById('result');
-    const speedEl = document.getElementById('speed');
-    const scoreEl = document.getElementById('score');
-    const memoryEl = document.getElementById('memory');
-
-    // --- モニター＆スコア計算ルーチン (1秒毎) ---
-    setInterval(() => {
-      if (performance.memory) {
-        const usedHeapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
-        memoryEl.textContent = usedHeapMB;
-      } else {
-        memoryEl.textContent = "非対応";
-      }
-
-      // スピード（件/秒）更新
-      speedEl.textContent = checkedCountInSec.toLocaleString();
-
-      // CPUスコアの計算： (1秒間にチェックした数) × √(現在の数値) / 1000
-      if (checkedCountInSec > 0) {
-        const difficulty = Math.sqrt(currentExploringNum);
-        const rawScore = (checkedCountInSec * difficulty) / 1000;
-        scoreEl.textContent = Math.round(rawScore).toLocaleString();
-      } else {
-        scoreEl.textContent = "0";
-      }
-
-      checkedCountInSec = 0;
-    }, 1000);
-
-    function initWorker() {
-      if (!worker) {
-        const blob = new Blob([workerScript], { type: 'application/javascript' });
-        workerUrl = URL.createObjectURL(blob);
-        worker = new Worker(workerUrl);
-
-        worker.onmessage = function(e) {
-          const data = e.data;
-
-          if (data.type === 'init') {
-            primeCount = data.totalCount;
-            currentExploringNum = data.current;
-            countEl.textContent = primeCount.toLocaleString();
-            currentEl.textContent = currentExploringNum.toLocaleString();
-            return;
-          }
-
-          if (data.type === 'progress') {
-            const { primes, current, checkedCount } = data;
-            
-            checkedCountInSec += checkedCount;
-            currentExploringNum = current;
-
-            primeCount += primes.length;
-            countEl.textContent = primeCount.toLocaleString();
-            currentEl.textContent = current.toLocaleString();
-
-            if (primes.length > 0) {
-              const textToAdd = primes.join(', ') + ', ';
-              resultDiv.appendChild(document.createTextNode(textToAdd));
-              resultDiv.scrollTop = resultDiv.scrollHeight;
-
-              if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
-                resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
-              }
-            }
-          }
-
-          if (data.type === 'reset_complete') {
-            primeCount = 0;
-            checkedCountInSec = 0;
-            currentExploringNum = 2;
-            speedEl.textContent = "0";
-            scoreEl.textContent = "0";
-            countEl.textContent = "0";
-            currentEl.textContent = "2";
-            resultDiv.textContent = "";
-            statusEl.textContent = "データをリセットしました";
-            startBtn.disabled = false;
-            pauseBtn.disabled = true;
-            resetBtn.disabled = false;
-          }
+        const deleteReq = indexedDB.deleteDatabase("PrimeDatabase");
+        deleteReq.onsuccess = () => {
+          primeCount = 0;
+          checkedCountInSec = 0;
+          totalOpsInSec = 0;
+          speedEl.textContent = "0";
+          scoreEl.textContent = "0";
+          countEl.textContent = "0";
+          currentEl.textContent = "2";
+          resultDiv.textContent = "";
+          statusEl.textContent = "データをリセットしました";
+          startBtn.disabled = false;
+          resetBtn.disabled = false;
         };
-      }
-    }
-
-    startBtn.addEventListener('click', () => {
-      initWorker();
-      worker.postMessage('start');
-
-      statusEl.textContent = "計算中...";
-      startBtn.disabled = true;
-      pauseBtn.disabled = false;
-      resetBtn.disabled = true;
-    });
-
-    pauseBtn.addEventListener('click', () => {
-      if (worker) {
-        worker.postMessage('pause');
-      }
-      statusEl.textContent = "一時停止中";
-      speedEl.textContent = "0";
-      scoreEl.textContent = "0";
-      startBtn.disabled = false;
-      pauseBtn.disabled = true;
-      resetBtn.disabled = false;
-    });
-
-    resetBtn.addEventListener('click', () => {
-      if (confirm("これまでに保存した素数データをすべて削除しますか？")) {
-        initWorker();
-        worker.postMessage('reset');
-        statusEl.textContent = "リセット中...";
-        startBtn.disabled = true;
-        pauseBtn.disabled = true;
-        resetBtn.disabled = true;
+        deleteReq.onerror = () => {
+          alert("DBの削除に失敗しました。ページを再読み込みしてください。");
+        };
       }
     });
   </script>
