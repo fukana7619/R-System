@@ -60,7 +60,7 @@
   <div id="result"></div>
 
   <script>
-    // --- 1. Worker用のスクリプト文字列を定義 (Blobで1ファイル化するため) ---
+    // --- 1. Worker用のスクリプト文字列を定義 ---
     const workerScript = `
       let db = null;
 
@@ -76,7 +76,7 @@
         db = e.target.result;
       };
 
-      // 素数判定（奇数のみをチェックして高速化）
+      // 素数判定（奇数のみチェック）
       function isPrime(num) {
         if (num <= 1) return false;
         if (num === 2) return true;
@@ -102,7 +102,7 @@
       function calculate() {
         let foundPrimes = [];
 
-        // 1回につき1000回判定
+        // 1000回判定ごとにバッチ処理
         for (let i = 0; i < 1000; i++) {
           if (isPrime(currentNumber)) {
             foundPrimes.push(currentNumber);
@@ -112,7 +112,7 @@
 
         saveToDB(foundPrimes);
 
-        // 結果をメインスレッドへ通知
+        // 結果をメインスレッドへ即時送信
         postMessage({
           primes: foundPrimes,
           current: currentNumber
@@ -131,11 +131,8 @@
     // --- 2. メインスレッド側の処理 ---
     let worker = null;
     let primeCount = 0;
-    let renderBuffer = "";
-    let typeInterval = null;
 
-    const MAX_DOM_LENGTH = 3000; // 画面上に残す最大文字数 (メモリ溢れ防止)
-    const SPEED_MS = 15;         // タイピング描画スピード (ms)
+    const MAX_DOM_LENGTH = 5000; // 画面上に残す最大文字数 (メモリ溢れ防止)
 
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -143,30 +140,12 @@
     const countEl = document.getElementById('count');
     const resultDiv = document.getElementById('result');
 
-    // 1文字ずつタイプライター風に描画する関数
-    function startTyping() {
-      typeInterval = setInterval(() => {
-        if (renderBuffer.length > 0) {
-          const char = renderBuffer[0];
-          renderBuffer = renderBuffer.slice(1);
-
-          resultDiv.appendChild(document.createTextNode(char));
-          resultDiv.scrollTop = resultDiv.scrollHeight;
-
-          // DOM肥大化によるメモリ圧迫の防止処理
-          if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
-            resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
-          }
-        }
-      }, SPEED_MS);
-    }
-
     // 開始ボタン
     startBtn.addEventListener('click', () => {
-      // Blobを作って外部ファイルなしでWorkerを起動可能にする
       const blob = new Blob([workerScript], { type: 'application/javascript' });
       worker = new Worker(URL.createObjectURL(blob));
 
+      // Workerからの結果を受け取ったら即座に画面へ反映
       worker.onmessage = function(e) {
         const { primes, current } = e.data;
         
@@ -175,12 +154,19 @@
         currentEl.textContent = current.toLocaleString();
 
         if (primes.length > 0) {
-          renderBuffer += primes.join(', ') + ', ';
+          // テキストをそのまま末尾に追加
+          const textToAdd = primes.join(', ') + ', ';
+          resultDiv.appendChild(document.createTextNode(textToAdd));
+          resultDiv.scrollTop = resultDiv.scrollHeight;
+
+          // DOMの肥大化・画面の重化を防ぐため、古い文字列を削る
+          if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
+            resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+          }
         }
       };
 
       worker.postMessage('start');
-      startTyping();
 
       startBtn.disabled = true;
       stopBtn.disabled = false;
@@ -191,10 +177,6 @@
       if (worker) {
         worker.terminate();
         worker = null;
-      }
-      if (typeInterval) {
-        clearInterval(typeInterval);
-        typeInterval = null;
       }
       startBtn.disabled = false;
       stopBtn.disabled = true;
