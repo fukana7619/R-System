@@ -198,3 +198,51 @@ summary {
   flex-wrap: wrap;
   gap: 10px;
 }
+/* ページ遷移ボタン用CSS */
+.page-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.nav-btn {
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-btn:hover {
+  background: #475569;
+}
+
+.nav-btn.gpu {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: #a855f7;
+  color: #c084fc;
+}
+
+.nav-btn.gpu:hover {
+  background: #a855f7;
+  color: #fff;
+}
+
+.nav-btn.cpu {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.nav-btn.cpu:hover {
+  background: #38bdf8;
+  color: #000;
+}
