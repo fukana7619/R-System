@@ -229,8 +229,14 @@
         <div class="setting-item">
           <label for="gpuThreads">⚡ GPU並列スレッド数 (WebGPU):</label>
           <input type="number" id="gpuThreads" value="65536" step="256" min="256">
+          <div style="font-size: 11px; color: #38bdf8; margin-top: 2px;">
+            💻 この端末の推奨最大値: <span id="gpuLimitText">取得中...</span>
+          </div>
+          <div id="threadWarning" style="display: none; font-size: 11px; color: #fbbf24; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 4px 8px; border-radius: 4px; margin-top: 4px;">
+            ⚠️ <strong>警告:</strong> お使いの端末の推奨限界値を超えています！ブラウザがフリーズしたり画面が一瞬真っ黒になる可能性がありますが、このまま実行しますか？(自己責任)
+          </div>
         </div>
-
+        
         <div class="setting-item">
           <label for="cpuBatch">💻 CPUバッチサイズ (Worker):</label>
           <input type="number" id="cpuBatch" value="1000" min="100" step="100">
