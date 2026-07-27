@@ -14,32 +14,51 @@ function initDB() {
 
 function loadState() {
   return new Promise((resolve) => {
-    if (!db) return resolve({ current: 2, count: 0 });
+    if (!db) return resolve({ current: 2, count: 0, settings: null });
     const tx = db.transaction(["primes", "state"], "readonly");
     const pStore = tx.objectStore("primes");
     const sStore = tx.objectStore("state");
     
-    let count = 0, current = 2;
+    let count = 0, current = 2, settings = null;
     const cReq = pStore.count();
     const sReq = sStore.get("currentNumber");
+    const setReq = sStore.get("appSettings");
 
     tx.oncomplete = () => {
       count = cReq.result || 0;
       current = sReq.result || 2;
-      resolve({ current, count });
+      settings = setReq.result || null;
+      resolve({ current, count, settings });
     };
-    tx.onerror = () => resolve({ current: 2, count: 0 });
+    tx.onerror = () => resolve({ current: 2, count: 0, settings: null });
   });
 }
 
 function saveStateAndPrimes(primes, lastNum, policy) {
-  if (!db || policy === 'none') return;
+  if (!db) return;
   const tx = db.transaction(["primes", "state"], "readwrite");
   if (policy === 'all' && primes.length > 0) {
     const pStore = tx.objectStore("primes");
     primes.forEach(p => pStore.add(p));
   }
-  tx.objectStore("state").put(lastNum, "currentNumber");
+  if (policy !== 'none') {
+    tx.objectStore("state").put(lastNum, "currentNumber");
+  }
+}
+
+// --- 詳細設定の保存機能 ---
+function saveCurrentSettings() {
+  if (!db) return;
+  const settings = {
+    engine: selectedEngine,
+    savePolicy: savePolicyEl.value,
+    saveInterval: saveIntervalEl.value,
+    gpuThreads: gpuThreadsInput.value,
+    cpuBatch: cpuBatchEl.value,
+    domLimit: domLimitEl.value
+  };
+  const tx = db.transaction(["state"], "readwrite");
+  tx.objectStore("state").put(settings, "appSettings");
 }
 
 // --- 変数定義 ---
@@ -97,7 +116,7 @@ async function detectDeviceLimits() {
   }
 }
 
-// 限界値オーバー時のリアルタイム警告制御
+// 限界値オーバー時のリアルタイム警告制御 ＆ 設定自動保存
 gpuThreadsInput.addEventListener('input', () => {
   const val = parseInt(gpuThreadsInput.value) || 0;
   if (val > maxSupportedGpuThreads) {
@@ -105,9 +124,16 @@ gpuThreadsInput.addEventListener('input', () => {
   } else {
     threadWarningEl.style.display = 'none';
   }
+  saveCurrentSettings();
 });
 
-// トグル切替イベント
+// 各設定入力値の変更時に自動保存
+[savePolicyEl, saveIntervalEl, cpuBatchEl, domLimitEl].forEach(el => {
+  el.addEventListener('change', saveCurrentSettings);
+  el.addEventListener('input', saveCurrentSettings);
+});
+
+// トグル切替イベント ＆ 設定自動保存
 document.querySelectorAll('input[name="engine"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
     selectedEngine = e.target.value;
@@ -118,6 +144,7 @@ document.querySelectorAll('input[name="engine"]').forEach(radio => {
       labelGpu.className = 'engine-option active-gpu';
       labelCpu.className = 'engine-option';
     }
+    saveCurrentSettings();
   });
 });
 
@@ -273,7 +300,6 @@ async function runGpuMode() {
   const workgroups = Math.ceil(totalThreads / 256);
   const policy = savePolicyEl.value;
 
-  // 【修正点1】バッファはループの外で1台分だけ生成（メモリリーク完全防止）
   const uniformBuffer = gpuDevice.createBuffer({ size: 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const opsBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
   const primeBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
@@ -295,7 +321,6 @@ async function runGpuMode() {
   while (isRunning) {
     const domLimit = parseInt(domLimitEl.value) || 0;
 
-    // ユニフォームバッファの再利用更新
     uintBufferArray[0] = currentNumber;
     gpuDevice.queue.writeBuffer(uniformBuffer, 0, uintBufferArray);
 
@@ -310,14 +335,12 @@ async function runGpuMode() {
     encoder.copyBufferToBuffer(primeBuffer, 0, readPrimeBuffer, 0, totalThreads * 4);
     gpuDevice.queue.submit([encoder.finish()]);
 
-    // 演算数バッファの読み出し
     await readOpsBuffer.mapAsync(GPUMapMode.READ);
     const opsRes = new Uint32Array(readOpsBuffer.getMappedRange());
     let batchOps = 0;
     for (let i = 0; i < totalThreads; i++) batchOps += opsRes[i];
     readOpsBuffer.unmap();
 
-    // 【修正点2】素数バッファの読み出し（カウント漏れを修正）
     let foundPrimes = [];
     let foundCountInBatch = 0;
 
@@ -336,7 +359,7 @@ async function runGpuMode() {
     checkedInSec += totalThreads;
     opsInSec += batchOps;
     currentNumber += totalThreads;
-    totalPrimeCount += foundCountInBatch; // 常に正しくカウント更新
+    totalPrimeCount += foundCountInBatch;
 
     currentEl.textContent = currentNumber.toLocaleString();
     countEl.textContent = totalPrimeCount.toLocaleString();
@@ -345,7 +368,6 @@ async function runGpuMode() {
     if (domLimit > 0) appendPrimesToDom(foundPrimes);
   }
 
-  // ループ終了時にバッファを解放
   uniformBuffer.destroy();
   opsBuffer.destroy();
   primeBuffer.destroy();
@@ -353,7 +375,7 @@ async function runGpuMode() {
   readPrimeBuffer.destroy();
 }
 
-// --- 【修正点3】DOM描画補助 (パフォーマンス最適化) ---
+// --- DOM描画補助 ---
 function appendPrimesToDom(primes) {
   const domLimit = parseInt(domLimitEl.value);
   if (domLimit === 0 || primes.length === 0) return;
@@ -362,7 +384,6 @@ function appendPrimesToDom(primes) {
   resultDiv.appendChild(document.createTextNode(txt));
   resultDiv.scrollTop = resultDiv.scrollHeight;
 
-  // 描画テキストが上限を超えた場合のみトリミング（毎フレームの全入れ替えを回避）
   if (resultDiv.textContent.length > domLimit + 1000) {
     let trimmed = resultDiv.textContent.slice(-domLimit);
     const idx = trimmed.indexOf(',');
@@ -380,6 +401,9 @@ startBtn.addEventListener('click', async () => {
     totalPrimeCount = state.count;
     countEl.textContent = totalPrimeCount.toLocaleString();
   }
+
+  // 計算開始時に現在の設定をDBに保存
+  saveCurrentSettings();
 
   isRunning = true;
   statusEl.textContent = selectedEngine.toUpperCase() + " で計算中...";
@@ -405,7 +429,7 @@ function stopCalculation() {
 
 pauseBtn.addEventListener('click', stopCalculation);
 
-// --- 【修正点4】DBダウンロード機能 (大容量対応 Blob URL方式) ---
+// --- DBダウンロード機能 ---
 downloadBtn.addEventListener('click', async () => {
   await initDB();
   if (!db) { alert("保存されたDBデータがありません。"); return; }
@@ -421,7 +445,6 @@ downloadBtn.addEventListener('click', async () => {
       return;
     }
 
-    // Blobオブジェクトを作ってメモリハングアップを回避
     const blob = new Blob([primes.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     
@@ -432,7 +455,7 @@ downloadBtn.addEventListener('click', async () => {
     link.click();
     
     document.body.removeChild(link);
-    URL.revokeObjectURL(url); // メモリ解放
+    URL.revokeObjectURL(url);
   };
 });
 
@@ -461,6 +484,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   const state = await loadState();
   currentNumber = state.current;
   totalPrimeCount = state.count;
+
+  // 保存されているカスタム設定があればフォームに復元
+  if (state.settings) {
+    const s = state.settings;
+    if (s.engine) {
+      selectedEngine = s.engine;
+      const radio = document.querySelector(`input[name="engine"][value="${s.engine}"]`);
+      if (radio) radio.checked = true;
+      if (s.engine === 'cpu') {
+        labelCpu.className = 'engine-option active-cpu';
+        labelGpu.className = 'engine-option';
+      } else {
+        labelGpu.className = 'engine-option active-gpu';
+        labelCpu.className = 'engine-option';
+      }
+    }
+    if (s.savePolicy !== undefined) savePolicyEl.value = s.savePolicy;
+    if (s.saveInterval !== undefined) saveIntervalEl.value = s.saveInterval;
+    if (s.gpuThreads !== undefined) gpuThreadsInput.value = s.gpuThreads;
+    if (s.cpuBatch !== undefined) cpuBatchEl.value = s.cpuBatch;
+    if (s.domLimit !== undefined) domLimitEl.value = s.domLimit;
+  }
 
   currentEl.textContent = currentNumber.toLocaleString();
   countEl.textContent = totalPrimeCount.toLocaleString();
