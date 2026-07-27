@@ -143,30 +143,38 @@
       let isRunning = false;
       let currentNumber = 2;
 
-      function isPrime(num) {
-        if (num <= 1) return false;
-        if (num === 2) return true;
-        if (num % 2 === 0) return false;
+      // 割り算（演算ステップ）の数を正確に計算する判定関数
+      function checkPrimeWithOps(num) {
+        if (num <= 1) return 1;
+        if (num === 2) return 1;
+        if (num % 2 === 0) return 1;
+        
+        let ops = 2;
         const sqrt = Math.sqrt(num);
         for (let i = 3; i <= sqrt; i += 2) {
-          if (num % i === 0) return false;
+          ops++;
+          if (num % i === 0) break;
         }
-        return true;
+        return ops;
       }
 
       function loop() {
         if (!isRunning) return;
 
-        // DB書き込みもDOM通知もせず、ひたすら10,000回連続計算
-        const BATCH_SIZE = 10000;
-        for (let i = 0; i < BATCH_SIZE; i++) {
-          isPrime(currentNumber);
+        let checked = 0;
+        let opsTotal = 0;
+        
+        // setTimeoutの遅延を回避するため、時間ベース(50ms)で一括処理してフルパワーを出す
+        const startTime = performance.now();
+        while (performance.now() - startTime < 50) {
+          opsTotal += checkPrimeWithOps(currentNumber);
+          checked++;
           currentNumber++;
         }
 
-        // 判定した件数と現在の位置だけを定期通知
         postMessage({
-          checkedCount: BATCH_SIZE,
+          checkedCount: checked,
+          opsCount: opsTotal,
           current: currentNumber
         });
 
@@ -178,7 +186,7 @@
       onmessage = function(e) {
         if (e.data === 'start') {
           isRunning = true;
-          currentNumber = 2; // 測定時は常に2からスタートして平準化
+          currentNumber = 2;
           loop();
         } else if (e.data === 'stop') {
           isRunning = false;
@@ -191,12 +199,13 @@
     let workerUrl = null;
 
     let checkedCountInSec = 0;
+    let opsCountInSec = 0;
     let currentExploringNum = 2;
 
-    // 統計データ用
     let maxScore = 0;
     let minScore = Infinity;
     let monitorTimer = null;
+    let isWarmup = true; // 1秒目のウォームアップ判定
 
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -207,32 +216,35 @@
     const currentNumEl = document.getElementById('currentNum');
     const speedEl = document.getElementById('speed');
 
-    // モニター用タイマー（1秒ごとにスコア計算・更新）
     function startMonitoring() {
+      isWarmup = true;
+      
       monitorTimer = setInterval(() => {
-        // スピード更新
         speedEl.textContent = checkedCountInSec.toLocaleString();
         currentNumEl.textContent = currentExploringNum.toLocaleString();
 
-        // スコア計算： (1秒間にチェックした数) × √(現在の数値) / 1000
-        if (checkedCountInSec > 0) {
-          const difficulty = Math.sqrt(currentExploringNum);
-          const rawScore = Math.round((checkedCountInSec * difficulty) / 1000);
-
+        // 実際のCPU演算ループ数を基準にスコア化（10,000演算 = 1pt）
+        if (opsCountInSec > 0) {
+          const rawScore = Math.round(opsCountInSec / 10000);
           currentScoreEl.textContent = rawScore.toLocaleString();
 
-          // 最大値・最小値の更新
-          if (rawScore > maxScore) {
-            maxScore = rawScore;
-            maxScoreEl.textContent = maxScore.toLocaleString();
-          }
-          if (rawScore < minScore) {
-            minScore = rawScore;
-            minScoreEl.textContent = minScore.toLocaleString();
+          // 初回のウォームアップ（1秒目）を避けて統計を更新
+          if (!isWarmup) {
+            if (rawScore > maxScore) {
+              maxScore = rawScore;
+              maxScoreEl.textContent = maxScore.toLocaleString();
+            }
+            if (rawScore < minScore) {
+              minScore = rawScore;
+              minScoreEl.textContent = minScore.toLocaleString();
+            }
+          } else {
+            isWarmup = false;
           }
         }
 
-        checkedCountInSec = 0; // リセット
+        checkedCountInSec = 0;
+        opsCountInSec = 0;
       }, 1000);
     }
 
@@ -243,12 +255,12 @@
       }
     }
 
-    // 開始ボタン
     startBtn.addEventListener('click', () => {
-      // 統計リセット
       maxScore = 0;
       minScore = Infinity;
       checkedCountInSec = 0;
+      opsCountInSec = 0;
+      
       currentScoreEl.textContent = "0";
       maxScoreEl.textContent = "0";
       minScoreEl.textContent = "0";
@@ -259,6 +271,7 @@
 
       worker.onmessage = function(e) {
         checkedCountInSec += e.data.checkedCount;
+        opsCountInSec += e.data.opsCount;
         currentExploringNum = e.data.current;
       };
 
@@ -269,7 +282,6 @@
       stopBtn.disabled = false;
     });
 
-    // 終了ボタン
     stopBtn.addEventListener('click', () => {
       if (worker) {
         worker.postMessage('stop');
@@ -282,7 +294,6 @@
       }
       stopMonitoring();
 
-      // MINが初期値のまま（更新されなかった場合）のガード
       if (minScore === Infinity) {
         minScoreEl.textContent = "0";
       }
