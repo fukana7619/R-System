@@ -46,11 +46,12 @@
   <h1>無限素数ジェネレーター</h1>
   
   <div class="controls">
-    <button id="startBtn">開始</button>
-    <button id="stopBtn" disabled>停止</button>
+    <button id="startBtn">開始 / 再開</button>
+    <button id="pauseBtn" disabled>一時停止</button>
   </div>
 
   <div class="status-panel">
+    <p>ステータス: <strong><span id="status">停止中</span></strong></p>
     <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
     <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
   </div>
@@ -64,7 +65,7 @@
       let currentNumber = 2;
       let isRunning = false;
 
-      // DB接続をPromise化して初期化を確実に待つ
+      // DB初期化
       function initDB() {
         return new Promise((resolve, reject) => {
           const request = indexedDB.open("PrimeDatabase", 1);
@@ -82,6 +83,37 @@
         });
       }
 
+      // DBから「最後に見つかった素数」と「保存件数」を取得して再開位置を設定
+      function loadLastState() {
+        return new Promise((resolve) => {
+          if (!db) return resolve({ lastPrime: 2, totalCount: 0 });
+          const transaction = db.transaction(["primes"], "readonly");
+          const store = transaction.objectStore("primes");
+          
+          let totalCount = 0;
+          let lastPrime = 2;
+
+          // 件数取得
+          const countReq = store.count();
+          countReq.onsuccess = () => {
+            totalCount = countReq.result;
+
+            // 最後の素数取得（カーソルを逆順に1件開く）
+            const cursorReq = store.openCursor(null, "prev");
+            cursorReq.onsuccess = (e) => {
+              const cursor = e.target.result;
+              if (cursor) {
+                lastPrime = cursor.value;
+                currentNumber = lastPrime + 1; // 最後の素数の次の数値からスタート
+              }
+              resolve({ lastPrime, totalCount });
+            };
+            cursorReq.onerror = () => resolve({ lastPrime: 2, totalCount: 0 });
+          };
+          countReq.onerror = () => resolve({ lastPrime: 2, totalCount: 0 });
+        });
+      }
+
       function isPrime(num) {
         if (num <= 1) return false;
         if (num === 2) return true;
@@ -95,16 +127,13 @@
 
       function saveToDB(primes) {
         return new Promise((resolve) => {
-          if (!db || primes.length === 0) {
-            resolve();
-            return;
-          }
+          if (!db || primes.length === 0) return resolve();
           const transaction = db.transaction(["primes"], "readwrite");
           const store = transaction.objectStore("primes");
           primes.forEach(prime => store.add(prime));
           
           transaction.oncomplete = () => resolve();
-          transaction.onerror = () => resolve(); // エラー時も処理を止めない
+          transaction.onerror = () => resolve();
         });
       }
 
@@ -120,10 +149,10 @@
           currentNumber++;
         }
 
-        // DB保存の完了を待ってから送信・次回呼び出し
         await saveToDB(foundPrimes);
 
         postMessage({
+          type: 'progress',
           primes: foundPrimes,
           current: currentNumber
         });
@@ -136,9 +165,18 @@
       onmessage = async function(e) {
         if (e.data === 'start') {
           if (!db) await initDB();
+          
+          // 初回/再スタート時に前回保存状態を復元
+          const { lastPrime, totalCount } = await loadLastState();
+          postMessage({
+            type: 'init',
+            current: currentNumber,
+            totalCount: totalCount
+          });
+
           isRunning = true;
           calculate();
-        } else if (e.data === 'stop') {
+        } else if (e.data === 'pause') {
           isRunning = false;
         }
       };
@@ -152,55 +190,70 @@
     const MAX_DOM_LENGTH = 5000;
 
     const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const statusEl = document.getElementById('status');
     const currentEl = document.getElementById('current');
     const countEl = document.getElementById('count');
     const resultDiv = document.getElementById('result');
 
-    startBtn.addEventListener('click', () => {
+    // Workerの生成とイベント登録
+    function initWorker() {
       if (!worker) {
         const blob = new Blob([workerScript], { type: 'application/javascript' });
         workerUrl = URL.createObjectURL(blob);
         worker = new Worker(workerUrl);
 
         worker.onmessage = function(e) {
-          const { primes, current } = e.data;
-          
-          primeCount += primes.length;
-          countEl.textContent = primeCount.toLocaleString();
-          currentEl.textContent = current.toLocaleString();
+          const data = e.data;
 
-          if (primes.length > 0) {
-            const textToAdd = primes.join(', ') + ', ';
-            resultDiv.appendChild(document.createTextNode(textToAdd));
-            resultDiv.scrollTop = resultDiv.scrollHeight;
+          // DBからの復元情報を受け取ったとき
+          if (data.type === 'init') {
+            primeCount = data.totalCount;
+            countEl.textContent = primeCount.toLocaleString();
+            currentEl.textContent = data.current.toLocaleString();
+            return;
+          }
 
-            // 文字数が上限を超えた場合のみトリミング
-            if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
-              resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+          // 通常の計算進捗を受け取ったとき
+          if (data.type === 'progress') {
+            const { primes, current } = data;
+            
+            primeCount += primes.length;
+            countEl.textContent = primeCount.toLocaleString();
+            currentEl.textContent = current.toLocaleString();
+
+            if (primes.length > 0) {
+              const textToAdd = primes.join(', ') + ', ';
+              resultDiv.appendChild(document.createTextNode(textToAdd));
+              resultDiv.scrollTop = resultDiv.scrollHeight;
+
+              if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
+                resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+              }
             }
           }
         };
       }
+    }
 
+    // 開始 / 再開ボタン
+    startBtn.addEventListener('click', () => {
+      initWorker();
       worker.postMessage('start');
+
+      statusEl.textContent = "計算中...";
       startBtn.disabled = true;
-      stopBtn.disabled = false;
+      pauseBtn.disabled = false;
     });
 
-    stopBtn.addEventListener('click', () => {
+    // 一時停止ボタン
+    pauseBtn.addEventListener('click', () => {
       if (worker) {
-        // terminateの代わりにメッセージで停止フラグを立て、リソース解放
-        worker.postMessage('stop');
-        worker.terminate();
-        worker = null;
+        worker.postMessage('pause');
       }
-      if (workerUrl) {
-        URL.revokeObjectURL(workerUrl); // メモリ解放
-        workerUrl = null;
-      }
+      statusEl.textContent = "一時停止中（次回はその続きから開始します）";
       startBtn.disabled = false;
-      stopBtn.disabled = true;
+      pauseBtn.disabled = true;
     });
   </script>
 </body>
