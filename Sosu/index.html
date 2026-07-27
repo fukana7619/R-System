@@ -72,8 +72,9 @@
       <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
     </div>
     <div>
-      <p>描画パフォーマンス: <strong><span id="fps">60</span> FPS</strong></p>
-      <p>JSメモリ使用量: <strong><span id="memory">--</span> MB</strong></p>
+      <p>CPUスコア: <strong><span id="score">0</span> pts</strong></p>
+      <p>処理速度: <strong><span id="speed">0</span> 件/秒</strong></p>
+      <p>JSメモリ: <strong><span id="memory">--</span> MB</strong></p>
     </div>
   </div>
 
@@ -159,7 +160,9 @@
         if (!isRunning) return;
 
         let foundPrimes = [];
-        for (let i = 0; i < 1000; i++) {
+        const BATCH_SIZE = 1000;
+
+        for (let i = 0; i < BATCH_SIZE; i++) {
           if (isPrime(currentNumber)) {
             foundPrimes.push(currentNumber);
           }
@@ -171,7 +174,8 @@
         postMessage({
           type: 'progress',
           primes: foundPrimes,
-          current: currentNumber
+          current: currentNumber,
+          checkedCount: BATCH_SIZE
         });
 
         if (isRunning) {
@@ -199,7 +203,6 @@
             db.close();
             db = null;
           }
-          // IndexedDBのクリア
           const deleteReq = indexedDB.deleteDatabase("PrimeDatabase");
           deleteReq.onsuccess = () => {
             currentNumber = 2;
@@ -214,6 +217,9 @@
     let workerUrl = null;
     let primeCount = 0;
 
+    let checkedCountInSec = 0;
+    let currentExploringNum = 2;
+
     const MAX_DOM_LENGTH = 5000;
 
     const startBtn = document.getElementById('startBtn');
@@ -223,36 +229,34 @@
     const currentEl = document.getElementById('current');
     const countEl = document.getElementById('count');
     const resultDiv = document.getElementById('result');
-    const fpsEl = document.getElementById('fps');
+    const speedEl = document.getElementById('speed');
+    const scoreEl = document.getElementById('score');
     const memoryEl = document.getElementById('memory');
 
-    // --- FPS & メモリモニター機能 ---
-    let frameCount = 0;
-    let lastTime = performance.now();
-
-    function updateMetrics() {
-      const now = performance.now();
-      frameCount++;
-
-      if (now - lastTime >= 1000) {
-        // FPSの更新
-        fpsEl.textContent = frameCount;
-        frameCount = 0;
-        lastTime = now;
-
-        // メモリ使用量の更新 (Chrome系ブラウザのみ対応)
-        if (performance.memory) {
-          const usedHeapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
-          memoryEl.textContent = usedHeapMB;
-        } else {
-          memoryEl.textContent = "非対応ブラウザ";
-        }
+    // --- モニター＆スコア計算ルーチン (1秒毎) ---
+    setInterval(() => {
+      if (performance.memory) {
+        const usedHeapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
+        memoryEl.textContent = usedHeapMB;
+      } else {
+        memoryEl.textContent = "非対応";
       }
-      requestAnimationFrame(updateMetrics);
-    }
-    requestAnimationFrame(updateMetrics);
 
-    // Worker初期化
+      // スピード（件/秒）更新
+      speedEl.textContent = checkedCountInSec.toLocaleString();
+
+      // CPUスコアの計算： (1秒間にチェックした数) × √(現在の数値) / 1000
+      if (checkedCountInSec > 0) {
+        const difficulty = Math.sqrt(currentExploringNum);
+        const rawScore = (checkedCountInSec * difficulty) / 1000;
+        scoreEl.textContent = Math.round(rawScore).toLocaleString();
+      } else {
+        scoreEl.textContent = "0";
+      }
+
+      checkedCountInSec = 0;
+    }, 1000);
+
     function initWorker() {
       if (!worker) {
         const blob = new Blob([workerScript], { type: 'application/javascript' });
@@ -264,14 +268,18 @@
 
           if (data.type === 'init') {
             primeCount = data.totalCount;
+            currentExploringNum = data.current;
             countEl.textContent = primeCount.toLocaleString();
-            currentEl.textContent = data.current.toLocaleString();
+            currentEl.textContent = currentExploringNum.toLocaleString();
             return;
           }
 
           if (data.type === 'progress') {
-            const { primes, current } = data;
+            const { primes, current, checkedCount } = data;
             
+            checkedCountInSec += checkedCount;
+            currentExploringNum = current;
+
             primeCount += primes.length;
             countEl.textContent = primeCount.toLocaleString();
             currentEl.textContent = current.toLocaleString();
@@ -289,6 +297,10 @@
 
           if (data.type === 'reset_complete') {
             primeCount = 0;
+            checkedCountInSec = 0;
+            currentExploringNum = 2;
+            speedEl.textContent = "0";
+            scoreEl.textContent = "0";
             countEl.textContent = "0";
             currentEl.textContent = "2";
             resultDiv.textContent = "";
@@ -301,7 +313,6 @@
       }
     }
 
-    // 開始ボタン
     startBtn.addEventListener('click', () => {
       initWorker();
       worker.postMessage('start');
@@ -309,21 +320,21 @@
       statusEl.textContent = "計算中...";
       startBtn.disabled = true;
       pauseBtn.disabled = false;
-      resetBtn.disabled = true; // 計算中はリセット不可にする
+      resetBtn.disabled = true;
     });
 
-    // 一時停止ボタン
     pauseBtn.addEventListener('click', () => {
       if (worker) {
         worker.postMessage('pause');
       }
       statusEl.textContent = "一時停止中";
+      speedEl.textContent = "0";
+      scoreEl.textContent = "0";
       startBtn.disabled = false;
       pauseBtn.disabled = true;
       resetBtn.disabled = false;
     });
 
-    // リセットボタン
     resetBtn.addEventListener('click', () => {
       if (confirm("これまでに保存した素数データをすべて削除しますか？")) {
         initWorker();
