@@ -3,52 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>無限素数ジェネレーター (LocalDB & Web Worker)</title>
+  <title>無限素数ジェネレーター & ベンチマーク</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       padding: 20px;
       max-width: 800px;
       margin: 0 auto;
-      background-color: #f4f4f9;
+      background-color: #f8fafc;
+      color: #334155;
     }
-    h1 { color: #333; }
+    h1 { color: #0f172a; margin-bottom: 5px; }
+    p.sub { color: #64748b; margin-top: 0; margin-bottom: 20px; }
+
+    /* ベンチマークへのナビゲーションリンク */
+    .nav-benchmarks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    .nav-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 15px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .nav-card:hover {
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+    }
+    .nav-card.gpu:hover {
+      border-color: #a855f7;
+      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+    }
+    .nav-title {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-title.cpu { color: #0284c7; }
+    .nav-title.gpu { color: #9333ea; }
+    .nav-desc { font-size: 12px; color: #64748b; }
+
+    /* メインコンテンツエリア */
+    .main-panel {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+    }
     .controls { margin-bottom: 15px; }
     button {
-      padding: 10px 20px;
-      font-size: 16px;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: bold;
       cursor: pointer;
-      margin-right: 10px;
-    }
-    #resetBtn {
-      background-color: #ff4d4d;
-      color: white;
+      margin-right: 8px;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
+      background-color: #e2e8f0;
+      color: #334155;
     }
-    #resetBtn:hover { background-color: #cc0000; }
-    #resetBtn:disabled { background-color: #ccc; }
+    button:hover { background-color: #cbd5e1; }
+    #startBtn { background-color: #38bdf8; color: #0f172a; }
+    #startBtn:hover { background-color: #7dd3fc; }
+    #resetBtn { background-color: #ef4444; color: white; }
+    #resetBtn:hover { background-color: #f87171; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     
     .status-panel {
-      background: #fff;
+      background: #f8fafc;
       padding: 15px;
-      border-radius: 5px;
-      border: 1px solid #ddd;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
       margin-bottom: 15px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    .status-panel p { margin: 5px 0; }
+    .status-panel p { margin: 5px 0; font-size: 14px; }
     
     #result {
-      height: 300px;
+      height: 250px;
       overflow-y: scroll;
-      background: #1e1e1e;
-      color: #00ff66;
-      font-family: 'Courier New', Courier, monospace;
+      background: #0f172a;
+      color: #4ade80;
+      font-family: monospace;
       padding: 15px;
-      border-radius: 5px;
+      border-radius: 6px;
       word-break: break-all;
       white-space: pre-wrap;
       line-height: 1.5;
@@ -58,27 +109,41 @@
 <body>
 
   <h1>無限素数ジェネレーター</h1>
-  
-  <div class="controls">
-    <button id="startBtn">開始 / 再開</button>
-    <button id="pauseBtn" disabled>一時停止</button>
-    <button id="resetBtn">データリセット</button>
+  <p class="sub">LocalDB & Web Worker によるバックグラウンド探索</p>
+
+  <div class="nav-benchmarks">
+    <a href="benchmark/CPU.html" class="nav-card">
+      <div class="nav-title cpu">CPU ベンチマーク <span>→</span></div>
+      <div class="nav-desc">単一コアの純粋な計算処理速度を測定</div>
+    </a>
+    <a href="benchmark/GPU.html" class="nav-card gpu">
+      <div class="nav-title gpu">GPU ベンチマーク <span>→</span></div>
+      <div class="nav-desc">WebGPUによる数万並列演算の限界測定</div>
+    </a>
   </div>
 
-  <div class="status-panel">
-    <div>
-      <p>ステータス: <strong><span id="status">停止中</span></strong></p>
-      <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
-      <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
+  <div class="main-panel">
+    <div class="controls">
+      <button id="startBtn">開始 / 再開</button>
+      <button id="pauseBtn" disabled>一時停止</button>
+      <button id="resetBtn">データリセット</button>
     </div>
-    <div>
-      <p>CPUスコア: <strong><span id="score">0</span> pts</strong></p>
-      <p>処理速度: <strong><span id="speed">0</span> 件/秒</strong></p>
-      <p>JSメモリ: <strong><span id="memory">--</span> MB</strong></p>
-    </div>
-  </div>
 
-  <div id="result"></div>
+    <div class="status-panel">
+      <div>
+        <p>ステータス: <strong><span id="status">停止中</span></strong></p>
+        <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
+        <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
+      </div>
+      <div>
+        <p>リアルタイムCPUスコア: <strong><span id="score">0</span> pts</strong></p>
+        <p>処理速度: <strong><span id="speed">0</span> 件/秒</strong></p>
+        <p>JSメモリ使用量: <strong><span id="memory">--</span> MB</strong></p>
+      </div>
+    </div>
+
+    <div id="result"></div>
+  </div>
 
   <script>
     // --- 1. Worker用のスクリプト文字列を定義 ---
@@ -131,7 +196,6 @@
         });
       }
 
-      // 素数判定 ＆ 実行した演算（割り算）回数をカウント
       function checkPrimeWithOps(num) {
         if (num <= 1) return { isPrime: false, ops: 1 };
         if (num === 2) return { isPrime: true, ops: 1 };
@@ -231,9 +295,7 @@
     const scoreEl = document.getElementById('score');
     const memoryEl = document.getElementById('memory');
 
-    // --- モニター＆スコア計算ルーチン (1秒毎) ---
     setInterval(() => {
-      // メモリ表示 (Chrome系対応)
       if (performance.memory) {
         const usedHeapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
         memoryEl.textContent = usedHeapMB;
@@ -241,10 +303,8 @@
         memoryEl.textContent = "非対応";
       }
 
-      // 処理速度（件/秒）更新
       speedEl.textContent = checkedCountInSec.toLocaleString();
 
-      // CPUスコア計算： 1秒間に実行した累積計算回数 ÷ 10,000
       if (totalOpsInSec > 0) {
         const realScore = Math.round(totalOpsInSec / 10000);
         scoreEl.textContent = realScore.toLocaleString();
@@ -252,7 +312,6 @@
         scoreEl.textContent = "0";
       }
 
-      // 1秒ごとに集計変数をリセット
       checkedCountInSec = 0;
       totalOpsInSec = 0;
     }, 1000);
@@ -288,7 +347,6 @@
               resultDiv.appendChild(document.createTextNode(textToAdd));
               resultDiv.scrollTop = resultDiv.scrollHeight;
 
-              // DOMのトリミング処理
               if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
                 let trimmed = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
                 const firstComma = trimmed.indexOf(',');
@@ -351,6 +409,7 @@
           resultDiv.textContent = "";
           statusEl.textContent = "データをリセットしました";
           startBtn.disabled = false;
+          pauseBtn.disabled = true;
           resetBtn.disabled = false;
         };
         deleteReq.onerror = () => {
