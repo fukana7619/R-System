@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CPU 素数計算ベンチマーク</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 30px 20px;
+      max-width: 700px;
+      margin: 0 auto;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    h1 {
+      text-align: center;
+      color: #38bdf8;
+      margin-bottom: 5px;
+    }
+    p.subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-top: 0;
+      margin-bottom: 25px;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    button {
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+    #startBtn {
+      background-color: #38bdf8;
+      color: #0f172a;
+    }
+    #startBtn:hover { background-color: #7dd3fc; }
+    #startBtn:disabled { background-color: #334155; color: #64748b; cursor: not-allowed; }
+    
+    #stopBtn {
+      background-color: #ef4444;
+      color: white;
+    }
+    #stopBtn:hover { background-color: #f87171; }
+    #stopBtn:disabled { background-color: #334155; color: #64748b; cursor: not-allowed; }
+
+    /* メインの巨大スコア表示 */
+    .score-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 25px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .score-card h2 {
+      margin: 0;
+      font-size: 14px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .score-value {
+      font-size: 56px;
+      font-weight: 800;
+      color: #4ade80;
+      margin: 10px 0 0 0;
+      font-family: monospace;
+    }
+
+    /* 詳細メトリクスのグリッド */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+    .metric-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .metric-label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    .metric-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #f1f5f9;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>CPU 素数計算ベンチマーク</h1>
+  <p class="subtitle">描画オーバーヘッドなしの純粋CPU演算性能測定</p>
+  
+  <div class="controls">
+    <button id="startBtn">ベンチマーク開始</button>
+    <button id="stopBtn" disabled>終了</button>
+  </div>
+
+  <div class="score-card">
+    <h2>Current CPU Score</h2>
+    <div class="score-value"><span id="currentScore">0</span> <span style="font-size: 24px;">pts</span></div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-box">
+      <div class="metric-label">最高スコア (MAX)</div>
+      <div class="metric-value"><span id="maxScore">0</span> pts</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">最低スコア (MIN)</div>
+      <div class="metric-value"><span id="minScore">0</span> pts</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">現在探索中の数値</div>
+      <div class="metric-value" id="currentNum">2</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-label">処理スピード</div>
+      <div class="metric-value"><span id="speed">0</span> 件/秒</div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. バックグラウンド計算専用Worker ---
+    const workerScript = `
+      let isRunning = false;
+      let currentNumber = 2;
+
+      function isPrime(num) {
+        if (num <= 1) return false;
+        if (num === 2) return true;
+        if (num % 2 === 0) return false;
+        const sqrt = Math.sqrt(num);
+        for (let i = 3; i <= sqrt; i += 2) {
+          if (num % i === 0) return false;
+        }
+        return true;
+      }
+
+      function loop() {
+        if (!isRunning) return;
+
+        // DB書き込みもDOM通知もせず、ひたすら10,000回連続計算
+        const BATCH_SIZE = 10000;
+        for (let i = 0; i < BATCH_SIZE; i++) {
+          isPrime(currentNumber);
+          currentNumber++;
+        }
+
+        // 判定した件数と現在の位置だけを定期通知
+        postMessage({
+          checkedCount: BATCH_SIZE,
+          current: currentNumber
+        });
+
+        if (isRunning) {
+          setTimeout(loop, 0);
+        }
+      }
+
+      onmessage = function(e) {
+        if (e.data === 'start') {
+          isRunning = true;
+          currentNumber = 2; // 測定時は常に2からスタートして平準化
+          loop();
+        } else if (e.data === 'stop') {
+          isRunning = false;
+        }
+      };
+    `;
+
+    // --- 2. メインスレッド処理 ---
+    let worker = null;
+    let workerUrl = null;
+
+    let checkedCountInSec = 0;
+    let currentExploringNum = 2;
+
+    // 統計データ用
+    let maxScore = 0;
+    let minScore = Infinity;
+    let monitorTimer = null;
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    const currentScoreEl = document.getElementById('currentScore');
+    const maxScoreEl = document.getElementById('maxScore');
+    const minScoreEl = document.getElementById('minScore');
+    const currentNumEl = document.getElementById('currentNum');
+    const speedEl = document.getElementById('speed');
+
+    // モニター用タイマー（1秒ごとにスコア計算・更新）
+    function startMonitoring() {
+      monitorTimer = setInterval(() => {
+        // スピード更新
+        speedEl.textContent = checkedCountInSec.toLocaleString();
+        currentNumEl.textContent = currentExploringNum.toLocaleString();
+
+        // スコア計算： (1秒間にチェックした数) × √(現在の数値) / 1000
+        if (checkedCountInSec > 0) {
+          const difficulty = Math.sqrt(currentExploringNum);
+          const rawScore = Math.round((checkedCountInSec * difficulty) / 1000);
+
+          currentScoreEl.textContent = rawScore.toLocaleString();
+
+          // 最大値・最小値の更新
+          if (rawScore > maxScore) {
+            maxScore = rawScore;
+            maxScoreEl.textContent = maxScore.toLocaleString();
+          }
+          if (rawScore < minScore) {
+            minScore = rawScore;
+            minScoreEl.textContent = minScore.toLocaleString();
+          }
+        }
+
+        checkedCountInSec = 0; // リセット
+      }, 1000);
+    }
+
+    function stopMonitoring() {
+      if (monitorTimer) {
+        clearInterval(monitorTimer);
+        monitorTimer = null;
+      }
+    }
+
+    // 開始ボタン
+    startBtn.addEventListener('click', () => {
+      // 統計リセット
+      maxScore = 0;
+      minScore = Infinity;
+      checkedCountInSec = 0;
+      currentScoreEl.textContent = "0";
+      maxScoreEl.textContent = "0";
+      minScoreEl.textContent = "0";
+
+      const blob = new Blob([workerScript], { type: 'application/javascript' });
+      workerUrl = URL.createObjectURL(blob);
+      worker = new Worker(workerUrl);
+
+      worker.onmessage = function(e) {
+        checkedCountInSec += e.data.checkedCount;
+        currentExploringNum = e.data.current;
+      };
+
+      worker.postMessage('start');
+      startMonitoring();
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    });
+
+    // 終了ボタン
+    stopBtn.addEventListener('click', () => {
+      if (worker) {
+        worker.postMessage('stop');
+        worker.terminate();
+        worker = null;
+      }
+      if (workerUrl) {
+        URL.revokeObjectURL(workerUrl);
+        workerUrl = null;
+      }
+      stopMonitoring();
+
+      // MINが初期値のまま（更新されなかった場合）のガード
+      if (minScore === Infinity) {
+        minScoreEl.textContent = "0";
+      }
+
+      speedEl.textContent = "0";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    });
+  </script>
+</body>
+</html>
