@@ -20,13 +20,27 @@
       cursor: pointer;
       margin-right: 10px;
     }
+    #resetBtn {
+      background-color: #ff4d4d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    #resetBtn:hover { background-color: #cc0000; }
+    #resetBtn:disabled { background-color: #ccc; }
+    
     .status-panel {
       background: #fff;
-      padding: 10px 15px;
+      padding: 15px;
       border-radius: 5px;
       border: 1px solid #ddd;
       margin-bottom: 15px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
+    .status-panel p { margin: 5px 0; }
+    
     #result {
       height: 300px;
       overflow-y: scroll;
@@ -48,12 +62,19 @@
   <div class="controls">
     <button id="startBtn">開始 / 再開</button>
     <button id="pauseBtn" disabled>一時停止</button>
+    <button id="resetBtn">データリセット</button>
   </div>
 
   <div class="status-panel">
-    <p>ステータス: <strong><span id="status">停止中</span></strong></p>
-    <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
-    <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
+    <div>
+      <p>ステータス: <strong><span id="status">停止中</span></strong></p>
+      <p>現在探索中の数値: <strong><span id="current">2</span></strong></p>
+      <p>発見した素数の総数: <strong><span id="count">0</span></strong></p>
+    </div>
+    <div>
+      <p>描画パフォーマンス: <strong><span id="fps">60</span> FPS</strong></p>
+      <p>JSメモリ使用量: <strong><span id="memory">--</span> MB</strong></p>
+    </div>
   </div>
 
   <div id="result"></div>
@@ -65,7 +86,6 @@
       let currentNumber = 2;
       let isRunning = false;
 
-      // DB初期化
       function initDB() {
         return new Promise((resolve, reject) => {
           const request = indexedDB.open("PrimeDatabase", 1);
@@ -83,7 +103,6 @@
         });
       }
 
-      // DBから「最後に見つかった素数」と「保存件数」を取得して再開位置を設定
       function loadLastState() {
         return new Promise((resolve) => {
           if (!db) return resolve({ lastPrime: 2, totalCount: 0 });
@@ -93,18 +112,17 @@
           let totalCount = 0;
           let lastPrime = 2;
 
-          // 件数取得
           const countReq = store.count();
           countReq.onsuccess = () => {
             totalCount = countReq.result;
-
-            // 最後の素数取得（カーソルを逆順に1件開く）
             const cursorReq = store.openCursor(null, "prev");
             cursorReq.onsuccess = (e) => {
               const cursor = e.target.result;
               if (cursor) {
                 lastPrime = cursor.value;
-                currentNumber = lastPrime + 1; // 最後の素数の次の数値からスタート
+                currentNumber = lastPrime + 1;
+              } else {
+                currentNumber = 2;
               }
               resolve({ lastPrime, totalCount });
             };
@@ -141,7 +159,6 @@
         if (!isRunning) return;
 
         let foundPrimes = [];
-
         for (let i = 0; i < 1000; i++) {
           if (isPrime(currentNumber)) {
             foundPrimes.push(currentNumber);
@@ -165,8 +182,6 @@
       onmessage = async function(e) {
         if (e.data === 'start') {
           if (!db) await initDB();
-          
-          // 初回/再スタート時に前回保存状態を復元
           const { lastPrime, totalCount } = await loadLastState();
           postMessage({
             type: 'init',
@@ -178,6 +193,18 @@
           calculate();
         } else if (e.data === 'pause') {
           isRunning = false;
+        } else if (e.data === 'reset') {
+          isRunning = false;
+          if (db) {
+            db.close();
+            db = null;
+          }
+          // IndexedDBのクリア
+          const deleteReq = indexedDB.deleteDatabase("PrimeDatabase");
+          deleteReq.onsuccess = () => {
+            currentNumber = 2;
+            postMessage({ type: 'reset_complete' });
+          };
         }
       };
     `;
@@ -191,12 +218,41 @@
 
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
     const statusEl = document.getElementById('status');
     const currentEl = document.getElementById('current');
     const countEl = document.getElementById('count');
     const resultDiv = document.getElementById('result');
+    const fpsEl = document.getElementById('fps');
+    const memoryEl = document.getElementById('memory');
 
-    // Workerの生成とイベント登録
+    // --- FPS & メモリモニター機能 ---
+    let frameCount = 0;
+    let lastTime = performance.now();
+
+    function updateMetrics() {
+      const now = performance.now();
+      frameCount++;
+
+      if (now - lastTime >= 1000) {
+        // FPSの更新
+        fpsEl.textContent = frameCount;
+        frameCount = 0;
+        lastTime = now;
+
+        // メモリ使用量の更新 (Chrome系ブラウザのみ対応)
+        if (performance.memory) {
+          const usedHeapMB = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
+          memoryEl.textContent = usedHeapMB;
+        } else {
+          memoryEl.textContent = "非対応ブラウザ";
+        }
+      }
+      requestAnimationFrame(updateMetrics);
+    }
+    requestAnimationFrame(updateMetrics);
+
+    // Worker初期化
     function initWorker() {
       if (!worker) {
         const blob = new Blob([workerScript], { type: 'application/javascript' });
@@ -206,7 +262,6 @@
         worker.onmessage = function(e) {
           const data = e.data;
 
-          // DBからの復元情報を受け取ったとき
           if (data.type === 'init') {
             primeCount = data.totalCount;
             countEl.textContent = primeCount.toLocaleString();
@@ -214,7 +269,6 @@
             return;
           }
 
-          // 通常の計算進捗を受け取ったとき
           if (data.type === 'progress') {
             const { primes, current } = data;
             
@@ -232,11 +286,22 @@
               }
             }
           }
+
+          if (data.type === 'reset_complete') {
+            primeCount = 0;
+            countEl.textContent = "0";
+            currentEl.textContent = "2";
+            resultDiv.textContent = "";
+            statusEl.textContent = "データをリセットしました";
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            resetBtn.disabled = false;
+          }
         };
       }
     }
 
-    // 開始 / 再開ボタン
+    // 開始ボタン
     startBtn.addEventListener('click', () => {
       initWorker();
       worker.postMessage('start');
@@ -244,6 +309,7 @@
       statusEl.textContent = "計算中...";
       startBtn.disabled = true;
       pauseBtn.disabled = false;
+      resetBtn.disabled = true; // 計算中はリセット不可にする
     });
 
     // 一時停止ボタン
@@ -251,9 +317,22 @@
       if (worker) {
         worker.postMessage('pause');
       }
-      statusEl.textContent = "一時停止中（次回はその続きから開始します）";
+      statusEl.textContent = "一時停止中";
       startBtn.disabled = false;
       pauseBtn.disabled = true;
+      resetBtn.disabled = false;
+    });
+
+    // リセットボタン
+    resetBtn.addEventListener('click', () => {
+      if (confirm("これまでに保存した素数データをすべて削除しますか？")) {
+        initWorker();
+        worker.postMessage('reset');
+        statusEl.textContent = "リセット中...";
+        startBtn.disabled = true;
+        pauseBtn.disabled = true;
+        resetBtn.disabled = true;
+      }
     });
   </script>
 </body>
