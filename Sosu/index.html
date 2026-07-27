@@ -2,61 +2,95 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>無限素数ジェネレーター</title>
+  <title>無限素数ジェネレーター (タイプライター表示)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    #result { max-height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; word-break: break-all; }
+    #result { 
+      max-height: 400px; 
+      overflow-y: scroll; 
+      border: 1px solid #ccc; 
+      padding: 10px; 
+      word-break: break-all;
+      font-family: monospace; /* 等幅フォントで見やすく */
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
-  <h1>無限素数計算アプリ</h1>
+  <h1>高速素数計算 (1文字ずつ描画)</h1>
   <button id="startBtn">開始</button>
   <button id="stopBtn" disabled>停止</button>
-  <p>見つかった素数の数: <span id="count">0</span></p>
+
+  <p>探索中の数値: <span id="current">2</span></p>
+  <p>発見した素数の数: <span id="count">0</span></p>
   <div id="result"></div>
 
   <script>
-    let isRunning = false;
-    let currentNumber = 2;
+    let worker = null;
     let primeCount = 0;
-    let timeoutId = null;
+    
+    // 描画キュー用
+    let renderBuffer = "";
+    let typeInterval = null;
 
-    // 素数判定関数
-    function isPrime(num) {
-      for (let i = 2, s = Math.sqrt(num); i <= s; i++) {
-        if (num % i === 0) return false;
-      }
-      return num > 1;
+    // 1文字の描画速度（ミリ秒）※数値を小さくすると速くなります
+    const SPEED_MS = 20;
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const currentEl = document.getElementById('current');
+    const countEl = document.getElementById('count');
+    const resultDiv = document.getElementById('result');
+
+    // 1文字ずつ画面に流し込む処理
+    function startTyping() {
+      typeInterval = setInterval(() => {
+        if (renderBuffer.length > 0) {
+          // 先頭の1文字を取り出す
+          const char = renderBuffer[0];
+          renderBuffer = renderBuffer.slice(1);
+
+          // テキストを追加して自動スクロール
+          resultDiv.appendChild(document.createTextNode(char));
+          resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+      }, SPEED_MS);
     }
 
-    function calculateNext() {
-      if (!isRunning) return;
+    startBtn.addEventListener('click', () => {
+      worker = new Worker('worker.js');
 
-      if (isPrime(currentNumber)) {
-        primeCount++;
-        document.getElementById('count').textContent = primeCount;
-        const resultDiv = document.getElementById('result');
-        resultDiv.innerHTML += currentNumber + ', ';
-        resultDiv.scrollTop = resultDiv.scrollHeight; // 自動スクロール
-      }
-      currentNumber++;
+      worker.onmessage = function(e) {
+        const { primes, current } = e.data;
+        
+        primeCount += primes.length;
+        countEl.textContent = primeCount.toLocaleString();
+        currentEl.textContent = current.toLocaleString();
 
-      // UIのフリーズを防ぐため、setTimeoutで非同期化
-      timeoutId = setTimeout(calculateNext, 10);
-    }
+        if (primes.length > 0) {
+          // 文字列に変換してバッファに追加
+          renderBuffer += primes.join(', ') + ', ';
+        }
+      };
 
-    document.getElementById('startBtn').addEventListener('click', () => {
-      isRunning = true;
-      document.getElementById('startBtn').disabled = true;
-      document.getElementById('stopBtn').disabled = false;
-      calculateNext();
+      worker.postMessage('start');
+      startTyping();
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
     });
 
-    document.getElementById('stopBtn').addEventListener('click', () => {
-      isRunning = false;
-      clearTimeout(timeoutId);
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('stopBtn').disabled = true;
+    stopBtn.addEventListener('click', () => {
+      if (worker) {
+        worker.terminate();
+        worker = null;
+      }
+      if (typeInterval) {
+        clearInterval(typeInterval);
+        typeInterval = null;
+      }
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
     });
   </script>
 </body>
