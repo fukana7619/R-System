@@ -13,9 +13,7 @@
       background-color: #f4f4f9;
     }
     h1 { color: #333; }
-    .controls {
-      margin-bottom: 15px;
-    }
+    .controls { margin-bottom: 15px; }
     button {
       padding: 10px 20px;
       font-size: 16px;
@@ -63,20 +61,27 @@
     // --- 1. Worker用のスクリプト文字列を定義 ---
     const workerScript = `
       let db = null;
+      let currentNumber = 2;
+      let isRunning = false;
 
-      // IndexedDB の初期化
-      const request = indexedDB.open("PrimeDatabase", 1);
-      request.onupgradeneeded = (e) => {
-        db = e.target.result;
-        if (!db.objectStoreNames.contains("primes")) {
-          db.createObjectStore("primes", { autoIncrement: true });
-        }
-      };
-      request.onsuccess = (e) => {
-        db = e.target.result;
-      };
+      // DB接続をPromise化して初期化を確実に待つ
+      function initDB() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open("PrimeDatabase", 1);
+          request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("primes")) {
+              db.createObjectStore("primes", { autoIncrement: true });
+            }
+          };
+          request.onsuccess = (e) => {
+            db = e.target.result;
+            resolve(db);
+          };
+          request.onerror = (e) => reject(e);
+        });
+      }
 
-      // 素数判定（奇数のみチェック）
       function isPrime(num) {
         if (num <= 1) return false;
         if (num === 2) return true;
@@ -88,21 +93,26 @@
         return true;
       }
 
-      let currentNumber = 2;
-
-      // IndexedDB への保存処理
       function saveToDB(primes) {
-        if (!db || primes.length === 0) return;
-        const transaction = db.transaction(["primes"], "readwrite");
-        const store = transaction.objectStore("primes");
-        primes.forEach(prime => store.add(prime));
+        return new Promise((resolve) => {
+          if (!db || primes.length === 0) {
+            resolve();
+            return;
+          }
+          const transaction = db.transaction(["primes"], "readwrite");
+          const store = transaction.objectStore("primes");
+          primes.forEach(prime => store.add(prime));
+          
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => resolve(); // エラー時も処理を止めない
+        });
       }
 
-      // ループ計算処理
-      function calculate() {
+      async function calculate() {
+        if (!isRunning) return;
+
         let foundPrimes = [];
 
-        // 1000回判定ごとにバッチ処理
         for (let i = 0; i < 1000; i++) {
           if (isPrime(currentNumber)) {
             foundPrimes.push(currentNumber);
@@ -110,29 +120,36 @@
           currentNumber++;
         }
 
-        saveToDB(foundPrimes);
+        // DB保存の完了を待ってから送信・次回呼び出し
+        await saveToDB(foundPrimes);
 
-        // 結果をメインスレッドへ即時送信
         postMessage({
           primes: foundPrimes,
           current: currentNumber
         });
 
-        setTimeout(calculate, 0);
+        if (isRunning) {
+          setTimeout(calculate, 0);
+        }
       }
 
-      onmessage = function(e) {
+      onmessage = async function(e) {
         if (e.data === 'start') {
+          if (!db) await initDB();
+          isRunning = true;
           calculate();
+        } else if (e.data === 'stop') {
+          isRunning = false;
         }
       };
     `;
 
     // --- 2. メインスレッド側の処理 ---
     let worker = null;
+    let workerUrl = null;
     let primeCount = 0;
 
-    const MAX_DOM_LENGTH = 5000; // 画面上に残す最大文字数 (メモリ溢れ防止)
+    const MAX_DOM_LENGTH = 5000;
 
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -140,43 +157,47 @@
     const countEl = document.getElementById('count');
     const resultDiv = document.getElementById('result');
 
-    // 開始ボタン
     startBtn.addEventListener('click', () => {
-      const blob = new Blob([workerScript], { type: 'application/javascript' });
-      worker = new Worker(URL.createObjectURL(blob));
+      if (!worker) {
+        const blob = new Blob([workerScript], { type: 'application/javascript' });
+        workerUrl = URL.createObjectURL(blob);
+        worker = new Worker(workerUrl);
 
-      // Workerからの結果を受け取ったら即座に画面へ反映
-      worker.onmessage = function(e) {
-        const { primes, current } = e.data;
-        
-        primeCount += primes.length;
-        countEl.textContent = primeCount.toLocaleString();
-        currentEl.textContent = current.toLocaleString();
+        worker.onmessage = function(e) {
+          const { primes, current } = e.data;
+          
+          primeCount += primes.length;
+          countEl.textContent = primeCount.toLocaleString();
+          currentEl.textContent = current.toLocaleString();
 
-        if (primes.length > 0) {
-          // テキストをそのまま末尾に追加
-          const textToAdd = primes.join(', ') + ', ';
-          resultDiv.appendChild(document.createTextNode(textToAdd));
-          resultDiv.scrollTop = resultDiv.scrollHeight;
+          if (primes.length > 0) {
+            const textToAdd = primes.join(', ') + ', ';
+            resultDiv.appendChild(document.createTextNode(textToAdd));
+            resultDiv.scrollTop = resultDiv.scrollHeight;
 
-          // DOMの肥大化・画面の重化を防ぐため、古い文字列を削る
-          if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
-            resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+            // 文字数が上限を超えた場合のみトリミング
+            if (resultDiv.textContent.length > MAX_DOM_LENGTH) {
+              resultDiv.textContent = resultDiv.textContent.slice(-MAX_DOM_LENGTH);
+            }
           }
-        }
-      };
+        };
+      }
 
       worker.postMessage('start');
-
       startBtn.disabled = true;
       stopBtn.disabled = false;
     });
 
-    // 停止ボタン
     stopBtn.addEventListener('click', () => {
       if (worker) {
+        // terminateの代わりにメッセージで停止フラグを立て、リソース解放
+        worker.postMessage('stop');
         worker.terminate();
         worker = null;
+      }
+      if (workerUrl) {
+        URL.revokeObjectURL(workerUrl); // メモリ解放
+        workerUrl = null;
       }
       startBtn.disabled = false;
       stopBtn.disabled = true;
