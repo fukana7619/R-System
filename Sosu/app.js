@@ -212,25 +212,43 @@ function runCpuMode() {
 
 // --- GPU モード (WebGPU) ---
 let gpuDevice = null, gpuPipeline = null;
+
+// 素数判定＆素数書き出し機能付き WGSL シェーダー
 const wgslCode = `
   struct Uniforms { startNum : u32 };
   @group(0) @binding(0) var<uniform> uniforms : Uniforms;
   @group(0) @binding(1) var<storage, read_write> opsBuffer : array<u32>;
+  @group(0) @binding(2) var<storage, read_write> primeBuffer : array<u32>; // 発見した素数格納用
 
   @compute @workgroup_size(256)
   fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     let index = global_id.x;
     let num = uniforms.startNum + index;
     var ops : u32 = 1u;
-    if (num > 2u && num % 2u != 0u) {
+    var isPrime : u32 = 0u;
+
+    if (num == 2u) {
+      isPrime = 1u;
+    } else if (num > 2u && num % 2u != 0u) {
       ops = 2u;
+      isPrime = 1u;
       let limit = u32(sqrt(f32(num)));
       for (var i : u32 = 3u; i <= limit; i += 2u) {
         ops += 1u;
-        if (num % i == 0u) { break; }
+        if (num % i == 0u) {
+          isPrime = 0u;
+          break;
+        }
       }
     }
+
     opsBuffer[index] = ops;
+    // 素数の場合はその数値を書き込み、素数でない場合は 0 を書き込む
+    if (isPrime == 1u) {
+      primeBuffer[index] = num;
+    } else {
+      primeBuffer[index] = 0u;
+    }
   }
 `;
 
@@ -259,15 +277,21 @@ async function runGpuMode() {
 
   const uniformBuffer = gpuDevice.createBuffer({ size: 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const opsBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-  const readBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+  const primeBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+
+  const readOpsBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+  const readPrimeBuffer = gpuDevice.createBuffer({ size: totalThreads * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
 
   while (isRunning) {
+    const domLimit = parseInt(domLimitEl.value) || 0;
+
     gpuDevice.queue.writeBuffer(uniformBuffer, 0, new Uint32Array([currentNumber]));
     const bindGroup = gpuDevice.createBindGroup({
       layout: gpuPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: uniformBuffer } },
-        { binding: 1, resource: { buffer: opsBuffer } }
+        { binding: 1, resource: { buffer: opsBuffer } },
+        { binding: 2, resource: { buffer: primeBuffer } }
       ]
     });
 
@@ -278,21 +302,40 @@ async function runGpuMode() {
     pass.dispatchWorkgroups(workgroups);
     pass.end();
 
-    encoder.copyBufferToBuffer(opsBuffer, 0, readBuffer, 0, totalThreads * 4);
+    encoder.copyBufferToBuffer(opsBuffer, 0, readOpsBuffer, 0, totalThreads * 4);
+    if (domLimit > 0 || policy === 'all') {
+      encoder.copyBufferToBuffer(primeBuffer, 0, readPrimeBuffer, 0, totalThreads * 4);
+    }
     gpuDevice.queue.submit([encoder.finish()]);
 
-    await readBuffer.mapAsync(GPUMapMode.READ);
-    const res = new Uint32Array(readBuffer.getMappedRange());
+    // 演算数バッファ読み出し
+    await readOpsBuffer.mapAsync(GPUMapMode.READ);
+    const opsRes = new Uint32Array(readOpsBuffer.getMappedRange());
     let batchOps = 0;
-    for (let i = 0; i < totalThreads; i++) batchOps += res[i];
-    readBuffer.unmap();
+    for (let i = 0; i < totalThreads; i++) batchOps += opsRes[i];
+    readOpsBuffer.unmap();
+
+    // 画面描画または全件保存が有効な場合、素数バッファも読み出し
+    let foundPrimes = [];
+    if (domLimit > 0 || policy === 'all') {
+      await readPrimeBuffer.mapAsync(GPUMapMode.READ);
+      const primeRes = new Uint32Array(readPrimeBuffer.getMappedRange());
+      for (let i = 0; i < totalThreads; i++) {
+        if (primeRes[i] !== 0) foundPrimes.push(primeRes[i]);
+      }
+      readPrimeBuffer.unmap();
+    }
 
     checkedInSec += totalThreads;
     opsInSec += batchOps;
     currentNumber += totalThreads;
+    totalPrimeCount += foundPrimes.length;
 
     currentEl.textContent = currentNumber.toLocaleString();
-    saveStateAndPrimes([], currentNumber, policy);
+    countEl.textContent = totalPrimeCount.toLocaleString();
+
+    saveStateAndPrimes(foundPrimes, currentNumber, policy);
+    if (domLimit > 0) appendPrimesToDom(foundPrimes);
   }
 }
 
