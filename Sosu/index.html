@@ -43,20 +43,26 @@
     const resultDiv = document.getElementById('result');
 
     // 1文字ずつ画面に流し込む処理
+    // index.html 内のタイピング処理部分の改善案
+
+    const MAX_CHAR_LENGTH = 1000; // 画面上に残す最大文字数
+    
     function startTyping() {
       typeInterval = setInterval(() => {
         if (renderBuffer.length > 0) {
-          // 先頭の1文字を取り出す
           const char = renderBuffer[0];
           renderBuffer = renderBuffer.slice(1);
-
-          // テキストを追加して自動スクロール
+    
           resultDiv.appendChild(document.createTextNode(char));
           resultDiv.scrollTop = resultDiv.scrollHeight;
+    
+          // 画面上のテキストが長くなりすぎたら、古い文字を消してメモリを節約
+          if (resultDiv.textContent.length > MAX_CHAR_LENGTH) {
+            resultDiv.textContent = resultDiv.textContent.slice(-MAX_CHAR_LENGTH);
+          }
         }
       }, SPEED_MS);
     }
-
     startBtn.addEventListener('click', () => {
       worker = new Worker('worker.js');
 
