@@ -20,9 +20,10 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      /* やわらかな淡いグラデーション背景 */
-      background: linear-gradient(135deg, #fff5f5 0%, #eef2ff 100%);
-      color: #5a5266; /* 濃すぎない優しいダークグレー */
+      /* 完全な黒 */
+      background-color: #000000;
+      /* 柔らかいミントグリーン */
+      color: #7ce3a1;
       font-family: 'M PLUS Rounded 1c', sans-serif;
       overflow: hidden;
     }
@@ -33,25 +34,11 @@
       line-height: 1;
       text-align: center;
       user-select: none;
-      /* ふんわり浮き出るようなソフトな影 */
-      text-shadow: 0 12px 24px rgba(120, 110, 140, 0.12);
-      transition: all 0.5s ease;
-    }
-
-    /* 充電中：優しいミントグリーン ＋ ゆっくり息をするようなアニメーション */
-    #battery-level.charging {
-      color: #48bb78;
-      animation: breathe 3s infinite ease-in-out;
-    }
-
-    @keyframes breathe {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.03); }
     }
 
     .error {
       font-size: 6vw;
-      color: #f56565;
+      color: #ff6b6b;
     }
   </style>
 </head>
@@ -70,17 +57,10 @@
           function updateBatteryInfo() {
             const level = Math.round(battery.level * 100);
             batteryDisplay.textContent = `${level}%`;
-
-            if (battery.charging) {
-              batteryDisplay.classList.add('charging');
-            } else {
-              batteryDisplay.classList.remove('charging');
-            }
           }
 
           updateBatteryInfo();
           battery.addEventListener('levelchange', updateBatteryInfo);
-          battery.addEventListener('chargingchange', updateBatteryInfo);
 
         } catch (error) {
           batteryDisplay.textContent = '取得失敗';
