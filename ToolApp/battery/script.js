@@ -126,24 +126,43 @@ async function initPresence() {
       displayTextEl.classList.remove('morphing');
     }, 4000);
   }
-
-  // 3. バッテリー変化の計測
+  
+  // --- 計測用の変数を更新 ---
+  let isFirstChange = true; // 最初の端数を捨てるためのフラグ
+  
+  // 3. バッテリー変化の計測（修正版）
   function trackBatteryPace() {
     const now = Date.now();
     const currentLevel = battery.level * 100;
-
+  
     if (lastRecordedLevel !== null && lastRecordedTime !== null) {
       const diffLevel = Math.abs(currentLevel - lastRecordedLevel);
-      const diffTime = (now - lastRecordedTime) / 1000;
-
+      const diffTime = (now - lastRecordedTime) / 1000; // 秒
+  
       if (diffLevel > 0) {
-        secondsPerPercent = diffTime / diffLevel;
+        // 最初の変化（端数のタイミング）は計算に使わず、計測スタートの基準線にするだけ！
+        if (isFirstChange) {
+          isFirstChange = false; 
+        } else {
+          // 2回目の変化（例: 4% -> 5%）で初めて「純粋な1%の所要時間」として採用！
+          secondsPerPercent = diffTime / diffLevel;
+        }
       }
     }
-
+  
     lastRecordedLevel = currentLevel;
     lastRecordedTime = now;
   }
+  
+  // プラグ抜き差し時はフラグもリセット
+  battery.addEventListener('chargingchange', () => {
+    lastRecordedLevel = null;
+    lastRecordedTime = null;
+    secondsPerPercent = null;
+    isFirstChange = true; // ✨ リセット！
+    trackBatteryPace();
+    updateInformation();
+  });
 
   // 4. 計算した残り時間テキスト
   function getCalculatedTimeText() {
