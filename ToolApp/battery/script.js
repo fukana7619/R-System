@@ -5,11 +5,18 @@ function lerp(start, end, amt) {
 
 let currentDisplayLevel = 0;
 let targetLevel = 0;
-let isPercentMode = true; // 現在「%」表示か「時間」表示か
-let currentMessage = "";
+let isPercentMode = true;
+
+// --- 自前で計測するための変数 ---
+let lastRecordedLevel = null;
+let lastRecordedTime = null;
+let secondsPerPercent = null; // 1%変化するのにかかった秒数
 
 async function initPresence() {
-  if (!('getBattery' in navigator)) return;
+  if (!('getBattery' in navigator)) {
+    console.warn('Battery API is not supported in this browser.');
+    return;
+  }
 
   const battery = await navigator.getBattery();
   const displayTextEl = document.getElementById('display-text');
@@ -17,13 +24,12 @@ async function initPresence() {
   // 初期値の取得
   targetLevel = battery.level * 100;
   currentDisplayLevel = targetLevel;
+  displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
 
   // 1. 数値を超ゆっくり追いかけさせるアニメーションループ
   function loop() {
-    // 非常に小さな割合でヌル〜〜ッと目標に近づく
     currentDisplayLevel = lerp(currentDisplayLevel, targetLevel, 0.005);
 
-    // %モード表示中で、かつ文字が遷移中でない場合のみ数字を書き換える
     if (isPercentMode && !displayTextEl.classList.contains('morphing')) {
       displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
     }
@@ -36,42 +42,70 @@ async function initPresence() {
   function morphTo(newContent) {
     if (displayTextEl.innerText === newContent) return;
 
-    // 一度ボカして消す
     displayTextEl.classList.add('morphing');
 
-    // ぼけて消えたタイミング（4秒後）でテキストを差し替えて再浮上させる
     setTimeout(() => {
       displayTextEl.innerText = newContent;
       displayTextEl.classList.remove('morphing');
     }, 4000);
   }
 
-  // 3. 表示内容の思考・切り替えロジック
+  // 3. バッテリー変化から「1%あたりの所要時間」を自前で計測する
+  function trackBatteryPace() {
+    const now = Date.now();
+    const currentLevel = battery.level * 100;
+
+    if (lastRecordedLevel !== null && lastRecordedTime !== null) {
+      const diffLevel = Math.abs(currentLevel - lastRecordedLevel);
+      const diffTime = (now - lastRecordedTime) / 1000; // 秒に変換
+
+      // 実際に%が動いた時だけ計測（1%あたりの秒数を更新）
+      if (diffLevel > 0) {
+        secondsPerPercent = diffTime / diffLevel;
+      }
+    }
+
+    lastRecordedLevel = currentLevel;
+    lastRecordedTime = now;
+  }
+
+  // 4. 自前計算による残り時間テキストの生成
+  function getCalculatedTimeText() {
+    // まだ一度も1%の変化を観測できていない場合は空文字を返す
+    if (!secondsPerPercent || lastRecordedLevel === null) return "";
+
+    if (battery.charging) {
+      // 満充電（100%）までの予測
+      const remainingPercent = 100 - lastRecordedLevel;
+      const totalSecondsLeft = remainingPercent * secondsPerPercent;
+      const mins = Math.round(totalSecondsLeft / 60);
+      return mins > 0 ? `あと ${mins}分` : "";
+    } else {
+      // 0%までの予測時刻
+      const totalSecondsLeft = lastRecordedLevel * secondsPerPercent;
+      const targetDate = new Date(Date.now() + totalSecondsLeft * 1000);
+      const h = String(targetDate.getHours()).padStart(2, '0');
+      const m = String(targetDate.getMinutes()).padStart(2, '0');
+      return `${h}:${m} まで`;
+    }
+  }
+
+  // 5. 表示内容の思考・切り替えロジック
   function updateInformation() {
     targetLevel = battery.level * 100;
 
-    // 充電状態クラスの切り替え（CSS側で10秒かけて背景が変わる）
+    // 充電状態クラスの切り替え
     if (battery.charging) {
       document.body.classList.add('is-charging');
     } else {
       document.body.classList.remove('is-charging');
     }
 
-    // 表示する時間情報を生成
-    let timeText = "";
-    if (battery.charging && battery.chargingTime !== Infinity && battery.chargingTime > 0) {
-      const mins = Math.round(battery.chargingTime / 60);
-      timeText = `あと ${mins}分`;
-    } else if (!battery.charging && battery.dischargingTime !== Infinity && battery.dischargingTime > 0) {
-      const target = new Date(Date.now() + battery.dischargingTime * 1000);
-      const h = String(target.getHours()).padStart(2, '0');
-      const m = String(target.getMinutes()).padStart(2, '0');
-      timeText = `${h}:${m} まで`;
-    }
+    // 自前計測した時間情報を取得
+    const timeText = getCalculatedTimeText();
 
-    // 時間情報が存在する場合、たまに%と時間を交互にモーフィング表示する
+    // 時間情報が計算できている時だけ交互に表示
     if (timeText) {
-      // モードを交互に切り替える
       isPercentMode = !isPercentMode;
 
       if (isPercentMode) {
@@ -80,22 +114,30 @@ async function initPresence() {
         morphTo(timeText);
       }
     } else {
-      // 時間情報が取れないときは静かに%のみ表示
+      // まだ計測中の時は静かに%表示をキープ
       isPercentMode = true;
-      morphTo(Math.round(currentDisplayLevel) + '%');
     }
   }
 
   // イベント検知
-  battery.addEventListener('levelchange', () => { targetLevel = battery.level * 100; });
-  battery.addEventListener('chargingchange', updateInformation);
-  battery.addEventListener('chargingtimechange', updateInformation);
-  battery.addEventListener('dischargingtimechange', updateInformation);
+  battery.addEventListener('levelchange', () => { 
+    targetLevel = battery.level * 100;
+    trackBatteryPace(); // バッテリーが変わったら時間を計測！
+  });
 
-  // 初期表示
-  displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
+  // プラグ抜き差し時はペースが変わるので計測をリセット
+  battery.addEventListener('chargingchange', () => {
+    lastRecordedLevel = null;
+    lastRecordedTime = null;
+    secondsPerPercent = null;
+    trackBatteryPace();
+    updateInformation();
+  });
 
-  // 15秒ごとに「いつの間にか情報が切り替わっている」サイクルを回す
+  // 初期計測の開始
+  trackBatteryPace();
+
+  // 15秒ごとに表示サイクルを回す
   setInterval(updateInformation, 15000);
 }
 
