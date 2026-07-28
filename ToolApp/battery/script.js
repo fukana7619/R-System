@@ -26,6 +26,10 @@ async function initPresence() {
   const ctx = canvas.getContext('2d');
   let particles = [];
 
+  // 吹雪全体のフェード（透明度）管理変数
+  let particleAlpha = 0; // 0 = 完全透明, 1 = 完全表示
+  let targetParticleAlpha = 0;
+
   function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -39,35 +43,39 @@ async function initPresence() {
       this.reset();
     }
     reset() {
-      this.x = Math.random() * canvas.width; // 画面の横幅どこからでも
-      this.y = canvas.height + Math.random() * 20; // 画面の少し下から発生
-      this.size = Math.random() * 2.5 + 0.5; // 小さな光の粒（0.5px〜3px）
-      this.speedY = Math.random() * 1.5 + 0.5; // 上昇スピード
-      this.speedX = (Math.random() - 0.5) * 0.8; // 左右へのわずかな揺れ（風）
-      this.opacity = Math.random() * 0.7 + 0.3; // 透明度
-      this.fadeSpeed = Math.random() * 0.003 + 0.001; // 徐々に消えるスピード
+      this.x = Math.random() * canvas.width;
+      this.y = canvas.height + Math.random() * 20;
+      this.size = Math.random() * 2.5 + 0.5;
+      this.speedY = Math.random() * 1.5 + 0.5;
+      this.speedX = (Math.random() - 0.5) * 0.8;
+      this.baseOpacity = Math.random() * 0.7 + 0.3; // 個別の基本透明度
+      this.fadeSpeed = Math.random() * 0.003 + 0.001;
     }
     update() {
       this.y -= this.speedY;
       this.x += this.speedX;
-      this.opacity -= this.fadeSpeed;
-      // 画面上部に行くか消えたらリセット
-      if (this.y < -10 || this.opacity <= 0) {
+      // 上昇中に少しずつ消える
+      this.baseOpacity -= this.fadeSpeed;
+      
+      if (this.y < -10 || this.baseOpacity <= 0) {
         this.reset();
       }
     }
-    draw() {
+    draw(globalAlpha) {
+      // 個別の透明度 × 全体のフェード透明度
+      const finalOpacity = Math.max(0, this.baseOpacity * globalAlpha);
+      if (finalOpacity <= 0) return;
+
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      // ネオン感のある幻想的なエメラルドグリーン
-      ctx.fillStyle = `rgba(50, 255, 180, ${this.opacity})`;
+      ctx.fillStyle = `rgba(50, 255, 180, ${finalOpacity})`;
       ctx.shadowBlur = 8;
-      ctx.shadowColor = "rgba(50, 255, 180, 0.8)";
+      ctx.shadowColor = `rgba(50, 255, 180, ${finalOpacity * 0.8})`;
       ctx.fill();
     }
   }
 
-  // 初期粒子を少量作成 (50個くらいが風情があって綺麗です)
+  // 初期粒子を生成
   for (let i = 0; i < 50; i++) {
     particles.push(new Particle());
   }
@@ -77,20 +85,29 @@ async function initPresence() {
   currentDisplayLevel = targetLevel;
   displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
 
-  // 1. 数値アニメーション ＆ パーティクル描画ループ
+  // 1. メインアニメーション ＆ 描画ループ
   function loop() {
+    // 数字のぬるっと変化
     currentDisplayLevel = lerp(currentDisplayLevel, targetLevel, 0.005);
 
     if (isPercentMode && !displayTextEl.classList.contains('morphing')) {
       displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
     }
 
-    // ✨ 充電中のみ吹雪を描画
+    // 充電状態に応じて吹雪全体の目標透明度を設定
+    targetParticleAlpha = battery.charging ? 1 : 0;
+
+    // ✨ 吹雪全体のフェード処理（0.03 = ゆっくりじわ〜っと切替）
+    particleAlpha = lerp(particleAlpha, targetParticleAlpha, 0.03);
+
+    // キャンバスクリア＆吹雪の描画
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (battery.charging) {
+
+    // 完全透明でないときだけ描画計算を行う（軽量化）
+    if (particleAlpha > 0.001) {
       particles.forEach(p => {
         p.update();
-        p.draw();
+        p.draw(particleAlpha);
       });
     }
 
