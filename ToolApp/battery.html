@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>充電残量</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -17,30 +20,38 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      background-color: #0d0d0d;
-      color: #ffffff;
-      font-family: system-ui, -apple-system, sans-serif;
+      /* やわらかな淡いグラデーション背景 */
+      background: linear-gradient(135deg, #fff5f5 0%, #eef2ff 100%);
+      color: #5a5266; /* 濃すぎない優しいダークグレー */
+      font-family: 'M PLUS Rounded 1c', sans-serif;
       overflow: hidden;
     }
 
     #battery-level {
-      /* 画面の幅・高さに合わせて文字サイズを最大化 */
-      font-size: 35vw;
-      font-weight: 900;
+      font-size: 30vw;
+      font-weight: 700;
       line-height: 1;
-      letter-spacing: -0.05em;
       text-align: center;
       user-select: none;
+      /* ふんわり浮き出るようなソフトな影 */
+      text-shadow: 0 12px 24px rgba(120, 110, 140, 0.12);
+      transition: all 0.5s ease;
     }
 
-    /* 充電中であることをわかりやすくするアニメーション効果（任意） */
-    .charging {
-      color: #34c759;
+    /* 充電中：優しいミントグリーン ＋ ゆっくり息をするようなアニメーション */
+    #battery-level.charging {
+      color: #48bb78;
+      animation: breathe 3s infinite ease-in-out;
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
     }
 
     .error {
-      font-size: 5vw;
-      color: #ff3b30;
+      font-size: 6vw;
+      color: #f56565;
     }
   </style>
 </head>
@@ -52,17 +63,14 @@
     const batteryDisplay = document.getElementById('battery-level');
 
     async function initBattery() {
-      // Battery Status APIに対応しているか確認
       if ('getBattery' in navigator) {
         try {
           const battery = await navigator.getBattery();
 
-          // 残量を更新する関数
           function updateBatteryInfo() {
             const level = Math.round(battery.level * 100);
             batteryDisplay.textContent = `${level}%`;
 
-            // 充電中なら文字色を緑色に変化
             if (battery.charging) {
               batteryDisplay.classList.add('charging');
             } else {
@@ -70,10 +78,7 @@
             }
           }
 
-          // 初期表示
           updateBatteryInfo();
-
-          // 状態が変化した時のイベントリスナー
           battery.addEventListener('levelchange', updateBatteryInfo);
           battery.addEventListener('chargingchange', updateBatteryInfo);
 
@@ -82,7 +87,6 @@
           batteryDisplay.classList.add('error');
         }
       } else {
-        // iOS Safariや一部の非対応ブラウザ向け
         batteryDisplay.textContent = '非対応';
         batteryDisplay.classList.add('error');
       }
