@@ -12,7 +12,6 @@
   --pulse-speed: 10s;
 }
 
-/* 充電中の雰囲気（10秒かけて超低速で変化する） */
 body.is-charging {
   --bg-color: #01060e;
   --glow-color: rgba(0, 180, 255, 0.25);
@@ -28,10 +27,21 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  overflow: hidden;
-
-  /* 充電プラグの抜き差し時、10秒かけて超ゆっくり環境が移り変わる */
+  width: 100vw;
+  overflow: hidden; /* ✨ 予期せぬはみ出し（はみ出して右寄りに見える現象）を徹底防止 */
+  position: relative;
   transition: background-color 10s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ✨ 背景キャンバスの固定 */
+#particle-canvas {
+  position: fixed; /* absolute から fixed に変更して画面に完全固定 */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .core-container {
@@ -40,9 +50,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  z-index: 1; /* 光や文字を全面に出す */
 }
 
-/* 生命体のようなコアの光 */
 .core-glow {
   position: absolute;
   width: 380px;
@@ -52,12 +62,9 @@ body {
   filter: blur(40px);
   animation: breathe var(--pulse-speed) infinite ease-in-out;
   pointer-events: none;
-
-  /* 光の色の切り替えも10秒かけてゆったり */
   transition: background 10s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* メイン表示エリア（数字やテキストが溶け合って切り替わる場所） */
 .display-text {
   font-size: 4.5rem;
   font-weight: 200;
@@ -68,7 +75,7 @@ body {
   text-align: center;
   white-space: nowrap;
 
-  /* 表示が切り替わるときに「ボケて溶ける」モーフィング効果 */
+  /* トランジション */
   opacity: 1;
   filter: blur(0px);
   transform: scale(1);
@@ -79,14 +86,12 @@ body {
     text-shadow 8s ease;
 }
 
-/* テキスト切り替え時の「溶けている」状態 */
 .display-text.morphing {
   opacity: 0;
   filter: blur(12px);
   transform: scale(0.95);
 }
 
-/* ゆっくり深呼吸するようなアニメーション */
 @keyframes breathe {
   0%, 100% {
     transform: scale(0.85);
@@ -96,15 +101,4 @@ body {
     transform: scale(1.15);
     opacity: 0.8;
   }
-}
-
-/* ✨ 追加: パーティクル描画用キャンバスの設定 */
-#particle-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none; /* クリックなどを透過させる */
-  z-index: 0;           /* コアや文字（z-index: 1）の裏側に配置 */
 }
