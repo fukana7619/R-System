@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Battery Core</title>
+  <title>Presence</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
-      background-color: #05050a;
-      color: #00ffcc;
-      font-family: 'Courier New', Courier, monospace;
+      background-color: #030305;
+      color: #e0f7fa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -17,145 +18,163 @@
       overflow: hidden;
     }
 
-    /* 背景のうっすらしたAIの鼓動感 */
-    .bg-glow {
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(0, 255, 204, 0.15) 0%, rgba(0,0,0,0) 70%);
-      border-radius: 50%;
-      animation: pulse 4s infinite ease-in-out;
-      z-index: 0;
-    }
-
-    .container {
+    /* 光の核（生命体のようなコア） */
+    .core-container {
       position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .core-glow {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(64, 224, 208, 0.25) 0%, rgba(3, 3, 5, 0) 70%);
+      border-radius: 50%;
+      filter: blur(20px);
+      animation: breathe 6s infinite ease-in-out;
+      pointer-events: none;
+    }
+
+    /* 充電中：エネルギーが流れ込むような変化 */
+    body.is-charging .core-glow {
+      background: radial-gradient(circle, rgba(127, 255, 212, 0.4) 0%, rgba(0, 150, 255, 0.1) 50%, rgba(3, 3, 5, 0) 70%);
+      animation: breathe-charging 3s infinite ease-in-out;
+    }
+
+    /* メイン数値 */
+    .percentage {
+      font-size: 5rem;
+      font-weight: 200;
+      letter-spacing: -2px;
+      text-shadow: 0 0 30px rgba(64, 224, 208, 0.6);
       z-index: 1;
-      text-align: center;
-      background: rgba(10, 15, 25, 0.8);
-      padding: 40px;
-      border-radius: 20px;
-      border: 1px solid rgba(0, 255, 204, 0.3);
-      box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
-      backdrop-filter: blur(10px);
-      width: 320px;
+      transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease;
+      cursor: default;
+      user-select: none;
     }
 
-    /* パーセント表示 */
-    .level {
-      font-size: 4rem;
-      font-weight: bold;
-      text-shadow: 0 0 20px #00ffcc;
-      transition: all 0.5s ease;
+    /* 変動した瞬間の有機的な反応 */
+    .percentage.react {
+      transform: scale(1.08);
+      text-shadow: 0 0 50px rgba(255, 255, 255, 0.9), 0 0 30px rgba(64, 224, 208, 0.8);
     }
 
-    /* アニメーション用クラス */
-    .level-changed {
-      transform: scale(1.1);
-      color: #fff;
-      text-shadow: 0 0 30px #ffffff, 0 0 50px #00ffcc;
-    }
-
-    .status-text {
+    /* たまに浮かび上がる細かな情報・囁き */
+    .sub-info {
       margin-top: 15px;
-      font-size: 0.9rem;
-      color: #88dffc;
+      font-size: 0.85rem;
+      font-weight: 300;
+      color: rgba(224, 247, 250, 0.6);
       letter-spacing: 1px;
+      height: 1.2em;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 2s ease;
     }
 
-    .time-text {
-      margin-top: 8px;
-      font-size: 0.8rem;
-      color: #55aacc;
+    .sub-info.visible {
+      opacity: 1;
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 0.5; }
-      50% { transform: scale(1.2); opacity: 0.8; }
+    /* 息づかいのアニメーション */
+    @keyframes breathe {
+      0%, 100% { transform: scale(0.95); opacity: 0.4; }
+      50% { transform: scale(1.15); opacity: 0.8; }
     }
 
-    /* 充電中用の特別な発光モード */
-    body.is-charging .bg-glow {
-      background: radial-gradient(circle, rgba(0, 200, 255, 0.3) 0%, rgba(0,0,0,0) 70%);
-      animation: pulse 1.5s infinite ease-in-out;
+    @keyframes breathe-charging {
+      0%, 100% { transform: scale(0.9); opacity: 0.5; }
+      50% { transform: scale(1.25); opacity: 0.95; }
     }
   </style>
 </head>
 <body>
 
-  <div class="bg-glow"></div>
-
-  <div class="container">
-    <div id="level" class="level">--%</div>
-    <div id="status" class="status-text">SYSTEM INITIALIZING...</div>
-    <div id="time" class="time-text">--</div>
+  <div class="core-container">
+    <div class="core-glow"></div>
+    <div id="percentage" class="percentage">--</div>
+    <div id="sub-info" class="sub-info"></div>
   </div>
 
   <script>
-    async function initBattery() {
-      if (!('getBattery' in navigator)) {
-        document.getElementById('status').innerText = 'Battery API 非対応のブラウザです';
-        return;
-      }
+    async function initPresence() {
+      if (!('getBattery' in navigator)) return;
 
       const battery = await navigator.getBattery();
+      const percentEl = document.getElementById('percentage');
+      const subInfoEl = document.getElementById('sub-info');
 
-      function updateAll() {
-        updateLevel();
-        updateCharging();
-        updateTime();
-      }
-
-      function updateLevel() {
-        const levelEl = document.getElementById('level');
-        const levelPct = Math.round(battery.level * 100) + '%';
-        
-        if (levelEl.innerText !== levelPct) {
-          levelEl.innerText = levelPct;
-          // 変動時のアニメーション付与
-          levelEl.classList.add('level-changed');
-          setTimeout(() => levelEl.classList.remove('level-changed'), 500);
+      function updateState() {
+        // 残量表示
+        const level = Math.round(battery.level * 100);
+        if (percentEl.innerText !== level + '%') {
+          percentEl.innerText = level + '%';
+          
+          // 変化した瞬間に一瞬脈動する
+          percentEl.classList.add('react');
+          setTimeout(() => percentEl.classList.remove('react'), 800);
         }
-      }
 
-      function updateCharging() {
-        const statusEl = document.getElementById('status');
+        // 充電状態に応じた背景の空気感
         if (battery.charging) {
           document.body.classList.add('is-charging');
-          statusEl.innerText = '⚡ AI CORE: CHARGING...';
         } else {
           document.body.classList.remove('is-charging');
-          statusEl.innerText = '🔋 AI CORE: DISCHARGING';
         }
+
+        thinkAndWhisper();
       }
 
-      function updateTime() {
-        const timeEl = document.getElementById('time');
-        
-        if (battery.charging && battery.chargingTime !== Infinity) {
-          const mins = Math.round(battery.chargingTime / 60);
-          timeEl.innerText = `満充電まで 約${mins}分`;
-        } else if (!battery.charging && battery.dischargingTime !== Infinity) {
-          const now = new Date();
-          const targetTime = new Date(now.getTime() + battery.dischargingTime * 1000);
-          const hours = String(targetTime.getHours()).padStart(2, '0');
-          const minutes = String(targetTime.getMinutes()).padStart(2, '0');
-          timeEl.innerText = `停止予想時刻 ${hours}:${minutes}`;
+      // 状況に応じて「たまに」言葉を出すロジック
+      function thinkAndWhisper() {
+        let message = '';
+
+        if (battery.charging) {
+          // 充電中：時間が判明している時だけそっと教える
+          if (battery.chargingTime !== Infinity && battery.chargingTime > 0) {
+            const mins = Math.round(battery.chargingTime / 60);
+            message = `あと ${mins} 分ほどで満たされます`;
+          }
         } else {
-          timeEl.innerText = '時間計測中...';
+          // 放電中：予想時刻がわかる時
+          if (battery.dischargingTime !== Infinity && battery.dischargingTime > 0) {
+            const target = new Date(Date.now() + battery.dischargingTime * 1000);
+            const h = String(target.getHours()).padStart(2, '0');
+            const m = String(target.getMinutes()).padStart(2, '0');
+            message = `${h}:${m} あたりまで持ちそうです`;
+          }
+        }
+
+        // 常に表示するのではなく、たまにフワッと浮かび上がらせる
+        if (message) {
+          subInfoEl.innerText = message;
+          subInfoEl.classList.add('visible');
+          
+          // 8秒ほど表示したらまた消えて静かになる
+          setTimeout(() => {
+            subInfoEl.classList.remove('visible');
+          }, 8000);
+        } else {
+          subInfoEl.classList.remove('visible');
         }
       }
 
-      // イベントリスナーの登録
-      battery.addEventListener('levelchange', updateLevel);
-      battery.addEventListener('chargingchange', updateAll);
-      battery.addEventListener('chargingtimechange', updateTime);
-      battery.addEventListener('dischargingtimechange', updateTime);
+      // イベント検知
+      battery.addEventListener('levelchange', updateState);
+      battery.addEventListener('chargingchange', updateState);
+      battery.addEventListener('chargingtimechange', updateState);
+      battery.addEventListener('dischargingtimechange', updateState);
 
-      updateAll();
+      updateState();
+
+      // たまに（1分ごとなど）思い出したように思考を更新する
+      setInterval(thinkAndWhisper, 60000);
     }
 
-    initBattery();
+    initPresence();
   </script>
 </body>
 </html>
