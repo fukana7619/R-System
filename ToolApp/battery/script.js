@@ -11,6 +11,10 @@ let isPercentMode = true;
 let lastRecordedLevel = null;
 let lastRecordedTime = null;
 let secondsPerPercent = null;
+let isFirstChange = true; // 最初の端数を捨てるためのフラグ
+
+// --- リアルタイムカウントダウン用 ---
+let estimatedTargetTimestamp = null; // ゴール（満充電または0%）の予定時刻(ミリ秒)
 
 async function initPresence() {
   if (!('getBattery' in navigator)) {
@@ -21,13 +25,11 @@ async function initPresence() {
   const battery = await navigator.getBattery();
   const displayTextEl = document.getElementById('display-text');
 
-  // --- ✨ 緑色の吹雪（パーティクル）演出用ロジック ---
+  // --- 緑色の吹雪（パーティクル）演出用 ---
   const canvas = document.getElementById('particle-canvas');
   const ctx = canvas.getContext('2d');
   let particles = [];
-
-  // 吹雪全体のフェード（透明度）管理変数
-  let particleAlpha = 0; // 0 = 完全透明, 1 = 完全表示
+  let particleAlpha = 0;
   let targetParticleAlpha = 0;
 
   function resizeCanvas() {
@@ -37,7 +39,6 @@ async function initPresence() {
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // 粒子（吹雪）クラス
   class Particle {
     constructor() {
       this.reset();
@@ -48,21 +49,18 @@ async function initPresence() {
       this.size = Math.random() * 2.5 + 0.5;
       this.speedY = Math.random() * 1.5 + 0.5;
       this.speedX = (Math.random() - 0.5) * 0.8;
-      this.baseOpacity = Math.random() * 0.7 + 0.3; // 個別の基本透明度
+      this.baseOpacity = Math.random() * 0.7 + 0.3;
       this.fadeSpeed = Math.random() * 0.003 + 0.001;
     }
     update() {
       this.y -= this.speedY;
       this.x += this.speedX;
-      // 上昇中に少しずつ消える
       this.baseOpacity -= this.fadeSpeed;
-      
       if (this.y < -10 || this.baseOpacity <= 0) {
         this.reset();
       }
     }
     draw(globalAlpha) {
-      // 個別の透明度 × 全体のフェード透明度
       const finalOpacity = Math.max(0, this.baseOpacity * globalAlpha);
       if (finalOpacity <= 0) return;
 
@@ -75,7 +73,6 @@ async function initPresence() {
     }
   }
 
-  // 初期粒子を生成
   for (let i = 0; i < 50; i++) {
     particles.push(new Particle());
   }
@@ -85,25 +82,28 @@ async function initPresence() {
   currentDisplayLevel = targetLevel;
   displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
 
-  // 1. メインアニメーション ＆ 描画ループ
+  // 1. 描画 ＆ リアルタイム更新ループ（毎フレーム実行）
   function loop() {
     // 数字のぬるっと変化
     currentDisplayLevel = lerp(currentDisplayLevel, targetLevel, 0.005);
 
+    // %モード表示中でモーフィング中でない場合
     if (isPercentMode && !displayTextEl.classList.contains('morphing')) {
       displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
+    } 
+    // 時間表示モード中でモーフィング中でない場合 ➔ リアルタイムに「残り秒数」をカウントダウン！
+    else if (!isPercentMode && !displayTextEl.classList.contains('morphing')) {
+      const liveTimeText = getCalculatedTimeText();
+      if (liveTimeText) {
+        displayTextEl.innerText = liveTimeText;
+      }
     }
 
-    // 充電状態に応じて吹雪全体の目標透明度を設定
+    // 吹雪のフェード処理
     targetParticleAlpha = battery.charging ? 1 : 0;
-
-    // ✨ 吹雪全体のフェード処理（0.03 = ゆっくりじわ〜っと切替）
     particleAlpha = lerp(particleAlpha, targetParticleAlpha, 0.03);
 
-    // キャンバスクリア＆吹雪の描画
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 完全透明でないときだけ描画計算を行う（軽量化）
     if (particleAlpha > 0.001) {
       particles.forEach(p => {
         p.update();
@@ -126,63 +126,67 @@ async function initPresence() {
       displayTextEl.classList.remove('morphing');
     }, 4000);
   }
-  
-  // --- 計測用の変数を更新 ---
-  let isFirstChange = true; // 最初の端数を捨てるためのフラグ
-  
-  // 3. バッテリー変化の計測（修正版）
+
+  // 3. バッテリー変化の計測（端数カットの正確ロジック）
   function trackBatteryPace() {
     const now = Date.now();
     const currentLevel = battery.level * 100;
-  
+
     if (lastRecordedLevel !== null && lastRecordedTime !== null) {
       const diffLevel = Math.abs(currentLevel - lastRecordedLevel);
-      const diffTime = (now - lastRecordedTime) / 1000; // 秒
-  
+      const diffTime = (now - lastRecordedTime) / 1000;
+
       if (diffLevel > 0) {
-        // 最初の変化（端数のタイミング）は計算に使わず、計測スタートの基準線にするだけ！
         if (isFirstChange) {
-          isFirstChange = false; 
+          isFirstChange = false; // 最初の1回（端数）は捨てる
         } else {
-          // 2回目の変化（例: 4% -> 5%）で初めて「純粋な1%の所要時間」として採用！
+          // 純粋な1%分の秒数を確定
           secondsPerPercent = diffTime / diffLevel;
         }
       }
     }
-  
+
     lastRecordedLevel = currentLevel;
     lastRecordedTime = now;
-  }
-  
-  // プラグ抜き差し時はフラグもリセット
-  battery.addEventListener('chargingchange', () => {
-    lastRecordedLevel = null;
-    lastRecordedTime = null;
-    secondsPerPercent = null;
-    isFirstChange = true; // ✨ リセット！
-    trackBatteryPace();
-    updateInformation();
-  });
 
-  // 4. 計算した残り時間テキスト
+    // ゴール時刻（タイムスタンプ）を再計算
+    if (secondsPerPercent !== null) {
+      if (battery.charging) {
+        const remainingPercent = 100 - currentLevel;
+        estimatedTargetTimestamp = now + (remainingPercent * secondsPerPercent * 1000);
+      } else {
+        const remainingPercent = currentLevel;
+        estimatedTargetTimestamp = now + (remainingPercent * secondsPerPercent * 1000);
+      }
+    }
+  }
+
+  // 4. リアルタイムに残時間を「分・秒」で動的に計算する関数
   function getCalculatedTimeText() {
-    if (!secondsPerPercent || lastRecordedLevel === null) return "";
+    if (!estimatedTargetTimestamp) return "";
+
+    const now = Date.now();
+    const diffMs = estimatedTargetTimestamp - now;
+
+    if (diffMs <= 0) return "";
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
 
     if (battery.charging) {
-      const remainingPercent = 100 - lastRecordedLevel;
-      const totalSecondsLeft = remainingPercent * secondsPerPercent;
-      const mins = Math.round(totalSecondsLeft / 60);
-      return mins > 0 ? `あと ${mins}分` : "";
+      // 例: あと 12分34秒
+      return `あと ${mins}分${String(secs).padStart(2, '0')}秒`;
     } else {
-      const totalSecondsLeft = lastRecordedLevel * secondsPerPercent;
-      const targetDate = new Date(Date.now() + totalSecondsLeft * 1000);
+      // バッテリー消費時は目標時刻（例: 18:45 まで）
+      const targetDate = new Date(estimatedTargetTimestamp);
       const h = String(targetDate.getHours()).padStart(2, '0');
       const m = String(targetDate.getMinutes()).padStart(2, '0');
       return `${h}:${m} まで`;
     }
   }
 
-  // 5. 表示内容の更新
+  // 5. 表示内容の思考・切り替えロジック
   function updateInformation() {
     targetLevel = battery.level * 100;
 
@@ -216,12 +220,16 @@ async function initPresence() {
     lastRecordedLevel = null;
     lastRecordedTime = null;
     secondsPerPercent = null;
+    estimatedTargetTimestamp = null;
+    isFirstChange = true;
     trackBatteryPace();
     updateInformation();
   });
 
   trackBatteryPace();
-  setInterval(updateInformation, 15000);
+
+  // ✨ 切り替え間隔を15秒から「30秒」に延長してゆったりに！
+  setInterval(updateInformation, 30000);
 }
 
 initPresence();
