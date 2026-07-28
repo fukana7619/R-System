@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Battery Core</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #05050a;
+      color: #00ffcc;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 背景のうっすらしたAIの鼓動感 */
+    .bg-glow {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0, 255, 204, 0.15) 0%, rgba(0,0,0,0) 70%);
+      border-radius: 50%;
+      animation: pulse 4s infinite ease-in-out;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      background: rgba(10, 15, 25, 0.8);
+      padding: 40px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 255, 204, 0.3);
+      box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+      backdrop-filter: blur(10px);
+      width: 320px;
+    }
+
+    /* パーセント表示 */
+    .level {
+      font-size: 4rem;
+      font-weight: bold;
+      text-shadow: 0 0 20px #00ffcc;
+      transition: all 0.5s ease;
+    }
+
+    /* アニメーション用クラス */
+    .level-changed {
+      transform: scale(1.1);
+      color: #fff;
+      text-shadow: 0 0 30px #ffffff, 0 0 50px #00ffcc;
+    }
+
+    .status-text {
+      margin-top: 15px;
+      font-size: 0.9rem;
+      color: #88dffc;
+      letter-spacing: 1px;
+    }
+
+    .time-text {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #55aacc;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.2); opacity: 0.8; }
+    }
+
+    /* 充電中用の特別な発光モード */
+    body.is-charging .bg-glow {
+      background: radial-gradient(circle, rgba(0, 200, 255, 0.3) 0%, rgba(0,0,0,0) 70%);
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-glow"></div>
+
+  <div class="container">
+    <div id="level" class="level">--%</div>
+    <div id="status" class="status-text">SYSTEM INITIALIZING...</div>
+    <div id="time" class="time-text">--</div>
+  </div>
+
+  <script>
+    async function initBattery() {
+      if (!('getBattery' in navigator)) {
+        document.getElementById('status').innerText = 'Battery API 非対応のブラウザです';
+        return;
+      }
+
+      const battery = await navigator.getBattery();
+
+      function updateAll() {
+        updateLevel();
+        updateCharging();
+        updateTime();
+      }
+
+      function updateLevel() {
+        const levelEl = document.getElementById('level');
+        const levelPct = Math.round(battery.level * 100) + '%';
+        
+        if (levelEl.innerText !== levelPct) {
+          levelEl.innerText = levelPct;
+          // 変動時のアニメーション付与
+          levelEl.classList.add('level-changed');
+          setTimeout(() => levelEl.classList.remove('level-changed'), 500);
+        }
+      }
+
+      function updateCharging() {
+        const statusEl = document.getElementById('status');
+        if (battery.charging) {
+          document.body.classList.add('is-charging');
+          statusEl.innerText = '⚡ AI CORE: CHARGING...';
+        } else {
+          document.body.classList.remove('is-charging');
+          statusEl.innerText = '🔋 AI CORE: DISCHARGING';
+        }
+      }
+
+      function updateTime() {
+        const timeEl = document.getElementById('time');
+        
+        if (battery.charging && battery.chargingTime !== Infinity) {
+          const mins = Math.round(battery.chargingTime / 60);
+          timeEl.innerText = `満充電まで 約${mins}分`;
+        } else if (!battery.charging && battery.dischargingTime !== Infinity) {
+          const now = new Date();
+          const targetTime = new Date(now.getTime() + battery.dischargingTime * 1000);
+          const hours = String(targetTime.getHours()).padStart(2, '0');
+          const minutes = String(targetTime.getMinutes()).padStart(2, '0');
+          timeEl.innerText = `停止予想時刻 ${hours}:${minutes}`;
+        } else {
+          timeEl.innerText = '時間計測中...';
+        }
+      }
+
+      // イベントリスナーの登録
+      battery.addEventListener('levelchange', updateLevel);
+      battery.addEventListener('chargingchange', updateAll);
+      battery.addEventListener('chargingtimechange', updateTime);
+      battery.addEventListener('dischargingtimechange', updateTime);
+
+      updateAll();
+    }
+
+    initBattery();
+  </script>
+</body>
+</html>
