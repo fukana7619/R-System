@@ -5,20 +5,19 @@
 }
 
 :root {
-  /* 基本のカラー定義（CSS変数で管理して滑らかに遷移させる） */
-  --bg-color: #030305;
-  --glow-color: rgba(64, 224, 208, 0.2);
+  --bg-color: #020204;
+  --glow-color: rgba(64, 224, 208, 0.15);
   --text-color: #e0f7fa;
-  --text-glow: rgba(64, 224, 208, 0.5);
-  --pulse-speed: 7s;
+  --text-glow: rgba(64, 224, 208, 0.4);
+  --pulse-speed: 10s;
 }
 
-/* 充電中の状態（ボディにクラスがついた時に時間をかけて色・光が変わる） */
+/* 充電中の雰囲気（10秒かけて超低速で変化する） */
 body.is-charging {
-  --bg-color: #020810;
-  --glow-color: rgba(0, 195, 255, 0.35);
-  --text-glow: rgba(0, 217, 255, 0.8);
-  --pulse-speed: 3.5s; /* 息づかいが少し早くなる */
+  --bg-color: #01060e;
+  --glow-color: rgba(0, 180, 255, 0.25);
+  --text-glow: rgba(0, 200, 255, 0.6);
+  --pulse-speed: 5s;
 }
 
 body {
@@ -31,8 +30,8 @@ body {
   min-height: 100vh;
   overflow: hidden;
 
-  /* 背景色や雰囲気の変化を数秒かけて極めて滑らかに変える */
-  transition: background-color 3s cubic-bezier(0.25, 1, 0.5, 1);
+  /* 充電プラグの抜き差し時、10秒かけて超ゆっくり環境が移り変わる */
+  transition: background-color 10s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .core-container {
@@ -43,69 +42,58 @@ body {
   justify-content: center;
 }
 
-/* 命の宿るオーラ（背景発光） */
+/* 生命体のようなコアの光 */
 .core-glow {
   position: absolute;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, var(--glow-color) 0%, rgba(3, 3, 5, 0) 70%);
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, var(--glow-color) 0%, rgba(2, 2, 4, 0) 70%);
   border-radius: 50%;
-  filter: blur(30px);
+  filter: blur(40px);
   animation: breathe var(--pulse-speed) infinite ease-in-out;
   pointer-events: none;
 
-  /* 充電切替時の光の色の変化も滑らかに */
-  transition: background 3s cubic-bezier(0.25, 1, 0.5, 1);
+  /* 光の色の切り替えも10秒かけてゆったり */
+  transition: background 10s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* メイン数字 */
-.percentage {
-  font-size: 5.5rem;
+/* メイン表示エリア（数字やテキストが溶け合って切り替わる場所） */
+.display-text {
+  font-size: 4.5rem;
   font-weight: 200;
-  letter-spacing: -2px;
-  text-shadow: 0 0 30px var(--text-glow);
+  letter-spacing: -1px;
+  text-shadow: 0 0 35px var(--text-glow);
   z-index: 1;
   user-select: none;
-  font-variant-numeric: tabular-nums; /* 数字の横幅を固定してガタつきを防ぐ */
+  text-align: center;
+  white-space: nowrap;
 
-  transition: text-shadow 3s ease;
-}
-
-/* サブテキスト（囁き） */
-.sub-info {
-  margin-top: 18px;
-  font-size: 0.85rem;
-  font-weight: 300;
-  color: rgba(224, 247, 250, 0.5);
-  letter-spacing: 1.5px;
-  height: 1.5em;
-  z-index: 1;
-  opacity: 0;
-  transform: translateY(6px);
-  filter: blur(4px);
-
-  /* 文字の浮き上がりと消え方を極上に滑らかにする */
-  transition: 
-    opacity 2.5s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 2.5s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 2.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* テキスト表示時のスタイル */
-.sub-info.visible {
+  /* 表示が切り替わるときに「ボケて溶ける」モーフィング効果 */
   opacity: 1;
-  transform: translateY(0);
   filter: blur(0px);
+  transform: scale(1);
+  transition: 
+    opacity 4s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 4s cubic-bezier(0.16, 1, 0.3, 1),
+    text-shadow 8s ease;
 }
 
-/* 有機的な息づかいのアニメーション */
+/* テキスト切り替え時の「溶けている」状態 */
+.display-text.morphing {
+  opacity: 0;
+  filter: blur(12px);
+  transform: scale(0.95);
+}
+
+/* ゆっくり深呼吸するようなアニメーション */
 @keyframes breathe {
   0%, 100% {
-    transform: scale(0.9) rotate(0deg);
-    opacity: 0.5;
+    transform: scale(0.85);
+    opacity: 0.4;
   }
   50% {
-    transform: scale(1.2) rotate(5deg);
-    opacity: 0.95;
+    transform: scale(1.15);
+    opacity: 0.8;
   }
 }
