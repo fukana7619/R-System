@@ -97,3 +97,14 @@ body {
     opacity: 0.8;
   }
 }
+
+/* ✨ 追加: パーティクル描画用キャンバスの設定 */
+#particle-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none; /* クリックなどを透過させる */
+  z-index: 0;           /* コアや文字（z-index: 1）の裏側に配置 */
+}
