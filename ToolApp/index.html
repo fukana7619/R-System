@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ファイル一覧（サイトマップ）</title>
+  <style>
+    :root {
+      --bg-color: #f6f8fa;
+      --card-bg: #ffffff;
+      --border-color: #d0d7de;
+      --text-color: #1f2328;
+      --link-color: #0969da;
+      --hover-bg: #f3f4f6;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      margin-top: 0;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-bar {
+      font-size: 0.85rem;
+      color: #57606a;
+      margin-bottom: 16px;
+      background: #f6f8fa;
+      padding: 8px 12px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    li:last-child {
+      border-bottom: none;
+    }
+
+    a {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      color: var(--link-color);
+      text-decoration: none;
+      font-size: 0.95rem;
+      border-radius: 4px;
+      transition: background-color 0.15s ease;
+    }
+
+    a:hover {
+      background-color: var(--hover-bg);
+      text-decoration: underline;
+    }
+
+    .icon {
+      margin-right: 10px;
+      font-size: 1.1rem;
+    }
+
+    .status-msg {
+      color: #57606a;
+      font-style: italic;
+      padding: 12px;
+    }
+
+    .error-msg {
+      color: #cf222e;
+      background: #ffebe9;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📂 フォルダ内ファイル一覧</h1>
+  <div id="info" class="info-bar">情報を取得中...</div>
+
+  <ul id="file-list">
+    <li class="status-msg">読み込み中...</li>
+  </ul>
+</div>
+
+<script>
+  // ==========================================
+  // ⚙️ 設定
+  // ==========================================
+  // 特定のフォルダ内だけを表示したい場合はここにフォルダ名を指定（例: 'projects' や 'docs/images'）
+  // ルート直下（またはこのindex.htmlがあるパス）の場合は空文字 '' のままでOK
+  const TARGET_FOLDER = ''; 
+
+  // ==========================================
+  // 🚀 自動取得 & 表示ロジック
+  // ==========================================
+  document.addEventListener('DOMContentLoaded', () => {
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
+
+    // ローカル実行時の簡易エラーハンドリング
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+      showError('GitHub Pages 上で実行してください（ローカル環境ではURLからの自動解析ができません）。');
+      return;
+    }
+
+    // URLからユーザー名を取得 (username.github.io -> username)
+    const USER = hostname.split('.')[0];
+
+    // パスを分解してリポジトリ名を取得
+    const pathSegments = pathname.split('/').filter(Boolean);
+    
+    // リポジトリ名判定（ユーザーページ名そのものの場合は分岐）
+    let REPO = '';
+    if (pathSegments.length > 0 && !hostname.startsWith(pathSegments[0])) {
+      REPO = pathSegments[0];
+    } else {
+      REPO = `${USER}.github.io`;
+    }
+
+    // 表示する対象パスの組み立て
+    // TARGET_FOLDER が指定されていなければ、現在のURLの階層構造からフォルダパスを抽出
+    let folderPath = TARGET_FOLDER;
+    if (!folderPath && pathSegments.length > (REPO === `${USER}.github.io` ? 0 : 1)) {
+      // index.html などを除いた純粋なフォルダパスを取得
+      const dirSegments = pathSegments.slice(REPO === `${USER}.github.io` ? 0 : 1);
+      if (dirSegments[dirSegments.length - 1].includes('.')) {
+        dirSegments.pop(); // index.html 等のファイル名を移動
+      }
+      folderPath = dirSegments.join('/');
+    }
+
+    // 画面に現在の読み込み情報を表示
+    document.getElementById('info').textContent = `Target: ${USER} / ${REPO} ${folderPath ? ' (/' + folderPath + ')' : ''}`;
+
+    // GitHub API URL の構築
+    const apiUrl = `https://api.github.com/repos/${USER}/${REPO}/contents/${folderPath}`;
+
+    // APIへリクエスト
+    fetch(apiUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`APIエラー (Status: ${response.status})`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        const listElement = document.getElementById('file-list');
+        listElement.innerHTML = ''; // 読み込みメッセージを消去
+
+        if (!Array.isArray(data) || data.length === 0) {
+          listElement.innerHTML = '<li class="status-msg">表示できるファイルがありません。</li>';
+          return;
+        }
+
+        // フォルダ優先、そのあとファイル名順でソート
+        data.sort((a, b) => {
+          if (a.type === b.type) return a.name.localeCompare(b.name);
+          return a.type === 'dir' ? -1 : 1;
+        });
+
+        data.forEach(item => {
+          // 自分自身 (index.html) やドットファイル (.gitignore等) を隠す場合
+          if (item.name === 'index.html' || item.name.startsWith('.')) {
+            return;
+          }
+
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          
+          // そのファイル/フォルダへの相対パス
+          a.href = `./${item.name}${item.type === 'dir' ? '/' : ''}`;
+          
+          // アイコンの設定
+          const icon = item.type === 'dir' ? '📁' : getFileIcon(item.name);
+          
+          a.innerHTML = `<span class="icon">${icon}</span> ${item.name}`;
+          li.appendChild(a);
+          listElement.appendChild(li);
+        });
+
+        if (listElement.children.length === 0) {
+          listElement.innerHTML = '<li class="status-msg">表示対象のファイルがありません。</li>';
+        }
+      })
+      .catch(error => {
+        showError(`ファイルの取得に失敗しました: ${error.message}`);
+      });
+  });
+
+  // ファイル拡張子に応じてアイコンを変えるプチ機能
+  function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'html': case 'htm': return '🌐';
+      case 'pdf': return '📄';
+      case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg': return '🖼️';
+      case 'zip': case 'rar': case '7z': return '📦';
+      case 'js': case 'css': case 'json': return '📜';
+      case 'md': return '📝';
+      return '📄';
+    }
+  }
+
+  function showError(msg) {
+    const listElement = document.getElementById('file-list');
+    listElement.innerHTML = `<li class="error-msg">${msg}</li>`;
+  }
+</script>
+
+</body>
+</html>
