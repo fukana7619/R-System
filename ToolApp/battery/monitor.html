@@ -378,6 +378,7 @@
         </div>
       </div>
       <div class="eta-line" id="etaLine">到達予定時刻を計算中...</div>
+      <div id="nextPctLine" style="margin-top: 6px; text-align: center; font-size: 10px; color: var(--dim);">次の 1% 変化まで: --</div>
     </div>
 
     <div class="details">
@@ -434,6 +435,7 @@
     mm: document.getElementById('mm'),
     ss: document.getElementById('ss'),
     etaLine: document.getElementById('etaLine'),
+    nextPctLine: document.getElementById('nextPctLine'), // ★追加
     nowClock: document.getElementById('nowClock'),
     totalSeconds: document.getElementById('totalSeconds'),
     manualPanel: document.getElementById('manualPanel'),
@@ -456,8 +458,9 @@
   let lastRecordedLevel = null;
   let lastRecordedTime = null;
   let secondsPerPercent = null;
-  let isFirstChange = true; // 起動直後の端数を捨てるフラグ
-  let estimatedTargetTimestamp = null; // ゴール（100% または 0%）の予定時刻(ミリ秒)
+  let isFirstChange = true;
+  let estimatedTargetTimestamp = null; // ゴール時刻(ミリ秒)
+  let nextPercentTimestamp = null;     // ★次の1%変化予定時刻(ミリ秒)
 
   // 手動モードの内部状態
   let manual = {
@@ -465,6 +468,7 @@
     charging: false,
     ratePercentPerNSec: { percent: 1, seconds: 5 },
     lastTick: Date.now(),
+    nextPercentSec: 5
   };
 
   function pad(n){ return String(Math.max(0, Math.floor(n))).padStart(2, '0'); }
@@ -518,6 +522,7 @@
       el.ss.textContent = '--';
       el.etaLine.textContent = secondsPerPercent === null ? '計測中...（1%以上変化すると計算を開始します）' : '推定時間を計算できません';
       el.totalSeconds.textContent = '-- 秒';
+      el.nextPctLine.textContent = '次の 1% 変化まで: --';
       return;
     }
 
@@ -534,6 +539,31 @@
       '<b>' + formatClock(eta) + '</b>（' + eta.getFullYear() + '/' + (eta.getMonth()+1) + '/' + eta.getDate() + '）';
 
     el.totalSeconds.textContent = Math.floor(totalSeconds).toLocaleString('ja-JP') + ' 秒';
+  }
+
+  // ★ 次の1%変化までの小表示を更新
+  function renderNextPercentCountdown(charging) {
+    if (mode === 'manual') {
+      const secPerPct = manual.ratePercentPerNSec.seconds / manual.ratePercentPerNSec.percent;
+      const currentProgress = (manual.level % 1);
+      const remainPct = charging ? (1 - currentProgress) : currentProgress;
+      const remainSec = Math.ceil((remainPct === 0 ? 1 : remainPct) * secPerPct);
+      
+      const actionText = charging ? '増加' : '減少';
+      el.nextPctLine.textContent = `次の 1% ${actionText}まで: 約 ${remainSec} 秒`;
+      return;
+    }
+
+    if (!nextPercentTimestamp) {
+      el.nextPctLine.textContent = '次の 1% 変化まで: 計測中...';
+      return;
+    }
+
+    const diffMs = nextPercentTimestamp - Date.now();
+    const remainSec = Math.max(0, Math.ceil(diffMs / 1000));
+    const actionText = charging ? '増加' : '減少';
+
+    el.nextPctLine.textContent = `次の 1% ${actionText}まで: 約 ${remainSec} 秒`;
   }
 
   function tickClock(){
@@ -553,9 +583,8 @@
 
       if (diffLevel > 0) {
         if (isFirstChange) {
-          isFirstChange = false; // 最初の変化（不規則な端数時間）は除外して精度を確保
+          isFirstChange = false; // 最初の不規則な端数時間をスキップ
         } else {
-          // 純粋な 1% あたりの所要秒数を計算
           secondsPerPercent = diffTime / diffLevel;
         }
       }
@@ -564,10 +593,11 @@
     lastRecordedLevel = currentLevel;
     lastRecordedTime = now;
 
-    // ゴール時刻（タイムスタンプ）を更新
+    // ゴール時刻 & 次の1%予定時刻の更新
     if (secondsPerPercent !== null) {
       const remainingPercent = battery.charging ? (100 - currentLevel) : currentLevel;
       estimatedTargetTimestamp = now + (remainingPercent * secondsPerPercent * 1000);
+      nextPercentTimestamp = now + (secondsPerPercent * 1000); // ★ 次の1%更新予定時刻
     }
   }
 
@@ -581,11 +611,11 @@
     });
 
     bat.addEventListener('chargingchange', () => {
-      // 状態変更時は計測用変数をリセット
       lastRecordedLevel = null;
       lastRecordedTime = null;
       secondsPerPercent = null;
       estimatedTargetTimestamp = null;
+      nextPercentTimestamp = null;
       isFirstChange = true;
 
       trackBatteryPace();
@@ -594,7 +624,7 @@
 
     trackBatteryPace();
     updateFromReal();
-    el.footerNote.textContent = 'Battery Status API と自前計測ロジックを併用しています。1%ごとの変化速度から到達時間を独自計算しています。';
+    el.footerNote.textContent = 'Battery Status API と自前計測ロジックを併用しています。1%ごとの変化速度から到達時間および次の1%変化を動的に計算しています。';
   }
 
   function updateFromReal(){
@@ -602,15 +632,15 @@
     const levelPct = battery.level * 100;
     renderLevel(levelPct, battery.charging);
 
-    // リアルタイムでの残り秒数計算
     if (estimatedTargetTimestamp) {
       const remainingMs = estimatedTargetTimestamp - Date.now();
       const remainingSec = Math.max(0, remainingMs / 1000);
       renderTimer(remainingSec, battery.charging, false);
     } else {
-      // まだ1%の変化が計測できていない場合
       renderTimer(null, battery.charging, true);
     }
+
+    renderNextPercentCountdown(battery.charging);
   }
 
   function enterManualMode(reason){
@@ -642,6 +672,8 @@
       remainingSeconds = remainPercent <= 0 ? 0 : remainPercent * secondsPerPercent;
       renderTimer(remainingSeconds, false, manual.level <= 0);
     }
+
+    renderNextPercentCountdown(manual.charging);
   }
 
   function manualLoop(){
@@ -707,7 +739,6 @@
       if(mode === 'manual'){
         manualLoop();
       } else if(mode === 'real' && battery){
-        // 1秒ごとに自前計算のカウントダウン表示を更新
         updateFromReal();
       }
     }, 1000);
