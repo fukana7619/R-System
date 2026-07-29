@@ -11,11 +11,11 @@ let isPercentMode = true;
 // ヒステリシス付き：境界付近の細かい行き来でパタパタ切り替わらないようにする
 let currentMood = null; // 'critical' | 'normal' | 'content'
 
-// 呼吸パラメータ（CSS変数と対応）。JS側でも同じ値を持ち、不規則な呼吸の計算に使う
+// 呼吸パラメータ（CSS変数と対応)。JS側でも同じ値を持ち、不規則な呼吸の計算に使う
 const MOOD_BREATH = {
-  critical: { speed: 3.2, minScale: 0.93, maxScale: 1.06, minOpacity: 0.45, maxOpacity: 0.75 },
-  normal:   { speed: 10,  minScale: 0.85, maxScale: 1.15, minOpacity: 0.4,  maxOpacity: 0.8  },
-  content:  { speed: 14,  minScale: 0.9,  maxScale: 1.25, minOpacity: 0.45, maxOpacity: 0.85 }
+  critical: { speed: 3.2, minScale: 0.93, maxScale: 1.06, minOpacity: 0.45, maxOpacity: 0.75, glowRGB: '255, 120, 70' },
+  normal:   { speed: 10,  minScale: 0.85, maxScale: 1.15, minOpacity: 0.4,  maxOpacity: 0.8,  glowRGB: '64, 224, 208' },
+  content:  { speed: 14,  minScale: 0.9,  maxScale: 1.25, minOpacity: 0.45, maxOpacity: 0.85, glowRGB: '140, 250, 230' }
 };
 
 function decideMood(level, prevMood) {
@@ -75,6 +75,10 @@ async function initPresence() {
   // ゆらぎ用のノイズ（毎フレーム小さく動かす、慣性つきランダムウォーク）
   let breathNoise = 0;
   let breathNoiseVelocity = 0;
+
+  // --- 3Dの傾き（rotateX/Y）用の慣性ノイズ。呼吸とは独立したゆっくりした漂い ---
+  let tiltX = 0, tiltXVel = 0;
+  let tiltY = 0, tiltYVel = 0;
 
   // --- 気づき演出（状態が変わった瞬間、ハッと反応する） ---
   triggerNotice = function () {
@@ -178,7 +182,7 @@ async function initPresence() {
       });
     }
 
-    // --- 不規則な呼吸（グローのscale/opacityを直接計算） ---
+    // --- 不規則な呼吸（奥行き・傾き・視差を含む3D的な動き） ---
     // 気づき演出（noticing）の最中はCSS側のワンショットアニメーションに主導権を譲る
     if (glowEl && !glowEl.classList.contains('noticing')) {
       const breath = MOOD_BREATH[currentMood] || MOOD_BREATH.normal;
@@ -198,12 +202,47 @@ async function initPresence() {
 
       const t = (wave + 1) / 2 + breathNoise; // 0〜1程度に正規化（ノイズ分は多少はみ出す）
       const clampedT = Math.max(0, Math.min(1, t));
+      const centered = clampedT - 0.5; // -0.5〜0.5。奥行きや傾きの符号付き計算に使う
 
-      const scale = breath.minScale + (breath.maxScale - breath.minScale) * clampedT;
-      const opacity = breath.minOpacity + (breath.maxOpacity - breath.minOpacity) * clampedT;
+      // --- 傾き（rotateX/Y）：呼吸とは別のゆっくりした慣性ノイズで、生き物が漂うような傾き ---
+      tiltXVel += (Math.random() - 0.5) * 0.008;
+      tiltXVel *= 0.95;
+      tiltX += tiltXVel;
+      tiltX = Math.max(-1, Math.min(1, tiltX));
 
-      glowEl.style.transform = `scale(${scale.toFixed(4)})`;
-      glowEl.style.opacity = opacity.toFixed(4);
+      tiltYVel += (Math.random() - 0.5) * 0.008;
+      tiltYVel *= 0.95;
+      tiltY += tiltYVel;
+      tiltY = Math.max(-1, Math.min(1, tiltY));
+
+      const maxTiltDeg = 2.2; // 傾きは控えめに（大きすぎると安っぽくなる）
+      const rotX = tiltX * maxTiltDeg;
+      const rotY = tiltY * maxTiltDeg;
+
+      // --- グロー（奥のレイヤー：視差で動きは小さく、少し遅れて追従する） ---
+      const glowScale = breath.minScale + (breath.maxScale - breath.minScale) * clampedT;
+      const glowOpacity = breath.minOpacity + (breath.maxOpacity - breath.minOpacity) * clampedT;
+      const glowZ = centered * 30; // 奥行き：-15px 〜 +15px 程度、控えめに漂う
+
+      glowEl.style.transform =
+        `translateZ(${glowZ.toFixed(2)}px) rotateX(${(rotX * 0.6).toFixed(3)}deg) rotateY(${(rotY * 0.6).toFixed(3)}deg) scale(${glowScale.toFixed(4)})`;
+      glowEl.style.opacity = glowOpacity.toFixed(4);
+
+      // --- テキスト（手前のレイヤー：視差で動きが大きく、グローより敏感に反応する） ---
+      if (displayTextEl && !displayTextEl.classList.contains('morphing') && !displayTextEl.classList.contains('noticing')) {
+        // 奥行き：呼吸が深いところで手前にせり出す（グローより大きい振幅で視差を作る）
+        const textZ = centered * 70; // -35px 〜 +35px
+        const floatY = centered * 3; // -1.5px 〜 +1.5px
+
+        displayTextEl.style.transform =
+          `translateZ(${textZ.toFixed(2)}px) translateY(${floatY.toFixed(2)}px) rotateX(${rotX.toFixed(3)}deg) rotateY(${rotY.toFixed(3)}deg) scale(1)`;
+
+        // グロー：文字の光の強弱も呼吸に合わせて変化させる
+        const glowRGB = battery.charging ? '0, 200, 255' : breath.glowRGB;
+        const blurRadius = 25 + clampedT * 20; // 25px 〜 45px
+        const glowAlpha = 0.28 + clampedT * 0.34; // 0.28 〜 0.62
+        displayTextEl.style.textShadow = `0 0 ${blurRadius.toFixed(1)}px rgba(${glowRGB}, ${glowAlpha.toFixed(3)})`;
+      }
     }
 
     requestAnimationFrame(loop);
