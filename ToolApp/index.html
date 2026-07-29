@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>インデックス / サイトマップ</title>
+  <title>インデックス / ファイルエクスプローラー</title>
   <style>
     :root {
       --bg-color: #0d1117;
@@ -15,9 +15,7 @@
       --hover-bg: #21262d;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -31,33 +29,50 @@
 
     .wrapper {
       width: 100%;
-      max-width: 720px;
+      max-width: 760px;
     }
 
     header {
-      margin-bottom: 24px;
-      text-align: left;
+      margin-bottom: 20px;
     }
 
     h1 {
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       font-weight: 600;
-      margin: 0 0 8px 0;
+      margin: 0 0 12px 0;
+      color: #f0f6fc;
       display: flex;
       align-items: center;
-      gap: 10px;
-      color: #f0f6fc;
+      gap: 8px;
     }
 
-    .path-badge {
-      font-size: 0.85rem;
-      color: var(--text-sub);
+    /* パンくずリスト（ディレクトリ移動バー） */
+    .breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
       background: var(--card-bg);
       border: 1px solid var(--border-color);
-      padding: 6px 12px;
-      border-radius: 20px;
-      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
       font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+    }
+
+    .breadcrumb a {
+      color: var(--accent-color);
+      text-decoration: none;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .breadcrumb a:hover {
+      background-color: var(--hover-bg);
+    }
+
+    .breadcrumb .separator {
+      color: var(--text-sub);
     }
 
     .file-card {
@@ -66,6 +81,7 @@
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      margin-top: 16px;
     }
 
     ul {
@@ -82,19 +98,23 @@
       border-bottom: none;
     }
 
-    a {
+    .item-link {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 20px;
-      color: var(--accent-color);
+      padding: 12px 20px;
+      color: var(--text-main);
       text-decoration: none;
-      transition: background-color 0.2s ease, transform 0.1s ease;
+      transition: background-color 0.15s ease;
+      cursor: pointer;
     }
 
-    a:hover {
+    .item-link:hover {
       background-color: var(--hover-bg);
-      text-decoration: none;
+    }
+
+    .item-link.is-dir {
+      color: var(--accent-color);
     }
 
     .file-info {
@@ -126,17 +146,16 @@
       font-size: 0.95rem;
     }
 
-    .error-msg {
-      color: #ff7b72;
-    }
+    .error-msg { color: #ff7b72; }
   </style>
 </head>
 <body>
 
 <div class="wrapper">
   <header>
-    <h1>📂 INDEX</h1>
-    <div id="path-display" class="path-badge">Loading...</div>
+    <h1>📂 EXPLORER</h1>
+    <nav id="breadcrumb" class="breadcrumb">
+      </nav>
   </header>
 
   <main class="file-card">
@@ -147,7 +166,9 @@
 </div>
 
 <script>
-  const TARGET_FOLDER = ''; // 特定のフォルダを指定したい場合はここに記入（例: 'projects'）
+  let USER = '';
+  let REPO = '';
+  let BASE_PATH = ''; // 初期設置場所のベースパス
 
   document.addEventListener('DOMContentLoaded', () => {
     const hostname = window.location.hostname;
@@ -158,28 +179,42 @@
       return;
     }
 
-    const USER = hostname.split('.')[0];
+    USER = hostname.split('.')[0];
     const pathSegments = pathname.split('/').filter(Boolean);
     
-    let REPO = '';
     if (pathSegments.length > 0 && !hostname.startsWith(pathSegments[0])) {
       REPO = pathSegments[0];
     } else {
       REPO = `${USER}.github.io`;
     }
 
-    let folderPath = TARGET_FOLDER;
-    if (!folderPath && pathSegments.length > (REPO === `${USER}.github.io` ? 0 : 1)) {
-      const dirSegments = pathSegments.slice(REPO === `${USER}.github.io` ? 0 : 1);
-      if (dirSegments[dirSegments.length - 1].includes('.')) {
-        dirSegments.pop();
-      }
-      folderPath = dirSegments.join('/');
+    // index.html が配置されているディレクトリ階層を取得
+    const dirSegments = pathSegments.slice(REPO === `${USER}.github.io` ? 0 : 1);
+    if (dirSegments.length > 0 && dirSegments[dirSegments.length - 1].includes('.')) {
+      dirSegments.pop();
+    }
+    BASE_PATH = dirSegments.join('/');
+
+    // URLのハッシュ変化（#/folder1 など）を検知して描画を更新
+    window.addEventListener('hashchange', loadDirectory);
+    
+    // 初回読み込み
+    loadDirectory();
+  });
+
+  function loadDirectory() {
+    // URLのハッシュ（#以降）から現在表示すべき相対パスを取得
+    let hashPath = window.location.hash.replace(/^#\/?/, '');
+    
+    // ベースパスと組み合わせる
+    let currentPath = BASE_PATH;
+    if (hashPath) {
+      currentPath = BASE_PATH ? `${BASE_PATH}/${hashPath}` : hashPath;
     }
 
-    document.getElementById('path-display').textContent = `/${REPO}${folderPath ? '/' + folderPath : ''}`;
+    updateBreadcrumb(hashPath);
 
-    const apiUrl = `https://api.github.com/repos/${USER}/${REPO}/contents/${folderPath}`;
+    const apiUrl = `https://api.github.com/repos/${USER}/${REPO}/contents/${currentPath}`;
 
     fetch(apiUrl)
       .then(response => {
@@ -191,8 +226,26 @@
         listElement.innerHTML = '';
 
         if (!Array.isArray(data) || data.length === 0) {
-          listElement.innerHTML = '<li class="status-msg">ファイルが見つかりません。</li>';
+          listElement.innerHTML = '<li class="status-msg">このフォルダは空です。</li>';
           return;
+        }
+
+        // 1つ上の階層へ行くボタン（ルート階層でない場合のみ表示）
+        if (hashPath) {
+          const parentHash = hashPath.split('/').slice(0, -1).join('/');
+          const parentUrl = parentHash ? `#/${parentHash}` : '#/';
+          
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <a href="${parentUrl}" class="item-link is-dir">
+              <div class="file-info">
+                <span class="file-icon">⬆️</span>
+                <span>.. (上の階層へ)</span>
+              </div>
+              <span class="file-type-badge">UP</span>
+            </a>
+          `;
+          listElement.appendChild(li);
         }
 
         // フォルダ優先ソート
@@ -205,33 +258,54 @@
           if (item.name === 'index.html' || item.name.startsWith('.')) return;
 
           const li = document.createElement('li');
-          const a = document.createElement('a');
+          const isDir = item.type === 'dir';
           
-          a.href = `./${item.name}${item.type === 'dir' ? '/' : ''}`;
-          
-          const icon = item.type === 'dir' ? '📁' : getFileIcon(item.name);
-          const ext = item.type === 'dir' ? 'DIR' : item.name.split('.').pop();
+          // フォルダならハッシュ変更（ページ内遷移）、ファイルなら実際のファイルを開く
+          const targetUrl = isDir 
+            ? `#/${hashPath ? hashPath + '/' : ''}${item.name}`
+            : `./${item.name}`;
 
-          a.innerHTML = `
-            <div class="file-info">
-              <span class="file-icon">${icon}</span>
-              <span>${item.name}</span>
-            </div>
-            <span class="file-type-badge">${ext}</span>
+          const icon = isDir ? '📁' : getFileIcon(item.name);
+          const ext = isDir ? 'DIR' : item.name.split('.').pop();
+
+          li.innerHTML = `
+            <a href="${targetUrl}" class="item-link ${isDir ? 'is-dir' : ''}" ${!isDir ? 'target="_blank"' : ''}>
+              <div class="file-info">
+                <span class="file-icon">${icon}</span>
+                <span>${item.name}</span>
+              </div>
+                <span class="file-type-badge">${ext}</span>
+            </a>
           `;
           
-          li.appendChild(a);
           listElement.appendChild(li);
         });
 
         if (listElement.children.length === 0) {
-          listElement.innerHTML = '<li class="status-msg">表示するファイルがありません。</li>';
+          listElement.innerHTML = '<li class="status-msg">表示できるファイルがありません。</li>';
         }
       })
       .catch(error => {
         showError(`取得エラー: ${error.message}`);
       });
-  });
+  }
+
+  // パンくずリスト（階層ナビ）の生成
+  function updateBreadcrumb(hashPath) {
+    const nav = document.getElementById('breadcrumb');
+    let html = `<a href="#/">root</a>`;
+    
+    if (hashPath) {
+      const parts = hashPath.split('/');
+      let accumulatedPath = '';
+      
+      parts.forEach(part => {
+        accumulatedPath += (accumulatedPath ? '/' : '') + part;
+        html += ` <span class="separator">/</span> <a href="#/${accumulatedPath}">${part}</a>`;
+      });
+    }
+    nav.innerHTML = html;
+  }
 
   function getFileIcon(filename) {
     const ext = filename.split('.').pop().toLowerCase();
