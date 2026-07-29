@@ -3,15 +3,62 @@
   padding: 0;
   box-sizing: border-box;
 }
-
 :root {
+  /* デフォルト（通常帯）の値。JSがmood属性に応じて上書きする */
   --bg-color: #020204;
   --glow-color: rgba(64, 224, 208, 0.15);
   --text-color: #e0f7fa;
   --text-glow: rgba(64, 224, 208, 0.4);
   --pulse-speed: 10s;
+  --pulse-min-scale: 0.85;
+  --pulse-max-scale: 1.15;
+  --pulse-min-opacity: 0.4;
+  --pulse-max-opacity: 0.8;
+  --glow-size: 380px;
 }
 
+/* --- 残量帯による「気分」の違い --- */
+/* 危機的：浅く速い呼吸、心もとない琥珀〜赤 */
+body[data-mood="critical"] {
+  --bg-color: #050202;
+  --glow-color: rgba(255, 106, 61, 0.22);
+  --text-color: #ffe3d1;
+  --text-glow: rgba(255, 120, 70, 0.55);
+  --pulse-speed: 3.2s;
+  --pulse-min-scale: 0.93;
+  --pulse-max-scale: 1.06;
+  --pulse-min-opacity: 0.45;
+  --pulse-max-opacity: 0.75;
+  --glow-size: 340px;
+}
+/* 通常：落ち着いたシアン（既存の雰囲気） */
+body[data-mood="normal"] {
+  --bg-color: #020204;
+  --glow-color: rgba(64, 224, 208, 0.15);
+  --text-color: #e0f7fa;
+  --text-glow: rgba(64, 224, 208, 0.4);
+  --pulse-speed: 10s;
+  --pulse-min-scale: 0.85;
+  --pulse-max-scale: 1.15;
+  --pulse-min-opacity: 0.4;
+  --pulse-max-opacity: 0.8;
+  --glow-size: 380px;
+}
+/* 満足：深みのある青緑、ゆったり大きい呼吸 */
+body[data-mood="content"] {
+  --bg-color: #010407;
+  --glow-color: rgba(120, 240, 220, 0.2);
+  --text-color: #f0fffb;
+  --text-glow: rgba(140, 250, 230, 0.5);
+  --pulse-speed: 14s;
+  --pulse-min-scale: 0.9;
+  --pulse-max-scale: 1.25;
+  --pulse-min-opacity: 0.45;
+  --pulse-max-opacity: 0.85;
+  --glow-size: 440px;
+}
+
+/* 充電中は青系のオーバーレイを優先（どの残量帯でも共通の"喜び"） */
 body.is-charging {
   --bg-color: #01060e;
   --glow-color: rgba(0, 180, 255, 0.25);
@@ -28,14 +75,12 @@ body {
   align-items: center;
   min-height: 100vh;
   width: 100vw;
-  overflow: hidden; /* ✨ 予期せぬはみ出し（はみ出して右寄りに見える現象）を徹底防止 */
+  overflow: hidden;
   position: relative;
-  transition: background-color 10s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 10s cubic-bezier(0.16, 1, 0.3, 1), color 6s ease;
 }
-
-/* ✨ 背景キャンバスの固定 */
 #particle-canvas {
-  position: fixed; /* absolute から fixed に変更して画面に完全固定 */
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -43,28 +88,25 @@ body {
   pointer-events: none;
   z-index: 0;
 }
-
 .core-container {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 1; /* 光や文字を全面に出す */
+  z-index: 1;
 }
-
 .core-glow {
   position: absolute;
-  width: 380px;
-  height: 380px;
+  width: var(--glow-size);
+  height: var(--glow-size);
   background: radial-gradient(circle, var(--glow-color) 0%, rgba(2, 2, 4, 0) 70%);
   border-radius: 50%;
   filter: blur(40px);
   animation: breathe var(--pulse-speed) infinite ease-in-out;
   pointer-events: none;
-  transition: background 10s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 10s cubic-bezier(0.16, 1, 0.3, 1), width 8s cubic-bezier(0.16, 1, 0.3, 1), height 8s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
 .display-text {
   font-size: 4.5rem;
   font-weight: 200;
@@ -74,8 +116,6 @@ body {
   user-select: none;
   text-align: center;
   white-space: nowrap;
-
-  /* トランジション */
   opacity: 1;
   filter: blur(0px);
   transform: scale(1);
@@ -85,20 +125,29 @@ body {
     transform 4s cubic-bezier(0.16, 1, 0.3, 1),
     text-shadow 8s ease;
 }
-
 .display-text.morphing {
   opacity: 0;
   filter: blur(12px);
   transform: scale(0.95);
 }
-
 @keyframes breathe {
   0%, 100% {
-    transform: scale(0.85);
-    opacity: 0.4;
+    transform: scale(var(--pulse-min-scale));
+    opacity: var(--pulse-min-opacity);
   }
   50% {
-    transform: scale(1.15);
-    opacity: 0.8;
+    transform: scale(var(--pulse-max-scale));
+    opacity: var(--pulse-max-opacity);
   }
+}
+
+/* 危機的な状態のときだけ、テキストにもかすかな不安げな明滅を足す */
+body[data-mood="critical"] .display-text:not(.morphing) {
+  animation: flicker-uneasy 3.2s infinite ease-in-out;
+}
+@keyframes flicker-uneasy {
+  0%, 100% { opacity: 1; }
+  48% { opacity: 1; }
+  50% { opacity: 0.82; }
+  52% { opacity: 1; }
 }
