@@ -7,6 +7,32 @@ let currentDisplayLevel = 0;
 let targetLevel = 0;
 let isPercentMode = true;
 
+// --- 残量帯（気分）の判定 ---
+// ヒステリシス付き：境界付近の細かい行き来でパタパタ切り替わらないようにする
+let currentMood = null; // 'critical' | 'normal' | 'content'
+
+function decideMood(level, prevMood) {
+  // 境界にちょっとした「のりしろ」を持たせる
+  if (prevMood === 'critical') {
+    return level < 18 ? 'critical' : (level < 82 ? 'normal' : 'content');
+  }
+  if (prevMood === 'content') {
+    return level > 78 ? 'content' : (level > 12 ? 'normal' : 'critical');
+  }
+  // normal、または初回判定
+  if (level < 12) return 'critical';
+  if (level > 82) return 'content';
+  return 'normal';
+}
+
+function applyMood(level) {
+  const nextMood = decideMood(level, currentMood);
+  if (nextMood !== currentMood) {
+    currentMood = nextMood;
+    document.body.setAttribute('data-mood', currentMood);
+  }
+}
+
 // --- 自前で計測するための変数 ---
 let lastRecordedLevel = null;
 let lastRecordedTime = null;
@@ -81,6 +107,7 @@ async function initPresence() {
   targetLevel = battery.level * 100;
   currentDisplayLevel = targetLevel;
   displayTextEl.innerText = Math.round(currentDisplayLevel) + '%';
+  applyMood(targetLevel);
 
   // 1. 描画 ＆ リアルタイム更新ループ（毎フレーム実行）
   function loop() {
@@ -189,6 +216,7 @@ async function initPresence() {
   // 5. 表示内容の思考・切り替えロジック
   function updateInformation() {
     targetLevel = battery.level * 100;
+    applyMood(targetLevel);
 
     if (battery.charging) {
       document.body.classList.add('is-charging');
@@ -213,6 +241,7 @@ async function initPresence() {
   // イベント検知
   battery.addEventListener('levelchange', () => { 
     targetLevel = battery.level * 100;
+    applyMood(targetLevel);
     trackBatteryPace();
   });
 
