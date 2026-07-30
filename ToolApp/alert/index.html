@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多機能Webタイマー</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="timer-container" id="timerContainer">
+    <div class="mode-selector hide-in-fs">
+      <button id="modeTimerBtn" class="active">タイマー</button>
+      <button id="modeSwBtn">ストップウォッチ</button>
+      <button id="modeAlarmBtn">アラーム</button>
+    </div>
+
+    <div id="display">00:00:00</div>
+
+    <div class="input-group hide-in-fs" id="inputTimerGroup">
+      <input type="number" id="inputMin" min="0" max="999" placeholder="分"> 分
+      <input type="number" id="inputSec" min="0" max="59" placeholder="秒"> 秒
+      <button id="setTimerBtn">設定</button>
+    </div>
+
+    <div class="input-group hide-in-fs" id="inputAlarmGroup" style="display: none;">
+      <input type="time" id="alarmTimeInput" step="1">
+      <button id="setAlarmBtn">アラームセット</button>
+      <div id="alarmStatus" class="status-text"></div>
+    </div>
+
+    <div class="controls" id="controlsArea">
+      <button id="startBtn">スタート</button>
+      <button id="stopBtn">ストップ</button>
+      <button id="resetBtn" class="hide-in-fs">リセット</button>
+    </div>
+
+    <button id="fullscreenBtn" class="fs-btn hide-in-fs">⛶ 全画面表示</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

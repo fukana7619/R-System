@@ -1,0 +1,181 @@
+/* 全体スタイル（黒背景） */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0f0f11;
+  color: #ffffff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.timer-container {
+  background-color: #1a1a1e;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  width: 380px;
+  border: 1px solid #2a2a30;
+  position: relative; /* ボタンの絶対配置用 */
+}
+
+/* モード切り替えボタン */
+.mode-selector {
+  margin-bottom: 20px;
+}
+
+.mode-selector button {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 15px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: 0.3s;
+}
+
+.mode-selector button.active {
+  color: #00adb5;
+  border-bottom: 2px solid #00adb5;
+  font-weight: bold;
+}
+
+/* 時間表示 */
+#display {
+  font-size: 56px;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
+  margin: 20px 0;
+  letter-spacing: 2px;
+  color: #00adb5;
+  transition: color 0.3s ease;
+}
+
+#display.time-up {
+  color: #ff3b30;
+  text-shadow: 0 0 20px rgba(255, 59, 48, 0.6);
+}
+
+/* 入力フォーム */
+.input-group {
+  margin-bottom: 20px;
+  color: #ccc;
+}
+
+.input-group input[type="number"],
+.input-group input[type="time"] {
+  padding: 8px;
+  background: #2a2a30;
+  border: 1px solid #444;
+  color: #fff;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.input-group input[type="number"] {
+  width: 60px;
+}
+
+.status-text {
+  font-size: 13px;
+  color: #00adb5;
+  margin-top: 8px;
+}
+
+/* 各種ボタン */
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+  margin: 4px;
+}
+
+.controls button {
+  background-color: #393e46;
+  color: #fff;
+}
+
+.controls button:hover {
+  background-color: #00adb5;
+}
+
+#setTimerBtn, #setAlarmBtn {
+  background-color: #222831;
+  color: #00adb5;
+  border: 1px solid #00adb5;
+}
+
+.fs-btn {
+  margin-top: 20px;
+  background: transparent;
+  color: #666;
+  font-size: 13px;
+}
+
+.fs-btn:hover {
+  color: #aaa;
+}
+
+/* === 全画面表示時のUI調整 === */
+:fullscreen body {
+  background-color: #000;
+}
+
+:fullscreen .timer-container {
+  width: 100vw;
+  height: 100vh;
+  border: none;
+  border-radius: 0;
+  background-color: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* 完全に隠す要素 */
+:fullscreen .hide-in-fs {
+  display: none !important;
+}
+
+/* 表示を極大化 */
+:fullscreen #display {
+  font-size: 20vw;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* コントロールエリア（全画面時は画面下部に配置してアニメーション） */
+.controls {
+  transition: opacity 0.5s ease;
+}
+
+:fullscreen .controls {
+  position: absolute;
+  bottom: 40px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  opacity: 1; /* 初期状態は表示 */
+}
+
+/* マウス3秒停止時のフェードアウト */
+:fullscreen .controls.fade-out {
+  opacity: 0;
+  pointer-events: none; /* 消えている時は押せないようにする */
+}
+
+/* JS側で「全画面時のみ特定のボタンを隠す」ためのクラス */
+:fullscreen .fs-hide-btn {
+  display: none !important;
+}
