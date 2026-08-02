@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>課題進捗チェッカー</title>
+  <title>タスク進捗管理</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,9 +11,21 @@
 <div class="container">
   <div class="battery-display" id="batteryDisplay">🔋 --%</div>
 
-  <h1>課題進捗チェッカー</h1>
+  <h1>タスク進捗管理</h1>
 
-  <div class="clock-display" id="clockDisplay">00:00:00</div>
+  <div class="display-container" id="displayContainer">
+    <div class="main-display" id="mainDisplay">00:00:00</div>
+    <div class="sub-display" id="subDisplay"></div>
+  </div>
+
+  <div class="display-mode-selector">
+    <label>表示設定:</label>
+    <select id="displayModeSelect" onchange="changeDisplayMode(this.value)">
+      <option value="countdown">⏳ 直近の期限カウントダウン</option>
+      <option value="clock">⏰ リアルタイム時計</option>
+      <option value="none">🙈 表示なし</option>
+    </select>
+  </div>
   
   <div class="progress-container">
     <div class="progress-bar" id="progressBar"></div>
@@ -22,31 +34,60 @@
   <div class="percentage-text" id="percentDisplay">0.0%</div>
 
   <div class="tasks-wrapper" id="tasksWrapper">
+    <div class="sort-container">
+      <label for="sortSelect">並び順:</label>
+      <select id="sortSelect" onchange="changeSortMode(this.value)">
+        <option value="deadline">📅 期限順 (近い順)</option>
+        <option value="name">🔤 名前順</option>
+        <option value="progressAsc">📉 進捗が低い順</option>
+        <option value="progressDesc">📈 進捗が高い順</option>
+      </select>
+    </div>
+
     <div id="taskList"></div>
 
-    <button class="btn-primary btn-add-task" onclick="openTaskModal()">＋ 新しい課題を追加</button>
+    <button class="btn-primary btn-add-task" onclick="openTaskModal()">＋ 新しいタスクを追加</button>
   </div>
 </div>
 
 <div class="modal-overlay" id="taskModal">
   <div class="modal-content">
-    <h2 id="modalTitle">課題の追加</h2>
+    <h2 id="modalTitle">タスクの追加</h2>
     <form id="taskForm" onsubmit="saveTask(event)">
       <input type="hidden" id="taskId">
       
       <div class="form-group">
-        <label for="taskName">課題名</label>
-        <input type="text" id="taskName" placeholder="例: 数学 夏季テキスト" required>
+        <label for="taskName">タスク名</label>
+        <input type="text" id="taskName" placeholder="例: 数学レポート / 部屋の掃除" required>
+      </div>
+
+      <div class="form-group-row">
+        <div class="form-group">
+          <label for="totalPages">作業量</label>
+          <input type="number" id="totalPages" min="1" placeholder="単発なら1 (空欄可)">
+        </div>
+        <div class="form-group">
+          <label for="unitName">単位</label>
+          <select id="unitName">
+            <option value="p">p (ページ)</option>
+            <option value="回">回</option>
+            <option value="個">個</option>
+            <option value="章">章</option>
+          </select>
+        </div>
       </div>
 
       <div class="form-group">
-        <label for="totalPages">総ページ数 (p)</label>
-        <input type="number" id="totalPages" min="1" placeholder="例: 30" required>
-      </div>
-
-      <div class="form-group">
-        <label for="pageTime">1ページあたりの所要時間 (分)</label>
+        <label for="pageTime">1単位あたりの所要時間 (分)</label>
         <input type="number" id="pageTime" min="1" placeholder="例: 15" required>
+      </div>
+
+      <div class="form-group">
+        <label>提出期限 (任意)</label>
+        <div class="datetime-inputs">
+          <input type="date" id="deadlineDate">
+          <input type="time" id="deadlineTime">
+        </div>
       </div>
 
       <div class="modal-actions">
