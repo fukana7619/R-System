@@ -1,45 +1,80 @@
 // ===================================
-// 💾 LocalDB (localStorage) & データ管理
+// 💾 LocalDB & データ管理
 // ===================================
-const STORAGE_KEY = 'homework_progress_tasks_v1';
+const STORAGE_KEY_V1 = 'homework_progress_tasks_v1';
+const STORAGE_KEY_V2 = 'homework_progress_tasks_v2';
+const SETTINGS_KEY = 'homework_progress_settings_v2';
 
-// 初期状態のタスク配列
 let tasks = loadTasks();
+let settings = loadSettings();
 
 let currentPercent = 0;
 let animationFrameId = null;
 
 function loadTasks() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
+  // まず V2 のデータを読み込む
+  const savedV2 = localStorage.getItem(STORAGE_KEY_V2);
+  if (savedV2) {
+    try { return JSON.parse(savedV2); } catch (e) {}
+  }
+
+  // V2 がなくて V1 のデータがある場合は引き継ぐ（移行処理）
+  const savedV1 = localStorage.getItem(STORAGE_KEY_V1);
+  if (savedV1) {
     try {
-      return JSON.parse(saved);
+      const oldTasks = JSON.parse(savedV1);
+      
+      // V1 データを V2 の形式に整える
+      const migratedTasks = oldTasks.map(task => ({
+        name: task.name || '無題のタスク',
+        totalPages: task.totalPages || 1,
+        completedPages: task.completedPages || 0,
+        pageTime: task.pageTime || 15,
+        unit: task.unit || 'p',
+        deadline: task.deadline || ''
+      }));
+
+      // V2のキーに保存し直す
+      localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(migratedTasks));
+      return migratedTasks;
     } catch (e) {
-      console.error('Failed to parse tasks from localStorage', e);
+      console.error('V1データの移行に失敗しました', e);
     }
   }
-  return []; // 初期状態は空配列
+
+  return [];
 }
 
 function saveTasksToStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(tasks)); // 👈 STORAGE_KEY_V2 に修正
+}
+
+function loadSettings() {
+  const saved = localStorage.getItem(SETTINGS_KEY);
+  if (saved) {
+    try { return JSON.parse(saved); } catch (e) {}
+  }
+  return { displayMode: 'countdown', sortMode: 'deadline' };
+}
+
+function saveSettingsToStorage() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 // ===================================
-// 🔋 電池残量表示機能
+// 🔋 電池残量表示
 // ===================================
 function initBattery() {
   if ('getBattery' in navigator) {
     navigator.getBattery().then(battery => {
-      function updateBatteryInfo() {
+      function update() {
         const level = Math.floor(battery.level * 100);
         const isCharging = battery.charging ? '⚡' : '🔋';
         document.getElementById('batteryDisplay').innerText = `${isCharging} ${level}%`;
       }
-      
-      updateBatteryInfo();
-      battery.addEventListener('levelchange', updateBatteryInfo);
-      battery.addEventListener('chargingchange', updateBatteryInfo);
+      update();
+      battery.addEventListener('levelchange', update);
+      battery.addEventListener('chargingchange', update);
     });
   } else {
     document.getElementById('batteryDisplay').innerText = '🔋 --%';
@@ -48,47 +83,107 @@ function initBattery() {
 initBattery();
 
 // ===================================
-// ⏰ リアルタイム時計
+// ⏰ タイマー＆ディスプレイ制御
 // ===================================
-function updateClock() {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  
-  const clockElement = document.getElementById('clockDisplay');
-  if (clockElement) {
-    clockElement.innerText = `${hours}:${minutes}:${seconds}`;
+function updateDisplay() {
+  const mainEl = document.getElementById('mainDisplay');
+  const subEl = document.getElementById('subDisplay');
+  const containerEl = document.getElementById('displayContainer');
+
+  if (settings.displayMode === 'none') {
+    containerEl.style.display = 'none';
+    return;
+  }
+  containerEl.style.display = 'block';
+
+  if (settings.displayMode === 'clock') {
+    const now = new Date();
+    mainEl.innerText = now.toTimeString().split(' ')[0];
+    subEl.innerText = '現在時刻';
+  } else if (settings.displayMode === 'countdown') {
+    // 未完了で最も期限が近いタスクを検索
+    const upcomingTasks = tasks
+      .filter(t => t.deadline && t.completedPages < t.totalPages)
+      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+
+    if (upcomingTasks.length === 0) {
+      mainEl.innerText = '--:--:--';
+      subEl.innerText = '期限付きの未完了タスクはありません';
+    } else {
+      const target = upcomingTasks[0];
+      const diff = new Date(target.deadline).getTime() - new Date().getTime(); // 👈 getTime() に修正
+      
+      if (isNaN(diff)) {
+        mainEl.innerText = '--:--:--';
+        subEl.innerText = '期限のフォーマットが不正です';
+      } else if (diff <= 0) {
+        mainEl.innerText = '期限超過！';
+        subEl.innerText = `🎯 ${target.name}`;
+      } else {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = String(Math.floor((diff / (1000 * 60 * 60)) % 24)).padStart(2, '0');
+        const mins = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, '0');
+        const secs = String(Math.floor((diff / 1000) % 60)).padStart(2, '0');
+
+        const dayText = days > 0 ? `${days}日 ` : '';
+        mainEl.innerText = `${dayText}${hours}:${mins}:${secs}`;
+        subEl.innerText = `🎯 残り時間: ${target.name}`;
+      }
+    }
   }
 }
-setInterval(updateClock, 1000);
-updateClock();
+setInterval(updateDisplay, 1000);
+
+function changeDisplayMode(mode) {
+  settings.displayMode = mode;
+  saveSettingsToStorage();
+  updateDisplay();
+}
+
+function changeSortMode(mode) {
+  settings.sortMode = mode;
+  saveSettingsToStorage();
+  render();
+}
 
 // ===================================
 // 💤 放置検知
 // ===================================
 let idleTimer = null;
-const IDLE_TIMEOUT = 5000;
-
 function resetIdleTimer() {
   document.body.classList.remove('idle-mode');
-  
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     document.body.classList.add('idle-mode');
-  }, IDLE_TIMEOUT);
+  }, 5000);
 }
-
-['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(eventType => {
-  window.addEventListener(eventType, resetIdleTimer, true);
+['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+  window.addEventListener(evt, resetIdleTimer, true);
 });
 resetIdleTimer();
 
 // ===================================
-// 🧮 計算 & レンダリング
+// 🧮 ソート & レンダリング
 // ===================================
-function floorToOneDecimal(num) {
-  return (Math.floor(num * 10) / 10).toFixed(1);
+function getSortedTasks() {
+  const list = [...tasks];
+  list.forEach((t, i) => t._originalIndex = i); // 元のインデックスを保持
+
+  return list.sort((a, b) => {
+    if (settings.sortMode === 'name') {
+      return a.name.localeCompare(b.name, 'ja');
+    }
+    if (settings.sortMode === 'progressAsc') {
+      return (a.completedPages / a.totalPages) - (b.completedPages / b.totalPages);
+    }
+    if (settings.sortMode === 'progressDesc') {
+      return (b.completedPages / b.totalPages) - (a.completedPages / a.totalPages);
+    }
+    // デフォルト: 期限順 (未設定は最後尾)
+    if (!a.deadline) return 1;
+    if (!b.deadline) return -1;
+    return new Date(a.deadline) - new Date(b.deadline);
+  });
 }
 
 function render() {
@@ -98,46 +193,59 @@ function render() {
   let totalRequiredTime = 0;
   let totalCompletedTime = 0;
 
-  tasks.forEach((task, index) => {
-    // 時間の計算（各タスクの合計分 = ページ数 * 1pあたりの時間）
+  const sortedTasks = getSortedTasks();
+
+  sortedTasks.forEach((task) => {
+    const originalIndex = task._originalIndex;
     const taskTotalTime = task.totalPages * task.pageTime;
     const taskCompletedTime = task.completedPages * task.pageTime;
 
     totalRequiredTime += taskTotalTime;
     totalCompletedTime += taskCompletedTime;
 
-    // タスクカードの動的作成
+    // 期限表示のフォーマット
+    let deadlineText = '期限なし';
+    let isUrgent = false;
+
+    if (task.deadline) {
+      const d = new Date(task.deadline);
+      deadlineText = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      
+      // 24時間以内ならハイライト用フラグ
+      const hoursLeft = (d - new Date()) / (1000 * 60 * 60);
+      if (hoursLeft > 0 && hoursLeft <= 24 && task.completedPages < task.totalPages) {
+        isUrgent = true;
+      }
+    }
+
     const card = document.createElement('div');
-    card.className = 'task-card';
+    card.className = `task-card ${isUrgent ? 'urgent' : ''}`;
     card.innerHTML = `
       <div class="task-title">
         <span>${escapeHtml(task.name)}</span>
         <div>
-          <span class="page-count">${task.completedPages} / ${task.totalPages} p</span>
-          <button class="btn-edit" onclick="openTaskModal(${index})">⚙️</button>
+          <span class="page-count">${task.completedPages} / ${task.totalPages} ${task.unit || 'p'}</span>
+          <button class="btn-edit" onclick="openTaskModal(${originalIndex})">⚙️</button>
         </div>
       </div>
-      <div class="task-info">1pあたり ${task.pageTime}分 (計 ${taskTotalTime}分)</div>
+      <div class="task-info">
+        1${task.unit || 'p'}/ ${task.pageTime}分 (計${taskTotalTime}分) | ⏰ 期限: ${deadlineText}
+      </div>
       <div class="controls">
-        <button class="btn-sub" onclick="updatePages(${index}, -1)">- 1p</button>
-        <button class="btn-add" onclick="updatePages(${index}, 1)">+ 1p 完了</button>
+        <button class="btn-sub" onclick="updatePages(${originalIndex}, -1)">- 1${task.unit || 'p'}</button>
+        <button class="btn-add" onclick="updatePages(${originalIndex}, 1)">+ 1${task.unit || 'p'} 完了</button>
       </div>
     `;
     taskListEl.appendChild(card);
   });
 
-  // 全体進捗率の計算
-  let targetPercent = 0;
-  if (totalRequiredTime > 0) {
-    targetPercent = (totalCompletedTime / totalRequiredTime) * 100;
-  }
+  // 進捗率
+  const targetPercent = totalRequiredTime > 0 ? (totalCompletedTime / totalRequiredTime) * 100 : 0;
   const clampedTarget = Math.min(100, Math.max(0, targetPercent));
 
-  // バーの伸長
   document.getElementById('progressBar').style.width = clampedTarget + '%';
-
-  // 数値アニメーション
   animatePercentText(clampedTarget);
+  updateDisplay();
 }
 
 function animatePercentText(target) {
@@ -145,18 +253,16 @@ function animatePercentText(target) {
 
   function step() {
     const diff = target - currentPercent;
-    
     if (Math.abs(diff) < 0.02) {
       currentPercent = target;
-      document.getElementById('percentDisplay').innerText = floorToOneDecimal(currentPercent) + '%';
+      document.getElementById('percentDisplay').innerText = (Math.floor(currentPercent * 10) / 10).toFixed(1) + '%';
       animationFrameId = null;
     } else {
-      currentPercent += diff * 0.03; 
-      document.getElementById('percentDisplay').innerText = floorToOneDecimal(currentPercent) + '%';
+      currentPercent += diff * 0.1; 
+      document.getElementById('percentDisplay').innerText = (Math.floor(currentPercent * 10) / 10).toFixed(1) + '%';
       animationFrameId = requestAnimationFrame(step);
     }
   }
-  
   step();
 }
 
@@ -172,21 +278,12 @@ function updatePages(index, delta) {
   }
 }
 
-// XSS防止用エスケープ関数
 function escapeHtml(str) {
-  return str.replace(/[&< me"']/g, function(m) {
-    return {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    }[m];
-  });
+  return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
 }
 
 // ===================================
-// 📝 モーダル & タスク操作機能
+// 📝 モーダル操作
 // ===================================
 function openTaskModal(index = null) {
   const modal = document.getElementById('taskModal');
@@ -194,19 +291,28 @@ function openTaskModal(index = null) {
   const btnDelete = document.getElementById('btnDeleteTask');
 
   if (index !== null) {
-    // 編集モード
     const task = tasks[index];
-    title.innerText = '課題の編集';
+    title.innerText = 'タスクの編集';
     document.getElementById('taskId').value = index;
     document.getElementById('taskName').value = task.name;
     document.getElementById('totalPages').value = task.totalPages;
+    document.getElementById('unitName').value = task.unit || 'p';
     document.getElementById('pageTime').value = task.pageTime;
+    
+    if (task.deadline) {
+      const [date, time] = task.deadline.split('T');
+      document.getElementById('deadlineDate').value = date || '';
+      document.getElementById('deadlineTime').value = time || '';
+    } else {
+      document.getElementById('deadlineDate').value = '';
+      document.getElementById('deadlineTime').value = '';
+    }
     btnDelete.style.display = 'block';
   } else {
-    // 新規作成モード
-    title.innerText = '課題の追加';
+    title.innerText = 'タスクの追加';
     document.getElementById('taskId').value = '';
     document.getElementById('taskForm').reset();
+    document.getElementById('unitName').value = 'p';
     btnDelete.style.display = 'none';
   }
 
@@ -214,7 +320,8 @@ function openTaskModal(index = null) {
 }
 
 function closeTaskModal() {
-  document.getElementById('taskModal').classList.remove('active');
+  const modal = document.getElementById('taskModal');
+  modal.classList.remove('active');
 }
 
 function saveTask(e) {
@@ -222,29 +329,23 @@ function saveTask(e) {
 
   const taskId = document.getElementById('taskId').value;
   const name = document.getElementById('taskName').value.trim();
-  const totalPages = parseInt(document.getElementById('totalPages').value, 10);
+  const rawPages = document.getElementById('totalPages').value;
+  const totalPages = rawPages === '' ? 1 : parseInt(rawPages, 10);
+  const unit = document.getElementById('unitName').value || 'p';
   const pageTime = parseInt(document.getElementById('pageTime').value, 10);
+  
+  const dateVal = document.getElementById('deadlineDate').value;
+  const timeVal = document.getElementById('deadlineTime').value || '23:59';
+  const deadline = dateVal ? `${dateVal}T${timeVal}` : '';
 
   if (!name || isNaN(totalPages) || isNaN(pageTime)) return;
 
   if (taskId !== '') {
-    // 既存更新
     const idx = parseInt(taskId, 10);
-    tasks[idx].name = name;
-    tasks[idx].totalPages = totalPages;
-    tasks[idx].pageTime = pageTime;
-    // 完了ページ数が総ページ数を超えないよう補正
-    if (tasks[idx].completedPages > totalPages) {
-      tasks[idx].completedPages = totalPages;
-    }
+    tasks[idx] = { ...tasks[idx], name, totalPages, unit, pageTime, deadline };
+    if (tasks[idx].completedPages > totalPages) tasks[idx].completedPages = totalPages;
   } else {
-    // 新規追加
-    tasks.push({
-      name: name,
-      totalPages: totalPages,
-      completedPages: 0,
-      pageTime: pageTime
-    });
+    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline });
   }
 
   saveTasksToStorage();
@@ -256,16 +357,17 @@ function deleteTask() {
   const taskId = document.getElementById('taskId').value;
   if (taskId === '') return;
 
-  if (confirm('この課題を削除しますか？')) {
-    const idx = parseInt(taskId, 10);
-    tasks.splice(idx, 1);
+  if (confirm('このタスクを削除しますか？')) {
+    tasks.splice(parseInt(taskId, 10), 1);
     saveTasksToStorage();
     closeTaskModal();
     render();
   }
 }
 
-// 初期実行（0%からスタート）
+// 初期化
+document.getElementById('displayModeSelect').value = settings.displayMode;
+document.getElementById('sortSelect').value = settings.sortMode;
 document.getElementById('percentDisplay').innerText = '0.0%';
 document.getElementById('progressBar').style.width = '0%';
 render();

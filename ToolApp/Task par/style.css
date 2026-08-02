@@ -9,6 +9,11 @@
   --btn-bg: #21262d;
   --btn-hover: #30363d;
   --danger-color: #f87171;
+  --warning-color: #fbbf24;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 body {
@@ -23,6 +28,7 @@ body {
   padding: 20px;
 }
 
+/* 親枠：中身の高さ変化（放置時）に合わせて滑らかに伸縮させる */
 .container {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -33,6 +39,8 @@ body {
   width: 100%;
   text-align: center;
   position: relative;
+  /* 高さが変わるときもヌルッと縮むように追加 */
+  transition: padding 0.4s ease;
 }
 
 /* バッテリー表示 */
@@ -53,15 +61,50 @@ h1 {
   letter-spacing: 0.05em;
 }
 
-/* 時計 */
-.clock-display {
+/* メインディスプレイ */
+.display-container {
+  margin-bottom: 8px;
+}
+
+.main-display {
   font-size: 2.2rem;
   font-weight: bold;
   color: var(--text-main);
   font-family: 'Courier New', Courier, monospace;
-  margin-bottom: 15px;
   letter-spacing: 0.08em;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.sub-display {
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  margin-top: 2px;
+}
+
+/* 表示設定・ソート設定のセレクトボックス（文字崩れ・変な改行を防止） */
+.display-mode-selector, .sort-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-bottom: 12px;
+}
+
+.display-mode-selector label, .sort-container label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+select {
+  background: #0d1117;
+  color: var(--text-main);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  max-width: 100%;
 }
 
 /* プログレスバー */
@@ -72,7 +115,6 @@ h1 {
   height: 20px;
   overflow: hidden;
   margin-bottom: 12px;
-  position: relative;
 }
 
 .progress-bar {
@@ -84,22 +126,35 @@ h1 {
   transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* パーセント表示 */
 .percentage-text {
   font-size: 3.5rem;
   font-weight: 800;
   color: var(--accent-color);
   text-shadow: 0 0 20px var(--accent-glow);
-  margin: 5px 0 20px;
+  margin: 5px 0 15px;
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* 操作ラッパー */
+/* タスク一覧エリア（通常時） */
 .tasks-wrapper {
   opacity: 1;
   transform: translateY(0);
-  max-height: 800px;
-  transition: opacity 0.6s ease, transform 0.6s ease, max-height 0.6s ease, margin 0.6s ease;
+  max-height: 2000px; /* 十分な高さを確保 */
+  overflow: hidden;   /* 畳むときに中身がはみ出さないガード */
+  transition: opacity 0.3s ease, 
+              transform 0.3s ease, 
+              max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              margin 0.4s ease;
+}
+
+/* 放置モード時（スーーッと縮んで下の空白を完全抹消！） */
+body.idle-mode .tasks-wrapper {
+  opacity: 0;
+  transform: translateY(-10px);
+  max-height: 0;       /* 👈 高さを0にして空間ごとスッと畳む！ */
+  margin-top: 0;
+  margin-bottom: 0;
+  pointer-events: none;
 }
 
 /* タスクカード */
@@ -109,6 +164,13 @@ h1 {
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 12px;
+  transition: border-color 0.3s ease;
+}
+
+/* 24時間以内の危険なタスク */
+.task-card.urgent {
+  border-color: var(--warning-color);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
 }
 
 .task-title {
@@ -118,7 +180,6 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: var(--text-main);
 }
 
 .task-title .page-count {
@@ -129,17 +190,15 @@ h1 {
 }
 
 .task-info {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-sub);
   margin-bottom: 10px;
   text-align: left;
 }
 
-/* ボタン関係 */
 .controls {
   display: flex;
   gap: 10px;
-  justify-content: center;
 }
 
 button {
@@ -152,30 +211,21 @@ button {
   transition: all 0.15s ease;
 }
 
-button:active {
-  transform: scale(0.96);
-}
+button:active { transform: scale(0.96); }
 
 .btn-add {
   background-color: var(--accent-color);
-  color: #000000;
+  color: #000;
   border: none;
   flex: 2;
 }
 
-.btn-add:hover {
-  background-color: #7dd3fc;
-  box-shadow: 0 0 10px var(--accent-glow);
-}
+.btn-add:hover { background-color: #7dd3fc; }
 
 .btn-sub {
   background-color: var(--btn-bg);
   color: var(--text-main);
   flex: 1;
-}
-
-.btn-sub:hover {
-  background-color: var(--btn-hover);
 }
 
 .btn-primary {
@@ -197,9 +247,7 @@ button:active {
   opacity: 0.6;
 }
 
-.btn-edit:hover {
-  opacity: 1;
-}
+.btn-edit:hover { opacity: 1; }
 
 .btn-danger {
   background-color: #3b1212;
@@ -207,80 +255,87 @@ button:active {
   border: 1px solid var(--danger-color);
 }
 
-/* 放置モード */
-body.idle-mode .tasks-wrapper {
-  opacity: 0;
-  transform: translateY(15px);
-  max-height: 0;
-  margin: 0;
-  pointer-events: none;
-}
-
-/* モーダル表示 */
+/* モーダル背景（非表示時） */
+/* モーダル背景（ふわっと暗くなるアニメーション） */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   background: rgba(0, 0, 0, 0.7);
+  
+  /* アニメーション用の設定 */
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000;
+  
   opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-  z-index: 100;
+  pointer-events: none; /* 隠れている時はクリックを無視 */
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1); /* 滑らかなイージング */
 }
 
-.modal-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-
+/* モーダルの中身（下からスッと浮き出てくるアニメーション） */
 .modal-content {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  padding: 24px;
+  padding: 20px;
   border-radius: 16px;
   width: 90%;
   max-width: 400px;
   text-align: left;
+  box-sizing: border-box;
+
+  /* 初期位置：ちょっと下に下げて小さくしておく */
+  transform: translateY(12px) scale(0.97);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.modal-content h2 {
-  margin-top: 0;
-  font-size: 1.2rem;
-  color: var(--text-main);
+/* --------------------------------------------------
+   モーダル表示時 (.active がついた瞬間)
+-------------------------------------------------- */
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto; /* クリック有効化 */
 }
 
-.form-group {
-  margin-bottom: 15px;
+.modal-overlay.active .modal-content {
+  /* 元の位置・大きさにヌルッと戻る */
+  transform: translateY(0) scale(1);
 }
 
-.form-group label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--text-sub);
-  margin-bottom: 5px;
+.modal-content h2 { margin-top: 0; font-size: 1.2rem; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; font-size: 0.85rem; color: var(--text-sub); margin-bottom: 5px; }
+
+.form-group-row {
+  display: flex;
+  gap: 10px;
 }
 
-.form-group input {
+.form-group-row .form-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.datetime-inputs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.datetime-inputs input {
+  flex: 1;
+  min-width: 130px;
+}
+
+.form-group input, .form-group select {
   width: 100%;
   padding: 10px;
   background: #0d1117;
   border: 1px solid var(--card-border);
   border-radius: 8px;
   color: var(--text-main);
-  box-sizing: border-box;
 }
 
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.modal-actions button {
-  flex: 1;
-}
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions button { flex: 1; }
