@@ -188,10 +188,10 @@ resetIdleTimer();
 // 🧮 ソート & レンダリング
 // ===================================
 function getSortedTasks() {
-  const list = tasks.filter(task => matchesSearch(task, settings.searchQuery));
-  list.forEach((t, i) => t._originalIndex = i); // 元のインデックスを保持
+  const list = tasks.map((task, i) => ({ ...task, _originalIndex: i }));
+  const filtered = list.filter(task => matchesSearch(task, settings.searchQuery));
 
-  return list.sort((a, b) => {
+  return filtered.sort((a, b) => {
     if (a.pinned !== b.pinned) {
       return b.pinned - a.pinned;
     }
