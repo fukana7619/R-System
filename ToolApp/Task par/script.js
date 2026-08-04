@@ -15,7 +15,12 @@ function loadTasks() {
   // まず V2 のデータを読み込む
   const savedV2 = localStorage.getItem(STORAGE_KEY_V2);
   if (savedV2) {
-    try { return JSON.parse(savedV2); } catch (e) {}
+    try {
+      return JSON.parse(savedV2).map(task => ({
+        ...task,
+        pinned: !!task.pinned
+      }));
+    } catch (e) {}
   }
 
   // V2 がなくて V1 のデータがある場合は引き継ぐ（移行処理）
@@ -31,7 +36,8 @@ function loadTasks() {
         completedPages: task.completedPages || 0,
         pageTime: task.pageTime || 15,
         unit: task.unit || 'p',
-        deadline: task.deadline || ''
+        deadline: task.deadline || '',
+        pinned: false
       }));
 
       // V2のキーに保存し直す
@@ -54,7 +60,7 @@ function loadSettings() {
   if (saved) {
     try { return JSON.parse(saved); } catch (e) {}
   }
-  return { displayMode: 'countdown', sortMode: 'deadline' };
+  return { displayMode: 'countdown', sortMode: 'deadline', searchQuery: '' };
 }
 
 function saveSettingsToStorage() {
@@ -146,6 +152,22 @@ function changeSortMode(mode) {
   render();
 }
 
+function updateSearchQuery(value) {
+  settings.searchQuery = value;
+  saveSettingsToStorage();
+  render();
+}
+
+function clearSearch() {
+  document.getElementById('taskSearch').value = '';
+  updateSearchQuery('');
+}
+
+function matchesSearch(task, query) {
+  if (!query) return true;
+  return task.name.toLowerCase().includes(query.toLowerCase());
+}
+
 // ===================================
 // 💤 放置検知
 // ===================================
@@ -166,10 +188,16 @@ resetIdleTimer();
 // 🧮 ソート & レンダリング
 // ===================================
 function getSortedTasks() {
-  const list = [...tasks];
+  const list = tasks.filter(task => matchesSearch(task, settings.searchQuery));
   list.forEach((t, i) => t._originalIndex = i); // 元のインデックスを保持
 
   return list.sort((a, b) => {
+    if (a.pinned !== b.pinned) {
+      return b.pinned - a.pinned;
+    }
+    if (settings.sortMode === 'added') {
+      return a._originalIndex - b._originalIndex;
+    }
     if (settings.sortMode === 'name') {
       return a.name.localeCompare(b.name, 'ja');
     }
@@ -218,13 +246,15 @@ function render() {
       }
     }
 
+    const isCompleted = task.completedPages >= task.totalPages;
     const card = document.createElement('div');
-    card.className = `task-card ${isUrgent ? 'urgent' : ''}`;
+    card.className = `task-card ${isUrgent ? 'urgent' : ''} ${task.pinned ? 'pinned' : ''} ${isCompleted ? 'completed' : ''}`;
     card.innerHTML = `
       <div class="task-title">
         <span>${escapeHtml(task.name)}</span>
         <div>
           <span class="page-count">${task.completedPages} / ${task.totalPages} ${task.unit || 'p'}</span>
+          <button class="btn-pin" onclick="togglePin(${originalIndex})">${task.pinned ? '📌' : '📍'}</button>
           <button class="btn-edit" onclick="openTaskModal(${originalIndex})">⚙️</button>
         </div>
       </div>
@@ -298,6 +328,7 @@ function openTaskModal(index = null) {
     document.getElementById('totalPages').value = task.totalPages;
     document.getElementById('unitName').value = task.unit || 'p';
     document.getElementById('pageTime').value = task.pageTime;
+    document.getElementById('taskPinned').checked = !!task.pinned;
     
     if (task.deadline) {
       const [date, time] = task.deadline.split('T');
@@ -313,6 +344,7 @@ function openTaskModal(index = null) {
     document.getElementById('taskId').value = '';
     document.getElementById('taskForm').reset();
     document.getElementById('unitName').value = 'p';
+    document.getElementById('taskPinned').checked = false;
     btnDelete.style.display = 'none';
   }
 
@@ -337,15 +369,16 @@ function saveTask(e) {
   const dateVal = document.getElementById('deadlineDate').value;
   const timeVal = document.getElementById('deadlineTime').value || '23:59';
   const deadline = dateVal ? `${dateVal}T${timeVal}` : '';
+  const pinned = document.getElementById('taskPinned').checked;
 
   if (!name || isNaN(totalPages) || isNaN(pageTime)) return;
 
   if (taskId !== '') {
     const idx = parseInt(taskId, 10);
-    tasks[idx] = { ...tasks[idx], name, totalPages, unit, pageTime, deadline };
+    tasks[idx] = { ...tasks[idx], name, totalPages, unit, pageTime, deadline, pinned };
     if (tasks[idx].completedPages > totalPages) tasks[idx].completedPages = totalPages;
   } else {
-    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline });
+    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline, pinned });
   }
 
   saveTasksToStorage();
@@ -365,9 +398,18 @@ function deleteTask() {
   }
 }
 
+function togglePin(index) {
+  const task = tasks[index];
+  if (!task) return;
+  task.pinned = !task.pinned;
+  saveTasksToStorage();
+  render();
+}
+
 // 初期化
 document.getElementById('displayModeSelect').value = settings.displayMode;
 document.getElementById('sortSelect').value = settings.sortMode;
+document.getElementById('taskSearch').value = settings.searchQuery || '';
 document.getElementById('percentDisplay').innerText = '0.0%';
 document.getElementById('progressBar').style.width = '0%';
 render();
