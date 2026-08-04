@@ -7,6 +7,10 @@ const SETTINGS_KEY = 'homework_progress_settings_v2';
 
 let tasks = loadTasks();
 let settings = loadSettings();
+let currentlyExpandedTaskIndex = null;
+let closeExpandedTimeout = null;
+let suppressHoverExpansionUntilPointerMove = false;
+let lastPointerPosition = { x: 0, y: 0 };
 
 let currentPercent = 0;
 let animationFrameId = null;
@@ -87,6 +91,12 @@ function initBattery() {
   }
 }
 initBattery();
+
+document.addEventListener('mousemove', event => {
+  lastPointerPosition.x = event.clientX;
+  lastPointerPosition.y = event.clientY;
+  suppressHoverExpansionUntilPointerMove = false;
+}, true);
 
 // ===================================
 // ⏰ タイマー＆ディスプレイ制御
@@ -248,7 +258,8 @@ function render() {
 
     const isCompleted = task.completedPages >= task.totalPages;
     const card = document.createElement('div');
-    card.className = `task-card ${isUrgent ? 'urgent' : ''} ${task.pinned ? 'pinned' : ''} ${isCompleted ? 'completed' : ''}`;
+    card.dataset.taskIndex = originalIndex;
+    card.className = `task-card ${isUrgent ? 'urgent' : ''} ${task.pinned ? 'pinned' : ''} ${isCompleted ? 'completed' : ''} ${currentlyExpandedTaskIndex === originalIndex ? 'expanded' : ''}`;
     card.innerHTML = `
       <div class="task-title">
         <span>${escapeHtml(task.name)}</span>
@@ -267,6 +278,33 @@ function render() {
       </div>
     `;
     taskListEl.appendChild(card);
+
+    card.addEventListener('mouseenter', () => {
+      if (suppressHoverExpansionUntilPointerMove && currentlyExpandedTaskIndex !== originalIndex) {
+        return;
+      }
+      if (closeExpandedTimeout) {
+        clearTimeout(closeExpandedTimeout);
+        closeExpandedTimeout = null;
+      }
+      currentlyExpandedTaskIndex = originalIndex;
+    });
+    card.addEventListener('mouseleave', () => {
+      if (closeExpandedTimeout) {
+        clearTimeout(closeExpandedTimeout);
+      }
+      closeExpandedTimeout = setTimeout(() => {
+        const element = document.elementFromPoint(lastPointerPosition.x, lastPointerPosition.y);
+        const hoveredCard = element ? element.closest('.task-card') : null;
+        if (hoveredCard && hoveredCard.dataset.taskIndex === String(originalIndex)) {
+          return;
+        }
+        if (currentlyExpandedTaskIndex === originalIndex) {
+          currentlyExpandedTaskIndex = null;
+          render();
+        }
+      }, 50);
+    });
   });
 
   // 進捗率
@@ -303,6 +341,8 @@ function updatePages(index, delta) {
   const newPages = task.completedPages + delta;
   if (newPages >= 0 && newPages <= task.totalPages) {
     task.completedPages = newPages;
+    currentlyExpandedTaskIndex = index;
+    suppressHoverExpansionUntilPointerMove = true;
     saveTasksToStorage();
     render();
   }
@@ -402,6 +442,8 @@ function togglePin(index) {
   const task = tasks[index];
   if (!task) return;
   task.pinned = !task.pinned;
+  currentlyExpandedTaskIndex = index;
+  suppressHoverExpansionUntilPointerMove = true;
   saveTasksToStorage();
   render();
 }

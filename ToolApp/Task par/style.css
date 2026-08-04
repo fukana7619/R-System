@@ -216,18 +216,19 @@ body.idle-mode .tasks-wrapper {
   transition: border-color 0.3s ease, transform 0.25s ease, box-shadow 0.25s ease, padding 0.25s ease;
 }
 
-.task-card:not(:hover):not(:focus-within) {
+.task-card:not(:hover):not(:focus-within):not(.expanded) {
   transform: scale(0.99);
   padding: 12px 14px;
 }
 
 .task-card:hover,
-.task-card:focus-within {
+.task-card:focus-within,
+.task-card.expanded {
   transform: scale(1);
 }
 
-.task-card:not(:hover):not(:focus-within) .task-info,
-.task-card:not(:hover):not(:focus-within) .controls {
+.task-card:not(:hover):not(:focus-within):not(.expanded) .task-info,
+.task-card:not(:hover):not(:focus-within):not(.expanded) .controls {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
@@ -238,7 +239,9 @@ body.idle-mode .tasks-wrapper {
 .task-card:hover .task-info,
 .task-card:hover .controls,
 .task-card:focus-within .task-info,
-.task-card:focus-within .controls {
+.task-card:focus-within .controls,
+.task-card.expanded .task-info,
+.task-card.expanded .controls {
   max-height: 200px;
   opacity: 1;
   transform: translateY(0);
