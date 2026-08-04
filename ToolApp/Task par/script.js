@@ -12,6 +12,8 @@ let closeExpandedTimeout = null;
 let suppressHoverExpansionUntilPointerMove = false;
 let lastPointerPosition = { x: 0, y: 0 };
 
+initializeSections();
+
 let currentPercent = 0;
 let animationFrameId = null;
 
@@ -22,9 +24,15 @@ function loadTasks() {
     try {
       return JSON.parse(savedV2).map(task => ({
         ...task,
-        pinned: !!task.pinned
+        pinned: !!task.pinned,
+        section: task.section || 'default',
+        completedPages: Number.isFinite(task.completedPages) ? task.completedPages : 0,
+        totalPages: Number.isFinite(task.totalPages) ? task.totalPages : 1,
+        pageTime: Number.isFinite(task.pageTime) ? task.pageTime : 15
       }));
-    } catch (e) {}
+    } catch (e) {
+      console.error('V2データの読み込みに失敗しました', e);
+    }
   }
 
   // V2 がなくて V1 のデータがある場合は引き継ぐ（移行処理）
@@ -34,14 +42,10 @@ function loadTasks() {
       const oldTasks = JSON.parse(savedV1);
       
       // V1 データを V2 の形式に整える
-      const migratedTasks = oldTasks.map(task => ({
-        name: task.name || '無題のタスク',
-        totalPages: task.totalPages || 1,
-        completedPages: task.completedPages || 0,
-        pageTime: task.pageTime || 15,
-        unit: task.unit || 'p',
-        deadline: task.deadline || '',
-        pinned: false
+      const migratedTasks = oldTasks.map(task => normalizeTask({
+        ...task,
+        pinned: false,
+        section: 'default'
       }));
 
       // V2のキーに保存し直す
@@ -55,20 +59,232 @@ function loadTasks() {
   return [];
 }
 
+function normalizeNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeTask(task) {
+  return {
+    name: typeof task.name === 'string' && task.name.trim() ? task.name.trim() : '無題のタスク',
+    totalPages: normalizeNumber(task.totalPages, 1),
+    completedPages: normalizeNumber(task.completedPages, 0),
+    pageTime: normalizeNumber(task.pageTime, 15),
+    unit: typeof task.unit === 'string' && task.unit ? task.unit : 'p',
+    deadline: typeof task.deadline === 'string' ? task.deadline : '',
+    pinned: !!task.pinned,
+    section: typeof task.section === 'string' && task.section ? task.section : 'default'
+  };
+}
+
 function saveTasksToStorage() {
-  localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(tasks)); // 👈 STORAGE_KEY_V2 に修正
+  const normalizedTasks = tasks.map(normalizeTask);
+  localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(normalizedTasks));
 }
 
 function loadSettings() {
   const saved = localStorage.getItem(SETTINGS_KEY);
   if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
+    try {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return {
+          displayMode: typeof parsed.displayMode === 'string' ? parsed.displayMode : 'countdown',
+          sortMode: typeof parsed.sortMode === 'string' ? parsed.sortMode : 'deadline',
+          searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '',
+          currentSection: typeof parsed.currentSection === 'string' ? parsed.currentSection : 'default',
+          sections: Array.isArray(parsed.sections) ? parsed.sections.filter(s => typeof s === 'string') : ['default']
+        };
+      }
+    } catch (e) {
+      console.error('設定の読み込みに失敗しました', e);
+    }
   }
-  return { displayMode: 'countdown', sortMode: 'deadline', searchQuery: '' };
+  return { displayMode: 'countdown', sortMode: 'deadline', searchQuery: '', currentSection: 'default', sections: ['default'] };
 }
 
 function saveSettingsToStorage() {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function initializeSections() {
+  const taskSections = Array.from(new Set(tasks.map(task => task.section || 'default')));
+  settings.sections = Array.from(new Set([...(Array.isArray(settings.sections) ? settings.sections : []), ...taskSections]));
+  if (!settings.currentSection || !settings.sections.includes(settings.currentSection)) {
+    settings.currentSection = settings.sections[0] || 'default';
+  }
+  if (!settings.sections.includes('default')) {
+    settings.sections.unshift('default');
+  }
+  saveSettingsToStorage();
+}
+
+function renderSectionOptions() {
+  const sectionSelect = document.getElementById('sectionSelect');
+  sectionSelect.innerHTML = '';
+  settings.sections.forEach(section => {
+    const option = document.createElement('option');
+    option.value = section;
+    option.textContent = section;
+    sectionSelect.appendChild(option);
+  });
+  sectionSelect.value = settings.currentSection;
+}
+
+function toggleTaskListSettings() {
+  const panel = document.getElementById('sectionSettings');
+  const isVisible = panel.style.display === 'block';
+  if (isVisible) {
+    hideSectionSettings();
+  } else {
+    panel.style.display = 'block';
+    hideSectionRenameForm();
+    hideSectionMergeForm();
+  }
+}
+
+function hideSectionSettings() {
+  document.getElementById('sectionSettings').style.display = 'none';
+  hideSectionRenameForm();
+  hideSectionMergeForm();
+}
+
+function showRenameTaskListForm() {
+  hideSectionMergeForm();
+  const renameForm = document.getElementById('sectionRenameForm');
+  const input = document.getElementById('sectionRenameInput');
+  renameForm.style.display = 'flex';
+  input.value = settings.currentSection;
+  input.focus();
+}
+
+function hideSectionRenameForm() {
+  document.getElementById('sectionRenameForm').style.display = 'none';
+}
+
+function renameTaskListFromInput() {
+  const input = document.getElementById('sectionRenameInput');
+  const trimmed = input.value.trim();
+  if (!trimmed || settings.sections.includes(trimmed) || trimmed === settings.currentSection) {
+    alert('有効な名前を入力するか、既存と異なる名前にしてください。');
+    return;
+  }
+  renameTaskList(trimmed);
+}
+
+function renameTaskList(newName) {
+  const current = settings.currentSection;
+  const trimmed = typeof newName === 'string' ? newName.trim() : '';
+  if (!trimmed || settings.sections.includes(trimmed) || trimmed === current) {
+    alert('有効な名前を入力するか、既存と異なる名前にしてください。');
+    return;
+  }
+  settings.sections = settings.sections.map(section => section === current ? trimmed : section);
+  tasks = tasks.map(task => ({ ...task, section: task.section === current ? trimmed : task.section }));
+  settings.currentSection = trimmed;
+  saveSettingsToStorage();
+  saveTasksToStorage();
+  renderSectionOptions();
+  render();
+  hideSectionSettings();
+}
+
+function confirmDeleteTaskList() {
+  const current = settings.currentSection;
+  if (current === 'default') {
+    alert('「default」リストは削除できません。');
+    return;
+  }
+  if (!confirm(`タスクリスト「${current}」を削除しますか？ このリスト内のタスクもすべて削除されます。`)) {
+    return;
+  }
+  deleteTaskList();
+}
+
+function deleteTaskList() {
+  const current = settings.currentSection;
+  settings.sections = settings.sections.filter(section => section !== current);
+  tasks = tasks.filter(task => task.section !== current);
+  settings.currentSection = settings.sections[0] || 'default';
+  saveSettingsToStorage();
+  saveTasksToStorage();
+  renderSectionOptions();
+  render();
+  hideSectionSettings();
+}
+
+function showMergeTaskListForm() {
+  hideSectionRenameForm();
+  const current = settings.currentSection;
+  const targets = settings.sections.filter(section => section !== current);
+  if (targets.length === 0) {
+    alert('統合先となる他のタスクリストがありません。');
+    return;
+  }
+  const select = document.getElementById('sectionMergeTarget');
+  select.innerHTML = '';
+  targets.forEach(section => {
+    const opt = document.createElement('option');
+    opt.value = section;
+    opt.textContent = section;
+    select.appendChild(opt);
+  });
+  document.getElementById('sectionMergeForm').style.display = 'flex';
+}
+
+function hideSectionMergeForm() {
+  document.getElementById('sectionMergeForm').style.display = 'none';
+}
+
+function mergeTaskListFromSelect() {
+  const current = settings.currentSection;
+  const select = document.getElementById('sectionMergeTarget');
+  const target = select.value;
+  if (!target || target === current) {
+    alert('有効な統合先を選択してください。');
+    return;
+  }
+  tasks = tasks.map(task => task.section === current ? { ...task, section: target } : task);
+  settings.sections = settings.sections.filter(section => section !== current);
+  settings.currentSection = target;
+  saveSettingsToStorage();
+  saveTasksToStorage();
+  renderSectionOptions();
+  render();
+  hideSectionSettings();
+}
+
+function changeSection(section) {
+  settings.currentSection = section;
+  saveSettingsToStorage();
+  render();
+}
+
+function showSectionInput() {
+  const form = document.getElementById('sectionAddForm');
+  form.style.display = 'inline-flex';
+  document.getElementById('newSectionName').value = '';
+  document.getElementById('newSectionName').focus();
+}
+
+function hideSectionInput() {
+  document.getElementById('sectionAddForm').style.display = 'none';
+}
+
+function createSection() {
+  const input = document.getElementById('newSectionName');
+  const trimmed = input.value.trim();
+  if (!trimmed) return;
+  if (settings.sections.includes(trimmed)) {
+    alert('同じ名前のセクションは既に存在します。');
+    return;
+  }
+  settings.sections.push(trimmed);
+  settings.currentSection = trimmed;
+  saveSettingsToStorage();
+  renderSectionOptions();
+  render();
+  hideSectionInput();
 }
 
 // ===================================
@@ -119,7 +335,7 @@ function updateDisplay() {
   } else if (settings.displayMode === 'countdown') {
     // 未完了で最も期限が近いタスクを検索
     const upcomingTasks = tasks
-      .filter(t => t.deadline && t.completedPages < t.totalPages)
+      .filter(t => t.section === settings.currentSection && t.deadline && t.completedPages < t.totalPages)
       .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
 
     if (upcomingTasks.length === 0) {
@@ -199,7 +415,7 @@ resetIdleTimer();
 // ===================================
 function getSortedTasks() {
   const list = tasks.map((task, i) => ({ ...task, _originalIndex: i }));
-  const filtered = list.filter(task => matchesSearch(task, settings.searchQuery));
+  const filtered = list.filter(task => task.section === settings.currentSection && matchesSearch(task, settings.searchQuery));
 
   return filtered.sort((a, b) => {
     if (a.pinned !== b.pinned) {
@@ -232,6 +448,9 @@ function render() {
   let totalCompletedTime = 0;
 
   const sortedTasks = getSortedTasks();
+  const listTasks = tasks.filter(task => task.section === settings.currentSection);
+  const allTasksTotalTime = listTasks.reduce((sum, task) => sum + (task.totalPages * task.pageTime), 0);
+  const allTasksCompletedTime = listTasks.reduce((sum, task) => sum + (task.completedPages * task.pageTime), 0);
 
   sortedTasks.forEach((task) => {
     const originalIndex = task._originalIndex;
@@ -313,7 +532,14 @@ function render() {
 
   document.getElementById('progressBar').style.width = clampedTarget + '%';
   animatePercentText(clampedTarget);
+  document.getElementById('summaryDisplay').innerText = `タスクリスト「${settings.currentSection}」総作業時間: ${formatMinutes(allTasksTotalTime)} / 完了済み時間: ${formatMinutes(allTasksCompletedTime)}`;
   updateDisplay();
+}
+
+function formatMinutes(minutes) {
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
 }
 
 function animatePercentText(target) {
@@ -418,7 +644,7 @@ function saveTask(e) {
     tasks[idx] = { ...tasks[idx], name, totalPages, unit, pageTime, deadline, pinned };
     if (tasks[idx].completedPages > totalPages) tasks[idx].completedPages = totalPages;
   } else {
-    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline, pinned });
+    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline, pinned, section: settings.currentSection });
   }
 
   saveTasksToStorage();
@@ -454,4 +680,5 @@ document.getElementById('sortSelect').value = settings.sortMode;
 document.getElementById('taskSearch').value = settings.searchQuery || '';
 document.getElementById('percentDisplay').innerText = '0.0%';
 document.getElementById('progressBar').style.width = '0%';
+renderSectionOptions();
 render();

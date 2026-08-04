@@ -32,6 +32,37 @@
   </div>
 
   <div class="percentage-text" id="percentDisplay">0.0%</div>
+  <div class="summary-text" id="summaryDisplay">総作業時間: 0分 / 完了済み時間: 0分</div>
+
+  <div class="section-container">
+    <label for="sectionSelect">タスクリスト:</label>
+    <select id="sectionSelect" onchange="changeSection(this.value)"></select>
+    <button id="addSectionButton" type="button" class="btn-sub btn-add-section" onclick="showSectionInput()">＋ 新しいタスクリスト</button>
+    <button type="button" class="btn-sub btn-list-settings" onclick="toggleTaskListSettings()">リスト設定</button>
+    <div class="section-add-form" id="sectionAddForm">
+      <input id="newSectionName" type="text" placeholder="タスクリスト名">
+      <button type="button" class="btn-primary btn-small" onclick="createSection()">作成</button>
+      <button type="button" class="btn-sub btn-small" onclick="hideSectionInput()">キャンセル</button>
+    </div>
+    <div class="section-settings" id="sectionSettings" style="display:none;">
+      <div class="section-settings-row">
+        <button type="button" class="btn-sub btn-small" onclick="showRenameTaskListForm()">名前変更</button>
+        <button type="button" class="btn-sub btn-small" onclick="confirmDeleteTaskList()">削除</button>
+        <button type="button" class="btn-sub btn-small" onclick="showMergeTaskListForm()">統合</button>
+        <button type="button" class="btn-sub btn-small" onclick="hideSectionSettings()">閉じる</button>
+      </div>
+      <div class="section-settings-form" id="sectionRenameForm" style="display:none; margin-top: 8px; gap: 6px; align-items: center;">
+        <input id="sectionRenameInput" type="text" placeholder="新しいタスクリスト名">
+        <button type="button" class="btn-primary btn-small" onclick="renameTaskListFromInput()">変更</button>
+        <button type="button" class="btn-sub btn-small" onclick="hideSectionRenameForm()">キャンセル</button>
+      </div>
+      <div class="section-settings-form" id="sectionMergeForm" style="display:none; margin-top: 8px; gap: 6px; align-items: center;">
+        <select id="sectionMergeTarget"></select>
+        <button type="button" class="btn-primary btn-small" onclick="mergeTaskListFromSelect()">統合</button>
+        <button type="button" class="btn-sub btn-small" onclick="hideSectionMergeForm()">キャンセル</button>
+      </div>
+    </div>
+  </div>
 
   <div class="tasks-wrapper" id="tasksWrapper">
     <div class="sort-container">

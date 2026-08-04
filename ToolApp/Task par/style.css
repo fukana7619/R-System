@@ -82,7 +82,7 @@ h1 {
 }
 
 /* 表示設定・ソート設定のセレクトボックス（文字崩れ・変な改行を防止） */
-.display-mode-selector, .sort-container {
+.display-mode-selector, .section-container, .sort-container {
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -92,7 +92,68 @@ h1 {
   margin-bottom: 12px;
 }
 
-.display-mode-selector label, .sort-container label {
+.section-container {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  overflow: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+}
+
+body.idle-mode .section-container {
+  opacity: 0;
+  transform: translateY(-10px);
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.section-add-form,
+.section-settings {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-settings {
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+}
+
+.section-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.section-settings-form {
+  display: none;
+  width: 100%;
+}
+
+.section-add-form input {
+  background: transparent;
+  color: var(--text-main);
+  border: none;
+  border-bottom: 1px solid var(--card-border);
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  min-width: 120px;
+  outline: none;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+
+.btn-list-settings {
+  white-space: nowrap;
+}
+
+.section-container label, .display-mode-selector label, .sort-container label {
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -179,8 +240,15 @@ select {
   font-weight: 800;
   color: var(--accent-color);
   text-shadow: 0 0 20px var(--accent-glow);
-  margin: 5px 0 15px;
+  margin: 5px 0 5px;
   font-family: 'Courier New', Courier, monospace;
+}
+
+.summary-text {
+  font-size: 0.9rem;
+  color: var(--text-sub);
+  margin-bottom: 15px;
+  letter-spacing: 0.02em;
 }
 
 /* タスク一覧エリア（通常時） */
