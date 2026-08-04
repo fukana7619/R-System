@@ -51,6 +51,11 @@
         <button type="button" class="btn-sub btn-small" onclick="showMergeTaskListForm()">統合</button>
         <button type="button" class="btn-sub btn-small" onclick="hideSectionSettings()">閉じる</button>
       </div>
+      <div class="section-share-info" id="sectionShareInfo">共有されていません。</div>
+      <div class="section-settings-row">
+        <button type="button" class="btn-primary btn-small" onclick="shareTaskList()">共有する</button>
+        <button type="button" class="btn-sub btn-small" onclick="loadSharedTaskList()">最新を取得</button>
+      </div>
       <div class="section-settings-form" id="sectionRenameForm" style="display:none; margin-top: 8px; gap: 6px; align-items: center;">
         <input id="sectionRenameInput" type="text" placeholder="新しいタスクリスト名">
         <button type="button" class="btn-primary btn-small" onclick="renameTaskListFromInput()">変更</button>

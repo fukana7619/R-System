@@ -133,6 +133,25 @@ body.idle-mode .section-container {
   width: 100%;
 }
 
+.section-settings-form input {
+  background: #0d1117;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text-main);
+  padding: 6px 8px;
+  min-width: 140px;
+  outline: none;
+}
+
+.section-share-info {
+  width: 100%;
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
 .section-add-form input {
   background: transparent;
   color: var(--text-main);

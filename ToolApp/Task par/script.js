@@ -73,9 +73,12 @@ function normalizeTask(task) {
     unit: typeof task.unit === 'string' && task.unit ? task.unit : 'p',
     deadline: typeof task.deadline === 'string' ? task.deadline : '',
     pinned: !!task.pinned,
-    section: typeof task.section === 'string' && task.section ? task.section : 'default'
+    section: typeof task.section === 'string' && task.section ? task.section : 'default',
+    shareId: typeof task.shareId === 'string' && task.shareId ? task.shareId : ''
   };
 }
+
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyyqc7Ym7nq_wAr8B_TKxWkaiPHTFlN8lBChNVJfnhxIIOYwKmjnQWDX0ZHPMAjM2uacg/exec';
 
 function saveTasksToStorage() {
   const normalizedTasks = tasks.map(normalizeTask);
@@ -93,14 +96,15 @@ function loadSettings() {
           sortMode: typeof parsed.sortMode === 'string' ? parsed.sortMode : 'deadline',
           searchQuery: typeof parsed.searchQuery === 'string' ? parsed.searchQuery : '',
           currentSection: typeof parsed.currentSection === 'string' ? parsed.currentSection : 'default',
-          sections: Array.isArray(parsed.sections) ? parsed.sections.filter(s => typeof s === 'string') : ['default']
+          sections: Array.isArray(parsed.sections) ? parsed.sections.filter(s => typeof s === 'string') : ['default'],
+          sharedIds: typeof parsed.sharedIds === 'object' && parsed.sharedIds !== null ? parsed.sharedIds : {}
         };
       }
     } catch (e) {
       console.error('設定の読み込みに失敗しました', e);
     }
   }
-  return { displayMode: 'countdown', sortMode: 'deadline', searchQuery: '', currentSection: 'default', sections: ['default'] };
+  return { displayMode: 'countdown', sortMode: 'deadline', searchQuery: '', currentSection: 'default', sections: ['default'], sharedIds: {} };
 }
 
 function saveSettingsToStorage() {
@@ -116,6 +120,7 @@ function initializeSections() {
   if (!settings.sections.includes('default')) {
     settings.sections.unshift('default');
   }
+  settings.sharedIds = typeof settings.sharedIds === 'object' && settings.sharedIds !== null ? settings.sharedIds : {};
   saveSettingsToStorage();
 }
 
@@ -129,6 +134,37 @@ function renderSectionOptions() {
     sectionSelect.appendChild(option);
   });
   sectionSelect.value = settings.currentSection;
+  updateShareInfoDisplay();
+}
+
+function getShareIdForSection(section) {
+  if (typeof settings.sharedIds === 'object' && settings.sharedIds !== null && settings.sharedIds[section]) {
+    return settings.sharedIds[section];
+  }
+  const task = tasks.find(task => task.section === section && task.shareId);
+  return task ? task.shareId : '';
+}
+
+function setShareIdForSection(section, id) {
+  if (typeof settings.sharedIds !== 'object' || settings.sharedIds === null) {
+    settings.sharedIds = {};
+  }
+  settings.sharedIds[section] = id;
+  saveSettingsToStorage();
+}
+
+function updateShareInfoDisplay() {
+  const currentSection = settings.currentSection;
+  const shareId = getShareIdForSection(currentSection);
+  const shareInfoEl = document.getElementById('sectionShareInfo');
+  if (!shareInfoEl) return;
+
+  if (!shareId) {
+    shareInfoEl.textContent = 'このタスクリストはまだ共有されていません。共有すると別端末から最新状態を取得できます。';
+    return;
+  }
+
+  shareInfoEl.innerHTML = `共有ID: <strong>${escapeHtml(shareId)}</strong>`;
 }
 
 function toggleTaskListSettings() {
@@ -211,6 +247,85 @@ function deleteTaskList() {
   renderSectionOptions();
   render();
   hideSectionSettings();
+}
+
+function shareTaskList() {
+  const current = settings.currentSection;
+  const sectionTasks = tasks.filter(task => task.section === current);
+  let shareId = getShareIdForSection(current);
+
+  const postData = () => {
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ id: shareId, data: JSON.stringify({ tasks: sectionTasks.map(normalizeTask) }) })
+    }).then(response => response.json())
+      .then(result => {
+        if (result && result.success) {
+          if (result.id) {
+            shareId = result.id;
+            setShareIdForSection(current, shareId);
+          }
+          saveTasksToStorage();
+          updateShareInfoDisplay();
+          alert('共有に成功しました。');
+        } else {
+          alert('共有に失敗しました。');
+        }
+      }).catch(() => {
+        alert('共有サーバーへの送信中にエラーが発生しました。');
+      });
+  };
+
+  if (!shareId) {
+    fetch(GAS_URL + '?newId=true')
+      .then(response => response.json())
+      .then(result => {
+        if (result && result.id) {
+          shareId = result.id;
+          setShareIdForSection(current, shareId);
+          postData();
+        } else {
+          alert('共有IDの発行に失敗しました。');
+        }
+      }).catch(() => {
+        alert('共有IDの取得中にエラーが発生しました。');
+      });
+  } else {
+    postData();
+  }
+}
+
+function loadSharedTaskList() {
+  const current = settings.currentSection;
+  const shareId = getShareIdForSection(current);
+  if (!shareId) {
+    alert('このタスクリストはまだ共有されていません。まずは「共有する」を押してください。');
+    return;
+  }
+
+  fetch(`${GAS_URL}?id=${encodeURIComponent(shareId)}`)
+    .then(response => response.json())
+    .then(result => {
+      if (!result || !result.tasks) {
+        alert('共有データが見つかりませんでした。');
+        return;
+      }
+      const updatedTasks = Array.isArray(result.tasks) ? result.tasks.map(normalizeTask) : [];
+      tasks = tasks.filter(task => task.section !== current).concat(updatedTasks.map(task => ({ ...task, section: current })));
+      saveTasksToStorage();
+      renderSectionOptions();
+      render();
+      alert('最新の共有データを読み込みました。');
+    }).catch(() => {
+      alert('共有サーバーからの読み込み中にエラーが発生しました。');
+    });
+}
+
+function initializeSharedSections() {
+  updateShareInfoDisplay();
 }
 
 function showMergeTaskListForm() {
@@ -644,7 +759,7 @@ function saveTask(e) {
     tasks[idx] = { ...tasks[idx], name, totalPages, unit, pageTime, deadline, pinned };
     if (tasks[idx].completedPages > totalPages) tasks[idx].completedPages = totalPages;
   } else {
-    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline, pinned, section: settings.currentSection });
+    tasks.push({ name, totalPages, completedPages: 0, unit, pageTime, deadline, pinned, section: settings.currentSection, shareId: '' });
   }
 
   saveTasksToStorage();
@@ -681,4 +796,5 @@ document.getElementById('taskSearch').value = settings.searchQuery || '';
 document.getElementById('percentDisplay').innerText = '0.0%';
 document.getElementById('progressBar').style.width = '0%';
 renderSectionOptions();
+initializeSharedSections();
 render();
