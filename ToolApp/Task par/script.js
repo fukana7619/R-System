@@ -249,6 +249,13 @@ function deleteTaskList() {
   hideSectionSettings();
 }
 
+function generateLocalShareId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `share-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+}
+
 function shareTaskList() {
   const current = settings.currentSection;
   const sectionTasks = tasks.filter(task => task.section === current);
@@ -260,7 +267,7 @@ function shareTaskList() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ id: shareId, data: JSON.stringify({ tasks: sectionTasks.map(normalizeTask) }) })
+      body: JSON.stringify({ id: shareId, data: { tasks: sectionTasks.map(normalizeTask) } })
     }).then(response => response.json())
       .then(result => {
         if (result && result.success) {
@@ -279,8 +286,14 @@ function shareTaskList() {
       });
   };
 
+  const fallbackToLocalShareId = () => {
+    shareId = generateLocalShareId();
+    setShareIdForSection(current, shareId);
+    postData();
+  };
+
   if (!shareId) {
-    fetch(GAS_URL + '?newId=true')
+    fetch(`${GAS_URL}?newId=true`)
       .then(response => response.json())
       .then(result => {
         if (result && result.id) {
@@ -288,10 +301,10 @@ function shareTaskList() {
           setShareIdForSection(current, shareId);
           postData();
         } else {
-          alert('共有IDの発行に失敗しました。');
+          fallbackToLocalShareId();
         }
       }).catch(() => {
-        alert('共有IDの取得中にエラーが発生しました。');
+        fallbackToLocalShareId();
       });
   } else {
     postData();
