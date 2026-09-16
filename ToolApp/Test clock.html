@@ -18,7 +18,6 @@
         margin: 0;
         padding: 0;
       }
-
       html,
       body {
         width: 100%;
@@ -31,7 +30,6 @@
         user-select: none;
         cursor: none;
       }
-
       body {
         display: flex;
         flex-direction: column;
@@ -47,7 +45,6 @@
       #date-wrap.hidden-el {
         display: none;
       }
-
       #time-wrap {
         display: flex;
         align-items: baseline;
@@ -61,10 +58,8 @@
         font-size: clamp(1.4rem, 4.5vw, 3rem);
         font-weight: 300;
         letter-spacing: 0.12em;
-        color: #fff;
         font-variant-numeric: tabular-nums;
       }
-
       .seg {
         font-size: clamp(3.5rem, 18vw, 14rem);
         font-weight: 100;
@@ -78,21 +73,20 @@
         line-height: 1;
         padding: 0 0.05em;
       }
-
       #sec-group {
-        display: contents;
-      }
-      #hhmm-group {
         display: contents;
       }
       #sec-group.hidden-el {
         display: none;
       }
+      #hhmm-group {
+        display: contents;
+      }
       #hhmm-group.hidden-el {
         display: none;
       }
 
-      /* ======= 歯車ボタン ======= */
+      /* 歯車 */
       #gear-btn {
         position: fixed;
         bottom: 28px;
@@ -125,12 +119,12 @@
         cursor: pointer;
       }
 
-      /* ======= 設定パネル ======= */
+      /* パネル */
       #panel {
         position: fixed;
         bottom: 84px;
         right: 28px;
-        width: 290px;
+        width: 300px;
         background: rgba(20, 20, 20, 0.96);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 12px;
@@ -156,7 +150,6 @@
         text-transform: uppercase;
         margin-bottom: 10px;
       }
-
       .toggle-row {
         display: flex;
         align-items: center;
@@ -222,21 +215,37 @@
         cursor: pointer;
       }
 
-      /* NTPステータス */
-      #ntp-status {
-        font-size: 0.65rem;
-        margin-top: 6px;
-        min-height: 1em;
-        padding-left: 2px;
-        transition: color 0.3s;
+      /* NTPステータスボックス */
+      #ntp-box {
+        margin-top: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 0.66rem;
+        line-height: 1.7;
+        display: none;
       }
-      #ntp-status.ok {
-        color: rgba(120, 220, 120, 0.8);
+      #ntp-box.show {
+        display: block;
       }
-      #ntp-status.error {
-        color: rgba(220, 100, 100, 0.8);
+      .ntp-row {
+        display: flex;
+        justify-content: space-between;
       }
-      #ntp-status.loading {
+      .ntp-key {
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .ntp-val {
+        color: #ddd;
+      }
+      .ntp-val.ok {
+        color: rgba(120, 220, 120, 0.9);
+      }
+      .ntp-val.error {
+        color: rgba(220, 100, 100, 0.9);
+      }
+      .ntp-val.loading {
         color: rgba(200, 200, 200, 0.4);
       }
 
@@ -277,7 +286,6 @@
         border-radius: 50%;
         cursor: pointer;
       }
-
       .divider {
         border: none;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -286,10 +294,7 @@
     </style>
   </head>
   <body>
-    <div id="date-wrap">
-      <span id="date">----/--/--</span>
-    </div>
-
+    <div id="date-wrap"><span id="date">----/--/--</span></div>
     <div id="time-wrap">
       <span id="hhmm-group">
         <span class="seg" id="hh">--</span>
@@ -303,9 +308,10 @@
     </div>
 
     <button id="gear-btn" aria-label="設定">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 24 24">
         <path
           d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.69.07-1.08s-.03-.74-.07-1.08l2.34-1.83c.21-.16.27-.46.13-.7l-2.22-3.84c-.14-.24-.43-.32-.67-.24l-2.76 1.11c-.58-.44-1.2-.82-1.88-1.1L14 2.42c-.05-.27-.29-.42-.56-.42h-4.44c-.27 0-.5.15-.55.42l-.42 2.94c-.68.28-1.3.66-1.88 1.1L3.39 5.35c-.24-.08-.53 0-.67.24L.5 9.43c-.14.24-.08.54.13.7l2.34 1.83C2.93 12.26 2.9 12.61 2.9 13s.03.74.07 1.08L.63 15.91c-.21.16-.27.46-.13.7l2.22 3.84c.14.24.43.32.67.24l2.76-1.11c.58.44 1.2.82 1.88 1.1l.42 2.94c.05.27.28.42.55.42h4.44c.27 0 .51-.15.56-.42l.42-2.94c.68-.28 1.3-.66 1.88-1.1l2.76 1.11c.24.08.53 0 .67-.24l2.22-3.84c.14-.24.08-.54-.13-.7l-2.34-1.83z"
+          fill="#fff"
         />
       </svg>
     </button>
@@ -323,7 +329,28 @@
             (NTP)</label
           >
         </div>
-        <div id="ntp-status"></div>
+        <div id="ntp-box">
+          <div class="ntp-row">
+            <span class="ntp-key">状態</span
+            ><span class="ntp-val" id="ns-state">—</span>
+          </div>
+          <div class="ntp-row">
+            <span class="ntp-key">オフセット</span
+            ><span class="ntp-val" id="ns-offset">—</span>
+          </div>
+          <div class="ntp-row">
+            <span class="ntp-key">精度</span
+            ><span class="ntp-val" id="ns-precision">—</span>
+          </div>
+          <div class="ntp-row">
+            <span class="ntp-key">サンプル数</span
+            ><span class="ntp-val" id="ns-samples">—</span>
+          </div>
+          <div class="ntp-row">
+            <span class="ntp-key">最終同期</span
+            ><span class="ntp-val" id="ns-time">—</span>
+          </div>
+        </div>
       </div>
 
       <hr class="divider" />
@@ -399,45 +426,41 @@
 
     <script>
       /* =============================================
-   IndexedDB ヘルパー
+   IndexedDB
    ============================================= */
-      const DB_NAME = "clock-settings";
-      const DB_VERSION = 1;
-      const STORE = "prefs";
-
       function openDB() {
-        return new Promise((resolve, reject) => {
-          const req = indexedDB.open(DB_NAME, DB_VERSION);
-          req.onupgradeneeded = (e) => {
-            e.target.result.createObjectStore(STORE);
-          };
-          req.onsuccess = (e) => resolve(e.target.result);
-          req.onerror = (e) => reject(e.target.error);
+        return new Promise((res, rej) => {
+          const r = indexedDB.open("clock-settings", 1);
+          r.onupgradeneeded = (e) => e.target.result.createObjectStore("prefs");
+          r.onsuccess = (e) => res(e.target.result);
+          r.onerror = (e) => rej(e.target.error);
         });
       }
-
       async function dbGet(key) {
         const db = await openDB();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readonly");
-          const req = tx.objectStore(STORE).get(key);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
+        return new Promise((res, rej) => {
+          const r = db
+            .transaction("prefs", "readonly")
+            .objectStore("prefs")
+            .get(key);
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => rej(r.error);
         });
       }
-
-      async function dbSet(key, value) {
+      async function dbSet(key, val) {
         const db = await openDB();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readwrite");
-          const req = tx.objectStore(STORE).put(value, key);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
+        return new Promise((res, rej) => {
+          const r = db
+            .transaction("prefs", "readwrite")
+            .objectStore("prefs")
+            .put(val, key);
+          r.onsuccess = () => res();
+          r.onerror = () => rej(r.error);
         });
       }
 
       /* =============================================
-   アプリ状態
+   状態
    ============================================= */
       const state = {
         src: "device",
@@ -448,10 +471,6 @@
         dateSize: 100,
         timeSize: 100,
       };
-
-      /* =============================================
-   設定の保存・読み込み
-   ============================================= */
       const SAVE_KEYS = [
         "src",
         "showDate",
@@ -463,41 +482,195 @@
 
       async function saveSettings() {
         try {
-          const data = {};
-          SAVE_KEYS.forEach((k) => (data[k] = state[k]));
-          await dbSet("settings", data);
+          const d = {};
+          SAVE_KEYS.forEach((k) => (d[k] = state[k]));
+          await dbSet("settings", d);
         } catch (e) {
-          console.warn("設定保存失敗", e);
+          console.warn("保存失敗", e);
         }
       }
-
       async function loadSettings() {
         try {
-          const data = await dbGet("settings");
-          if (!data) return;
-          SAVE_KEYS.forEach((k) => {
-            if (data[k] !== undefined) state[k] = data[k];
-          });
+          const d = await dbGet("settings");
+          if (d)
+            SAVE_KEYS.forEach((k) => {
+              if (d[k] !== undefined) state[k] = d[k];
+            });
         } catch (e) {
-          console.warn("設定読み込み失敗", e);
+          console.warn("読み込み失敗", e);
         }
       }
 
       /* =============================================
-   DOM 要素
+   高精度NTP実装
+   ブラウザでできる最高精度を目指す：
+   1. performance.now() で高分解能タイムスタンプ
+   2. 1エンドポイントにつき8回サンプリング
+   3. 往復最短のサンプルを最も信頼性が高いとして採用（NTPアルゴリズム）
+   4. 複数エンドポイントの結果を中央値で集計
+   5. 30分ごとに再同期（ドリフト補正）
    ============================================= */
-      const elDateWrap = document.getElementById("date-wrap");
-      const elDate = document.getElementById("date");
-      const elTimeWrap = document.getElementById("time-wrap");
-      const elHHMMGroup = document.getElementById("hhmm-group");
-      const elSecGroup = document.getElementById("sec-group");
-      const elHH = document.getElementById("hh");
-      const elMM = document.getElementById("mm");
-      const elSec = document.getElementById("sec");
-      const elColon2 = document.getElementById("colon2");
-      const gearBtn = document.getElementById("gear-btn");
-      const panel = document.getElementById("panel");
-      const ntpStatus = document.getElementById("ntp-status");
+      const ntp = {
+        offset: 0, // ms: Date.now() + offset = 真の時刻（推定）
+        precision: null, // ms: 推定誤差の上限
+        samples: 0,
+        lastSync: null,
+        syncing: false,
+      };
+
+      // high-res now: performance.timeOrigin + performance.now() の方がDate.now()より精確
+      function hrNow() {
+        return performance.timeOrigin + performance.now();
+      }
+
+      // エンドポイント定義: serverTime(ms UTC)を返す関数
+      const ENDPOINTS = [
+        {
+          name: "timeapi.io",
+          fetch: async () => {
+            const r = await fetch(
+              "https://timeapi.io/api/time/current/zone?timeZone=UTC",
+              { signal: AbortSignal.timeout(4000), cache: "no-store" },
+            );
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const j = await r.json();
+            return new Date(j.dateTime + "Z").getTime();
+          },
+        },
+        {
+          name: "worldtimeapi.org",
+          fetch: async () => {
+            const r = await fetch("https://worldtimeapi.org/api/timezone/UTC", {
+              signal: AbortSignal.timeout(4000),
+              cache: "no-store",
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const j = await r.json();
+            // unixtime (秒) → ms
+            return j.unixtime * 1000;
+          },
+        },
+      ];
+
+      // 1エンドポイントを N 回サンプリングしてオフセットを返す（Marzullo風）
+      async function sampleEndpoint(endpoint, N = 8) {
+        const results = [];
+        for (let i = 0; i < N; i++) {
+          try {
+            const t1 = hrNow();
+            const serverMs = await endpoint.fetch();
+            const t4 = hrNow();
+            const rtt = t4 - t1; // ラウンドトリップ時間
+            const offset = serverMs - (t1 + rtt / 2); // NTP offset式
+            results.push({ rtt, offset });
+          } catch (e) {
+            // 1サンプル失敗は無視
+          }
+          // 連続リクエストを少し間隔を空ける（サーバー負荷＋RTTの安定化）
+          if (i < N - 1) await sleep(150);
+        }
+        if (results.length === 0) return null;
+
+        // RTT最短サンプルを選ぶ（往復が短い＝ネット遅延が少ない＝最も正確）
+        results.sort((a, b) => a.rtt - b.rtt);
+        const best = results[0];
+        // 最小RTT/2 が理論上の誤差上限
+        return {
+          offset: best.offset,
+          precision: best.rtt / 2,
+          count: results.length,
+        };
+      }
+
+      function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
+      }
+
+      // 全エンドポイントを並列サンプリングし中央値で統合
+      async function syncNTP() {
+        if (ntp.syncing) return;
+        ntp.syncing = true;
+        updateNTPStatus("loading", "同期中…");
+
+        const promises = ENDPOINTS.map((ep) => sampleEndpoint(ep, 8));
+        const results = (await Promise.allSettled(promises))
+          .filter((r) => r.status === "fulfilled" && r.value !== null)
+          .map((r) => r.value);
+
+        if (results.length === 0) {
+          updateNTPStatus("error", "全エンドポイント失敗");
+          ntp.syncing = false;
+          return;
+        }
+
+        // オフセットの中央値を採用（外れ値に強い）
+        const offsets = results.map((r) => r.offset).sort((a, b) => a - b);
+        const medianOffset =
+          offsets.length % 2 === 1
+            ? offsets[Math.floor(offsets.length / 2)]
+            : (offsets[offsets.length / 2 - 1] + offsets[offsets.length / 2]) /
+              2;
+
+        // 精度は各エンドポイントの precision の平均
+        const avgPrecision =
+          results.reduce((s, r) => s + r.precision, 0) / results.length;
+        const totalSamples = results.reduce((s, r) => s + r.count, 0);
+
+        ntp.offset = medianOffset;
+        ntp.precision = avgPrecision;
+        ntp.samples = totalSamples;
+        ntp.lastSync = new Date();
+        ntp.syncing = false;
+
+        state.ntpOffset = ntp.offset; // state にも反映
+        updateNTPStatus("ok");
+      }
+
+      function updateNTPStatus(cls, msg) {
+        const stateEl = document.getElementById("ns-state");
+        const offsetEl = document.getElementById("ns-offset");
+        const precEl = document.getElementById("ns-precision");
+        const samplesEl = document.getElementById("ns-samples");
+        const timeEl = document.getElementById("ns-time");
+
+        if (cls === "loading") {
+          stateEl.textContent = msg || "同期中…";
+          stateEl.className = "ntp-val loading";
+          offsetEl.textContent =
+            precEl.textContent =
+            samplesEl.textContent =
+            timeEl.textContent =
+              "—";
+          return;
+        }
+        if (cls === "error") {
+          stateEl.textContent = msg || "失敗";
+          stateEl.className = "ntp-val error";
+          return;
+        }
+        // ok
+        const sign = ntp.offset >= 0 ? "+" : "";
+        stateEl.textContent = "同期済み";
+        stateEl.className = "ntp-val ok";
+        offsetEl.textContent = `${sign}${ntp.offset.toFixed(1)} ms`;
+        precEl.textContent = `±${ntp.precision.toFixed(1)} ms`;
+        samplesEl.textContent = `${ntp.samples} 回`;
+        timeEl.textContent = ntp.lastSync
+          ? `${pad(ntp.lastSync.getHours())}:${pad(ntp.lastSync.getMinutes())}:${pad(ntp.lastSync.getSeconds())}`
+          : "—";
+      }
+
+      // NTPモード中は30分ごとに再同期
+      let resyncTimer = null;
+      function startResync() {
+        clearInterval(resyncTimer);
+        resyncTimer = setInterval(
+          () => {
+            if (state.src === "ntp") syncNTP();
+          },
+          30 * 60 * 1000,
+        );
+      }
 
       /* =============================================
    tick
@@ -507,93 +680,54 @@
       }
 
       function tick() {
-        const base =
-          state.src === "ntp"
-            ? new Date(Date.now() + state.ntpOffset)
-            : new Date();
-        elDate.textContent = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
-        elHH.textContent = pad(base.getHours());
-        elMM.textContent = pad(base.getMinutes());
-        elSec.textContent = pad(base.getSeconds());
+        const now =
+          state.src === "ntp" ? new Date(hrNow() + ntp.offset) : new Date();
+        document.getElementById("date").textContent =
+          `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        document.getElementById("hh").textContent = pad(now.getHours());
+        document.getElementById("mm").textContent = pad(now.getMinutes());
+        document.getElementById("sec").textContent = pad(now.getSeconds());
+      }
+
+      // setInterval は最速でも数ms誤差が出るため、
+      // 毎秒の「正確な境界」に合わせて再スケジュールする
+      function scheduleTick() {
+        tick();
+        const now = state.src === "ntp" ? hrNow() + ntp.offset : Date.now();
+        const next = 1000 - (now % 1000);
+        setTimeout(scheduleTick, next);
       }
 
       /* =============================================
-   NTP 取得
-   - フォールバックで端末時計には戻さない
-   - 複数エンドポイントを順番に試みる
-   ============================================= */
-      const NTP_ENDPOINTS = [
-        async () => {
-          const r = await fetch(
-            "https://timeapi.io/api/time/current/zone?timeZone=UTC",
-            { signal: AbortSignal.timeout(5000) },
-          );
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const j = await r.json();
-          // dateTime: "2026-09-16T01:23:45.678"
-          return new Date(j.dateTime + "Z").getTime();
-        },
-        async () => {
-          const r = await fetch("https://worldtimeapi.org/api/timezone/UTC", {
-            signal: AbortSignal.timeout(5000),
-          });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const j = await r.json();
-          return new Date(j.datetime).getTime();
-        },
-      ];
-
-      async function fetchNTP() {
-        ntpStatus.textContent = "取得中…";
-        ntpStatus.className = "loading";
-
-        for (const endpoint of NTP_ENDPOINTS) {
-          try {
-            const before = Date.now();
-            const serverMs = await endpoint();
-            const after = Date.now();
-            // ラウンドトリップの半分をレイテンシ補正
-            const latency = Math.round((after - before) / 2);
-            state.ntpOffset = serverMs - before + latency;
-            ntpStatus.textContent = `同期済み (±${latency}ms)`;
-            ntpStatus.className = "ok";
-            return; // 成功したら終了
-          } catch (e) {
-            console.warn("NTPエンドポイント失敗:", e);
-          }
-        }
-
-        // 全エンドポイント失敗 → オフセット0のまま継続（端末時計に戻さない）
-        ntpStatus.textContent = "取得失敗 (端末時計で代替中)";
-        ntpStatus.className = "error";
-      }
-
-      /* =============================================
-   表示更新
+   表示
    ============================================= */
       function applyDisplay() {
-        elDateWrap.classList.toggle("hidden-el", !state.showDate);
-
+        document
+          .getElementById("date-wrap")
+          .classList.toggle("hidden-el", !state.showDate);
         const anyTime = state.showHHMM || state.showSec;
-        elTimeWrap.classList.toggle("hidden-el", !anyTime);
-
-        elHHMMGroup.classList.toggle("hidden-el", !state.showHHMM);
-
+        document
+          .getElementById("time-wrap")
+          .classList.toggle("hidden-el", !anyTime);
+        document
+          .getElementById("hhmm-group")
+          .classList.toggle("hidden-el", !state.showHHMM);
+        const c2 = document.getElementById("colon2");
         if (state.showSec && !state.showHHMM) {
-          // 時分OFF・秒ONのみ → コロンなし秒だけ
-          elSecGroup.classList.remove("hidden-el");
-          elColon2.style.display = "none";
+          document.getElementById("sec-group").classList.remove("hidden-el");
+          c2.style.display = "none";
         } else {
-          elSecGroup.classList.toggle("hidden-el", !state.showSec);
-          elColon2.style.display = "";
+          document
+            .getElementById("sec-group")
+            .classList.toggle("hidden-el", !state.showSec);
+          c2.style.display = "";
         }
       }
-
       function applyDateSize() {
         const s = state.dateSize / 100;
-        elDate.style.fontSize = `clamp(${1.4 * s}rem, ${4.5 * s}vw, ${3 * s}rem)`;
+        document.getElementById("date").style.fontSize =
+          `clamp(${1.4 * s}rem, ${4.5 * s}vw, ${3 * s}rem)`;
       }
-
       function applyTimeSize() {
         const s = state.timeSize / 100;
         const fs = `clamp(${3.5 * s}rem, ${18 * s}vw, ${14 * s}rem)`;
@@ -601,36 +735,33 @@
           .querySelectorAll(".seg, .colon")
           .forEach((el) => (el.style.fontSize = fs));
       }
-
       function applyAll() {
         applyDisplay();
         applyDateSize();
         applyTimeSize();
       }
 
-      /* =============================================
-   UI とステートの同期
-   ============================================= */
       function syncUIFromState() {
         document.querySelector(`input[name=src][value=${state.src}]`).checked =
           true;
         document.getElementById("tog-date").checked = state.showDate;
         document.getElementById("tog-hhmm").checked = state.showHHMM;
         document.getElementById("tog-sec").checked = state.showSec;
-
-        const dsSlider = document.getElementById("date-size");
-        dsSlider.value = state.dateSize;
+        const ds = document.getElementById("date-size");
+        ds.value = state.dateSize;
         document.getElementById("date-size-val").textContent =
           state.dateSize + "%";
-
-        const tsSlider = document.getElementById("time-size");
-        tsSlider.value = state.timeSize;
+        const ts = document.getElementById("time-size");
+        ts.value = state.timeSize;
         document.getElementById("time-size-val").textContent =
           state.timeSize + "%";
 
-        if (state.src === "ntp" && state.ntpOffset === 0) {
-          ntpStatus.textContent = "（未取得）";
-          ntpStatus.className = "loading";
+        const ntpBox = document.getElementById("ntp-box");
+        if (state.src === "ntp") {
+          ntpBox.classList.add("show");
+          updateNTPStatus("loading", "（未取得）");
+        } else {
+          ntpBox.classList.remove("show");
         }
       }
 
@@ -640,96 +771,84 @@
       document.querySelectorAll("input[name=src]").forEach((r) => {
         r.addEventListener("change", async () => {
           state.src = r.value;
+          const ntpBox = document.getElementById("ntp-box");
           if (state.src === "ntp") {
-            await fetchNTP();
+            ntpBox.classList.add("show");
+            syncNTP();
+            startResync();
           } else {
-            ntpStatus.textContent = "";
-            ntpStatus.className = "";
+            ntpBox.classList.remove("show");
+            clearInterval(resyncTimer);
           }
           await saveSettings();
         });
       });
 
-      document
-        .getElementById("tog-date")
-        .addEventListener("change", async (e) => {
-          state.showDate = e.target.checked;
+      ["tog-date", "tog-hhmm", "tog-sec"].forEach((id) => {
+        document.getElementById(id).addEventListener("change", async (e) => {
+          const map = {
+            "tog-date": "showDate",
+            "tog-hhmm": "showHHMM",
+            "tog-sec": "showSec",
+          };
+          state[map[id]] = e.target.checked;
           applyDisplay();
           await saveSettings();
         });
-      document
-        .getElementById("tog-hhmm")
-        .addEventListener("change", async (e) => {
-          state.showHHMM = e.target.checked;
-          applyDisplay();
-          await saveSettings();
-        });
-      document
-        .getElementById("tog-sec")
-        .addEventListener("change", async (e) => {
-          state.showSec = e.target.checked;
-          applyDisplay();
-          await saveSettings();
-        });
+      });
 
       document
         .getElementById("date-size")
         .addEventListener("input", async (e) => {
-          state.dateSize = parseInt(e.target.value);
+          state.dateSize = +e.target.value;
           document.getElementById("date-size-val").textContent =
             state.dateSize + "%";
           applyDateSize();
           await saveSettings();
         });
-
       document
         .getElementById("time-size")
         .addEventListener("input", async (e) => {
-          state.timeSize = parseInt(e.target.value);
+          state.timeSize = +e.target.value;
           document.getElementById("time-size-val").textContent =
             state.timeSize + "%";
           applyTimeSize();
           await saveSettings();
         });
 
-      /* =============================================
-   歯車UI
-   ============================================= */
+      /* ======= 歯車UI ======= */
+      const gearBtn = document.getElementById("gear-btn");
+      const panel = document.getElementById("panel");
       let hideTimer = null;
 
       function showUI() {
         gearBtn.classList.add("visible");
         document.body.style.cursor = "default";
         clearTimeout(hideTimer);
-        hideTimer = setTimeout(hideUI, 3000);
+        hideTimer = setTimeout(hideUI, 5000);
       }
-
       function hideUI() {
         if (panel.classList.contains("open")) {
-          hideTimer = setTimeout(hideUI, 3000);
+          hideTimer = setTimeout(hideUI, 5000);
           return;
         }
         gearBtn.classList.remove("visible");
         document.body.style.cursor = "none";
       }
-
       document.addEventListener("mousemove", showUI);
       document.addEventListener("touchstart", showUI, { passive: true });
-
       gearBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         panel.classList.toggle("open");
         clearTimeout(hideTimer);
       });
-
       document.addEventListener("click", (e) => {
         if (!panel.contains(e.target) && e.target !== gearBtn) {
           panel.classList.remove("open");
           clearTimeout(hideTimer);
-          hideTimer = setTimeout(hideUI, 3000);
+          hideTimer = setTimeout(hideUI, 5000);
         }
       });
-
       panel.addEventListener("mousemove", () => clearTimeout(hideTimer));
 
       /* =============================================
@@ -739,14 +858,11 @@
         await loadSettings();
         syncUIFromState();
         applyAll();
-
-        // NTPモードで起動した場合は自動取得
         if (state.src === "ntp") {
-          fetchNTP(); // await不要、バックグラウンドで取得
+          syncNTP();
+          startResync();
         }
-
-        tick();
-        setInterval(tick, 1000);
+        scheduleTick();
       })();
     </script>
   </body>
