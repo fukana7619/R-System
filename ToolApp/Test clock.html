@@ -701,12 +701,12 @@
         gearBtn.classList.add("visible");
         document.body.style.cursor = "default";
         clearTimeout(hideTimer);
-        hideTimer = setTimeout(hideUI, 5000);
+        hideTimer = setTimeout(hideUI, 3000);
       }
 
       function hideUI() {
         if (panel.classList.contains("open")) {
-          hideTimer = setTimeout(hideUI, 5000);
+          hideTimer = setTimeout(hideUI, 3000);
           return;
         }
         gearBtn.classList.remove("visible");
@@ -726,7 +726,7 @@
         if (!panel.contains(e.target) && e.target !== gearBtn) {
           panel.classList.remove("open");
           clearTimeout(hideTimer);
-          hideTimer = setTimeout(hideUI, 5000);
+          hideTimer = setTimeout(hideUI, 3000);
         }
       });
 
