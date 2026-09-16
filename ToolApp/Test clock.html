@@ -53,7 +53,6 @@
       #time-wrap.hidden-el {
         display: none;
       }
-
       #date {
         font-size: clamp(1.4rem, 4.5vw, 3rem);
         font-weight: 300;
@@ -86,7 +85,7 @@
         display: none;
       }
 
-      /* 歯車 */
+      /* 歯車ボタン */
       #gear-btn {
         position: fixed;
         bottom: 28px;
@@ -119,7 +118,7 @@
         cursor: pointer;
       }
 
-      /* パネル */
+      /* 設定パネル */
       #panel {
         position: fixed;
         bottom: 84px;
@@ -138,6 +137,8 @@
         flex-direction: column;
         gap: 18px;
         cursor: default;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
       }
       #panel.open {
         display: flex;
@@ -215,7 +216,7 @@
         cursor: pointer;
       }
 
-      /* NTPステータスボックス */
+      /* NTPボックス */
       #ntp-box {
         margin-top: 8px;
         background: rgba(255, 255, 255, 0.04);
@@ -232,6 +233,7 @@
       .ntp-row {
         display: flex;
         justify-content: space-between;
+        align-items: center;
       }
       .ntp-key {
         color: rgba(255, 255, 255, 0.35);
@@ -249,6 +251,33 @@
         color: rgba(200, 200, 200, 0.4);
       }
 
+      /* 手動同期ボタン */
+      #sync-btn {
+        margin-top: 8px;
+        width: 100%;
+        padding: 6px 0;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        color: #ccc;
+        font-family: "Roboto Mono", monospace;
+        font-size: 0.72rem;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: none;
+      }
+      #sync-btn.show {
+        display: block;
+      }
+      #sync-btn:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.13);
+      }
+      #sync-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      /* スライダー */
       .slider-block {
         display: flex;
         flex-direction: column;
@@ -286,6 +315,22 @@
         border-radius: 50%;
         cursor: pointer;
       }
+
+      /* Wake Lock インジケーター */
+      #wakelock-indicator {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        font-size: 0.6rem;
+        color: rgba(255, 255, 255, 0.2);
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-family: "Roboto Mono", monospace;
+      }
+      #wakelock-indicator.visible {
+        opacity: 1;
+      }
+
       .divider {
         border: none;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -307,6 +352,8 @@
       </span>
     </div>
 
+    <div id="wakelock-indicator">スリープ防止中</div>
+
     <button id="gear-btn" aria-label="設定">
       <svg viewBox="0 0 24 24">
         <path
@@ -317,6 +364,7 @@
     </button>
 
     <div id="panel">
+      <!-- 時刻ソース -->
       <div>
         <div class="p-section-title">時刻ソース</div>
         <div class="radio-group">
@@ -351,10 +399,12 @@
             ><span class="ntp-val" id="ns-time">—</span>
           </div>
         </div>
+        <button id="sync-btn">↻ 今すぐ同期</button>
       </div>
 
       <hr class="divider" />
 
+      <!-- 表示項目 -->
       <div>
         <div class="p-section-title">表示項目</div>
         <div style="display: flex; flex-direction: column; gap: 12px">
@@ -387,6 +437,7 @@
 
       <hr class="divider" />
 
+      <!-- サイズ -->
       <div>
         <div class="p-section-title">サイズ</div>
         <div style="display: flex; flex-direction: column; gap: 14px">
@@ -420,6 +471,36 @@
             />
             <div class="slider-labels"><span>小</span><span>大</span></div>
           </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- システム -->
+      <div>
+        <div class="p-section-title">システム</div>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div class="toggle-row">
+            <span class="toggle-label">スリープ防止</span>
+            <label class="toggle"
+              ><input type="checkbox" id="tog-wakelock" /><span
+                class="toggle-track"
+              ></span
+            ></label>
+          </div>
+        </div>
+        <div
+          id="wakelock-note"
+          style="
+            margin-top: 8px;
+            font-size: 0.63rem;
+            color: rgba(255, 255, 255, 0.25);
+            line-height: 1.6;
+            display: none;
+          "
+        >
+          ※ Screen Wake Lock
+          API対応ブラウザのみ有効。非対応の場合はOSの設定でスリープを延長してください。
         </div>
       </div>
     </div>
@@ -470,6 +551,7 @@
         showSec: true,
         dateSize: 100,
         timeSize: 100,
+        wakeLock: false,
       };
       const SAVE_KEYS = [
         "src",
@@ -478,6 +560,7 @@
         "showSec",
         "dateSize",
         "timeSize",
+        "wakeLock",
       ];
 
       async function saveSettings() {
@@ -502,31 +585,22 @@
       }
 
       /* =============================================
-   高精度NTP実装
-   ブラウザでできる最高精度を目指す：
-   1. performance.now() で高分解能タイムスタンプ
-   2. 1エンドポイントにつき8回サンプリング
-   3. 往復最短のサンプルを最も信頼性が高いとして採用（NTPアルゴリズム）
-   4. 複数エンドポイントの結果を中央値で集計
-   5. 30分ごとに再同期（ドリフト補正）
+   高精度NTP
    ============================================= */
       const ntp = {
-        offset: 0, // ms: Date.now() + offset = 真の時刻（推定）
-        precision: null, // ms: 推定誤差の上限
+        offset: 0,
+        precision: null,
         samples: 0,
         lastSync: null,
         syncing: false,
       };
 
-      // high-res now: performance.timeOrigin + performance.now() の方がDate.now()より精確
       function hrNow() {
         return performance.timeOrigin + performance.now();
       }
 
-      // エンドポイント定義: serverTime(ms UTC)を返す関数
       const ENDPOINTS = [
         {
-          name: "timeapi.io",
           fetch: async () => {
             const r = await fetch(
               "https://timeapi.io/api/time/current/zone?timeZone=UTC",
@@ -538,7 +612,6 @@
           },
         },
         {
-          name: "worldtimeapi.org",
           fetch: async () => {
             const r = await fetch("https://worldtimeapi.org/api/timezone/UTC", {
               signal: AbortSignal.timeout(4000),
@@ -546,13 +619,15 @@
             });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const j = await r.json();
-            // unixtime (秒) → ms
             return j.unixtime * 1000;
           },
         },
       ];
 
-      // 1エンドポイントを N 回サンプリングしてオフセットを返す（Marzullo風）
+      function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
+      }
+
       async function sampleEndpoint(endpoint, N = 8) {
         const results = [];
         for (let i = 0; i < N; i++) {
@@ -560,21 +635,14 @@
             const t1 = hrNow();
             const serverMs = await endpoint.fetch();
             const t4 = hrNow();
-            const rtt = t4 - t1; // ラウンドトリップ時間
-            const offset = serverMs - (t1 + rtt / 2); // NTP offset式
-            results.push({ rtt, offset });
-          } catch (e) {
-            // 1サンプル失敗は無視
-          }
-          // 連続リクエストを少し間隔を空ける（サーバー負荷＋RTTの安定化）
+            const rtt = t4 - t1;
+            results.push({ rtt, offset: serverMs - (t1 + rtt / 2) });
+          } catch (e) {}
           if (i < N - 1) await sleep(150);
         }
-        if (results.length === 0) return null;
-
-        // RTT最短サンプルを選ぶ（往復が短い＝ネット遅延が少ない＝最も正確）
+        if (!results.length) return null;
         results.sort((a, b) => a.rtt - b.rtt);
         const best = results[0];
-        // 最小RTT/2 が理論上の誤差上限
         return {
           offset: best.offset,
           precision: best.rtt / 2,
@@ -582,85 +650,75 @@
         };
       }
 
-      function sleep(ms) {
-        return new Promise((r) => setTimeout(r, ms));
-      }
-
-      // 全エンドポイントを並列サンプリングし中央値で統合
       async function syncNTP() {
         if (ntp.syncing) return;
         ntp.syncing = true;
         updateNTPStatus("loading", "同期中…");
+        setSyncBtnDisabled(true);
 
         const promises = ENDPOINTS.map((ep) => sampleEndpoint(ep, 8));
         const results = (await Promise.allSettled(promises))
           .filter((r) => r.status === "fulfilled" && r.value !== null)
           .map((r) => r.value);
 
-        if (results.length === 0) {
+        if (!results.length) {
           updateNTPStatus("error", "全エンドポイント失敗");
           ntp.syncing = false;
+          setSyncBtnDisabled(false);
           return;
         }
 
-        // オフセットの中央値を採用（外れ値に強い）
         const offsets = results.map((r) => r.offset).sort((a, b) => a - b);
-        const medianOffset =
+        ntp.offset =
           offsets.length % 2 === 1
             ? offsets[Math.floor(offsets.length / 2)]
             : (offsets[offsets.length / 2 - 1] + offsets[offsets.length / 2]) /
               2;
-
-        // 精度は各エンドポイントの precision の平均
-        const avgPrecision =
+        ntp.precision =
           results.reduce((s, r) => s + r.precision, 0) / results.length;
-        const totalSamples = results.reduce((s, r) => s + r.count, 0);
-
-        ntp.offset = medianOffset;
-        ntp.precision = avgPrecision;
-        ntp.samples = totalSamples;
+        ntp.samples = results.reduce((s, r) => s + r.count, 0);
         ntp.lastSync = new Date();
         ntp.syncing = false;
+        state.ntpOffset = ntp.offset;
 
-        state.ntpOffset = ntp.offset; // state にも反映
         updateNTPStatus("ok");
+        setSyncBtnDisabled(false);
+      }
+
+      function setSyncBtnDisabled(v) {
+        document.getElementById("sync-btn").disabled = v;
+        document.getElementById("sync-btn").textContent = v
+          ? "同期中…"
+          : "↻ 今すぐ同期";
       }
 
       function updateNTPStatus(cls, msg) {
-        const stateEl = document.getElementById("ns-state");
-        const offsetEl = document.getElementById("ns-offset");
-        const precEl = document.getElementById("ns-precision");
-        const samplesEl = document.getElementById("ns-samples");
-        const timeEl = document.getElementById("ns-time");
-
+        const el = (id) => document.getElementById(id);
         if (cls === "loading") {
-          stateEl.textContent = msg || "同期中…";
-          stateEl.className = "ntp-val loading";
-          offsetEl.textContent =
-            precEl.textContent =
-            samplesEl.textContent =
-            timeEl.textContent =
-              "—";
+          el("ns-state").textContent = msg || "同期中…";
+          el("ns-state").className = "ntp-val loading";
+          ["ns-offset", "ns-precision", "ns-samples", "ns-time"].forEach(
+            (i) => (el(i).textContent = "—"),
+          );
           return;
         }
         if (cls === "error") {
-          stateEl.textContent = msg || "失敗";
-          stateEl.className = "ntp-val error";
+          el("ns-state").textContent = msg || "失敗";
+          el("ns-state").className = "ntp-val error";
           return;
         }
-        // ok
         const sign = ntp.offset >= 0 ? "+" : "";
-        stateEl.textContent = "同期済み";
-        stateEl.className = "ntp-val ok";
-        offsetEl.textContent = `${sign}${ntp.offset.toFixed(1)} ms`;
-        precEl.textContent = `±${ntp.precision.toFixed(1)} ms`;
-        samplesEl.textContent = `${ntp.samples} 回`;
-        timeEl.textContent = ntp.lastSync
+        el("ns-state").textContent = "同期済み";
+        el("ns-state").className = "ntp-val ok";
+        el("ns-offset").textContent = `${sign}${ntp.offset.toFixed(1)} ms`;
+        el("ns-precision").textContent = `±${ntp.precision.toFixed(1)} ms`;
+        el("ns-samples").textContent = `${ntp.samples} 回`;
+        el("ns-time").textContent = ntp.lastSync
           ? `${pad(ntp.lastSync.getHours())}:${pad(ntp.lastSync.getMinutes())}:${pad(ntp.lastSync.getSeconds())}`
           : "—";
       }
 
-      // NTPモード中は30分ごとに再同期
+      // 定期再同期（30分）
       let resyncTimer = null;
       function startResync() {
         clearInterval(resyncTimer);
@@ -671,6 +729,78 @@
           30 * 60 * 1000,
         );
       }
+
+      /* =============================================
+   同期トリガーイベント
+   - visibilitychange: タブが非表示→表示に戻ったとき
+   - focus: ウィンドウがアクティブになったとき
+   - online: ネット復帰時
+   ============================================= */
+      function onResyncTrigger() {
+        if (state.src !== "ntp") return;
+        // スリープ復帰後は performance.now() のズレが大きいので必ず再同期
+        syncNTP();
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") onResyncTrigger();
+      });
+      window.addEventListener("focus", onResyncTrigger);
+      window.addEventListener("online", onResyncTrigger);
+
+      /* =============================================
+   スリープ防止（Screen Wake Lock API）
+   ============================================= */
+      let wakeLockSentinel = null;
+
+      async function acquireWakeLock() {
+        if (!("wakeLock" in navigator)) return false;
+        try {
+          wakeLockSentinel = await navigator.wakeLock.request("screen");
+          // 他のイベントでリリースされたら自動再取得
+          wakeLockSentinel.addEventListener("release", () => {
+            if (state.wakeLock) acquireWakeLock();
+          });
+          updateWakeLockUI(true);
+          return true;
+        } catch (e) {
+          console.warn("Wake Lock取得失敗", e);
+          updateWakeLockUI(false, true);
+          return false;
+        }
+      }
+
+      async function releaseWakeLock() {
+        if (wakeLockSentinel) {
+          await wakeLockSentinel.release();
+          wakeLockSentinel = null;
+        }
+        updateWakeLockUI(false);
+      }
+
+      function updateWakeLockUI(active, failed = false) {
+        const indicator = document.getElementById("wakelock-indicator");
+        const note = document.getElementById("wakelock-note");
+        if (active) {
+          indicator.classList.add("visible");
+          note.style.display = "none";
+        } else {
+          indicator.classList.remove("visible");
+          if (failed) note.style.display = "block";
+          else note.style.display = "none";
+        }
+      }
+
+      // visibilitychange で復帰したとき Wake Lock を再取得（ブラウザが自動解除するため）
+      document.addEventListener("visibilitychange", async () => {
+        if (
+          document.visibilityState === "visible" &&
+          state.wakeLock &&
+          !wakeLockSentinel
+        ) {
+          await acquireWakeLock();
+        }
+      });
 
       /* =============================================
    tick
@@ -689,8 +819,6 @@
         document.getElementById("sec").textContent = pad(now.getSeconds());
       }
 
-      // setInterval は最速でも数ms誤差が出るため、
-      // 毎秒の「正確な境界」に合わせて再スケジュールする
       function scheduleTick() {
         tick();
         const now = state.src === "ntp" ? hrNow() + ntp.offset : Date.now();
@@ -705,10 +833,9 @@
         document
           .getElementById("date-wrap")
           .classList.toggle("hidden-el", !state.showDate);
-        const anyTime = state.showHHMM || state.showSec;
         document
           .getElementById("time-wrap")
-          .classList.toggle("hidden-el", !anyTime);
+          .classList.toggle("hidden-el", !(state.showHHMM || state.showSec));
         document
           .getElementById("hhmm-group")
           .classList.toggle("hidden-el", !state.showHHMM);
@@ -747,21 +874,23 @@
         document.getElementById("tog-date").checked = state.showDate;
         document.getElementById("tog-hhmm").checked = state.showHHMM;
         document.getElementById("tog-sec").checked = state.showSec;
-        const ds = document.getElementById("date-size");
-        ds.value = state.dateSize;
+        document.getElementById("tog-wakelock").checked = state.wakeLock;
+        document.getElementById("date-size").value = state.dateSize;
         document.getElementById("date-size-val").textContent =
           state.dateSize + "%";
-        const ts = document.getElementById("time-size");
-        ts.value = state.timeSize;
+        document.getElementById("time-size").value = state.timeSize;
         document.getElementById("time-size-val").textContent =
           state.timeSize + "%";
 
         const ntpBox = document.getElementById("ntp-box");
+        const syncBtn = document.getElementById("sync-btn");
         if (state.src === "ntp") {
           ntpBox.classList.add("show");
+          syncBtn.classList.add("show");
           updateNTPStatus("loading", "（未取得）");
         } else {
           ntpBox.classList.remove("show");
+          syncBtn.classList.remove("show");
         }
       }
 
@@ -772,26 +901,32 @@
         r.addEventListener("change", async () => {
           state.src = r.value;
           const ntpBox = document.getElementById("ntp-box");
+          const syncBtn = document.getElementById("sync-btn");
           if (state.src === "ntp") {
             ntpBox.classList.add("show");
+            syncBtn.classList.add("show");
             syncNTP();
             startResync();
           } else {
             ntpBox.classList.remove("show");
+            syncBtn.classList.remove("show");
             clearInterval(resyncTimer);
           }
           await saveSettings();
         });
       });
 
-      ["tog-date", "tog-hhmm", "tog-sec"].forEach((id) => {
+      document.getElementById("sync-btn").addEventListener("click", () => {
+        if (state.src === "ntp") syncNTP();
+      });
+
+      [
+        ["tog-date", "showDate"],
+        ["tog-hhmm", "showHHMM"],
+        ["tog-sec", "showSec"],
+      ].forEach(([id, key]) => {
         document.getElementById(id).addEventListener("change", async (e) => {
-          const map = {
-            "tog-date": "showDate",
-            "tog-hhmm": "showHHMM",
-            "tog-sec": "showSec",
-          };
-          state[map[id]] = e.target.checked;
+          state[key] = e.target.checked;
           applyDisplay();
           await saveSettings();
         });
@@ -813,6 +948,22 @@
           document.getElementById("time-size-val").textContent =
             state.timeSize + "%";
           applyTimeSize();
+          await saveSettings();
+        });
+
+      document
+        .getElementById("tog-wakelock")
+        .addEventListener("change", async (e) => {
+          state.wakeLock = e.target.checked;
+          if (state.wakeLock) {
+            const ok = await acquireWakeLock();
+            if (!ok) {
+              state.wakeLock = false;
+              e.target.checked = false;
+            }
+          } else {
+            await releaseWakeLock();
+          }
           await saveSettings();
         });
 
@@ -862,6 +1013,7 @@
           syncNTP();
           startResync();
         }
+        if (state.wakeLock) await acquireWakeLock();
         scheduleTick();
       })();
     </script>
