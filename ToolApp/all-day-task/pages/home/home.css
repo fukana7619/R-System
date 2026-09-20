@@ -760,3 +760,28 @@ body {
     padding: 18px;
   }
 }
+
+.allday-chip-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.allday-chip {
+  background: #166534;
+  color: #d1fae5;
+
+  padding: 8px 14px;
+
+  border-radius: 999px;
+
+  font-size: 14px;
+}
+
+.today-card {
+  padding: 24px;
+  gap: 18px;
+
+  height: auto;
+  min-height: unset;
+}
