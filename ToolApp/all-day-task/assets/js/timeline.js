@@ -31,6 +31,7 @@ export async function renderTimeline() {
 
   renderToday(timeline[0]);
 
+  // 今日を飛ばす
   renderFuture(timeline.slice(1));
 }
 
