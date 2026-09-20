@@ -103,7 +103,11 @@ body {
 #clock {
   color: var(--green);
 
-  font-size: 24px;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.02em;
 
   font-weight: 600;
 }
@@ -112,7 +116,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   width: 100%;
   margin-top: 14px;
 }
@@ -192,7 +196,7 @@ body {
   }
 
   #clock {
-    font-size: 20px;
+    font-size: 23px;
   }
 }
 
