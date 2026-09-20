@@ -52,7 +52,8 @@ function renderToday(day) {
   // 次の予定
   // -----------------------
 
-  const nextEvent = day.events.find((e) => !e.allDay);
+  const timedEvents = day.events.filter((e) => !e.allDay);
+  const nextEvent = timedEvents[0] ?? null;
 
   if (nextEvent) {
     wrapper.appendChild(createNextCard(nextEvent));
