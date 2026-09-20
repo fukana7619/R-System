@@ -256,8 +256,6 @@ function createCard(event, isToday) {
     info.appendChild(desc);
   }
 
-  card.appendChild(info);
-
   // ----------------------
   // 今日だけ既読ボタン
   // ----------------------
@@ -277,8 +275,10 @@ function createCard(event, isToday) {
       setTimeout(renderTimeline, 300);
     };
 
-    card.appendChild(readButton);
+    info.appendChild(readButton);
   }
+
+  card.appendChild(info);
 
   // タスクならチェックボックスを左に付ける
   if (event.kind === "task") {
