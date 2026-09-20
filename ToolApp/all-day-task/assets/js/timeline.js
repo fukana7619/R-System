@@ -311,8 +311,16 @@ function createCard(event, isToday) {
   // 編集
   // ----------------------
 
-  card.onclick = () => openModal(event);
+  readButton.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
+    await markAsRead(event.id, event.instanceDate);
+
+    card.classList.add("removing");
+
+    setTimeout(renderTimeline, 300);
+  });
   return card;
 }
 

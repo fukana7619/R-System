@@ -133,19 +133,17 @@ export function getCountdown(dateString) {
   const now = new Date();
   const target = new Date(dateString);
 
-  const diff = target - now;
+  const diffMs = target - now;
 
-  const minutes = Math.floor(diff / 60000);
-
-  // 開始済み
-  if (minutes <= 0) {
+  if (diffMs <= 0) {
     return {
       state: "started",
       text: "開始しました",
     };
   }
 
-  // 1時間以内
+  const minutes = Math.ceil(diffMs / 60000);
+
   if (minutes < 60) {
     return {
       state: minutes <= 5 ? "danger" : "warning",
@@ -156,16 +154,9 @@ export function getCountdown(dateString) {
   const hours = Math.floor(minutes / 60);
   const remain = minutes % 60;
 
-  if (remain === 0) {
-    return {
-      state: "normal",
-      text: `あと${hours}時間`,
-    };
-  }
-
   return {
     state: "normal",
-    text: `あと${hours}時間${remain}分`,
+    text: remain === 0 ? `あと${hours}時間` : `あと${hours}時間${remain}分`,
   };
 }
 
