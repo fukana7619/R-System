@@ -204,8 +204,10 @@ function createCard(event, isToday) {
 
   if (event.allDay) {
     const badge = document.createElement("span");
-    badge.className = "badge allday";
-    badge.textContent = "終日予定";
+    badge.className = event.isCarryOver
+      ? "badge allday overdue-task"
+      : "badge allday";
+    badge.textContent = event.isCarryOver ? "未完了タスク" : "終日予定";
 
     info.appendChild(badge);
   }

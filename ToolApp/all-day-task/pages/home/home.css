@@ -397,6 +397,12 @@ body {
   color: #b7f7cb;
 }
 
+.badge.allday.overdue-task {
+  background: #7f1d1d;
+
+  color: #fecaca;
+}
+
 /* ---------- 時刻 ---------- */
 
 .time {
