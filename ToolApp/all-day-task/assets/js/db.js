@@ -3,7 +3,12 @@
 // assets/js/db.js
 // ============================================
 
-import { createNext30Days, shouldRepeat, sortByTime } from "./utils.js";
+import {
+  createNext30Days,
+  getPreviousOccurrenceDate,
+  shouldRepeat,
+  sortByTime,
+} from "./utils.js";
 
 const DB_NAME = "RoutineTimeline";
 const DB_VERSION = 2;
@@ -213,6 +218,26 @@ export async function getTimeline() {
       }
 
       dayEvents.push(copy);
+    }
+
+    if (date === days[0]) {
+      for (const event of events) {
+        if (event.kind !== "task") continue;
+
+        const previousDate = getPreviousOccurrenceDate(event, date);
+        if (!previousDate || (await isRead(event.id, previousDate))) continue;
+
+        const copy = structuredClone(event);
+        copy.instanceDate = previousDate;
+        copy.isCarryOver = true;
+
+        if (!copy.allDay) {
+          const time = copy.start.slice(11, 16);
+          copy.start = `${date}T${time}`;
+        }
+
+        dayEvents.push(copy);
+      }
     }
 
     timeline.push({

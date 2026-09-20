@@ -133,6 +133,34 @@ export function shouldRepeat(event, dateString) {
   return passed >= 0 && passed % event.repeat.intervalDays === 0;
 }
 
+// 今日より前で、最後に発生した日付
+export function getPreviousOccurrenceDate(event, dateString) {
+  const startDate = event.repeat.enabled
+    ? event.repeat.startDate
+    : event.start.slice(0, 10);
+
+  const passed = diffDays(startDate, dateString);
+
+  if (passed <= 0) return null;
+
+  if (!event.repeat.enabled) return startDate;
+
+  const intervalDays = Number(event.repeat.intervalDays);
+  if (!intervalDays) return null;
+
+  const occurrence = new Date(`${startDate}T00:00`);
+  occurrence.setDate(
+    occurrence.getDate() +
+      Math.floor((passed - 1) / intervalDays) * intervalDays,
+  );
+
+  const y = occurrence.getFullYear();
+  const m = String(occurrence.getMonth() + 1).padStart(2, "0");
+  const d = String(occurrence.getDate()).padStart(2, "0");
+
+  return `${y}-${m}-${d}`;
+}
+
 // ----------------------------
 // あと○分
 // ----------------------------

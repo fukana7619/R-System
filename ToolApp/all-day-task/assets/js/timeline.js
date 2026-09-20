@@ -170,7 +170,7 @@ function createNextCard(event) {
   const card = document.createElement("div");
   card.className = "next-card";
 
-  const countdown = getCountdown(event.start);
+  const countdown = getEventStatus(event);
 
   card.innerHTML = `
         <div class="time">${formatTime(event.start)}</div>
@@ -225,7 +225,7 @@ function createCard(event, isToday) {
 
     row.appendChild(time);
 
-    const countdown = getCountdown(event.start);
+    const countdown = getEventStatus(event);
 
     const badge = document.createElement("div");
     badge.className = `countdown ${countdown.state}`;
@@ -327,6 +327,17 @@ function createCard(event, isToday) {
   card.onclick = () => openModal(event);
 
   return card;
+}
+
+function getEventStatus(event) {
+  if (event.kind === "task" && (event.isCarryOver || hasStarted(event.start))) {
+    return {
+      state: "overdue-task",
+      text: "未完了タスク",
+    };
+  }
+
+  return getCountdown(event.start);
 }
 
 // ==========================================
