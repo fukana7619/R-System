@@ -257,10 +257,15 @@ function createCard(event, isToday) {
   }
 
   // ----------------------
-  // 今日だけ既読ボタン
+  // 今日だけ既読ボタン（予定のみ）
   // ----------------------
 
-  if (isToday && !event.allDay && hasStarted(event.start)) {
+  if (
+    isToday &&
+    !event.allDay &&
+    event.kind !== "task" &&
+    hasStarted(event.start)
+  ) {
     const readButton = document.createElement("button");
     readButton.className = "read-button";
     readButton.textContent = "既読";
