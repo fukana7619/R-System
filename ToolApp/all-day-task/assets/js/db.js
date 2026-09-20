@@ -1,17 +1,22 @@
 // ============================================
-// Routine Timeline - IndexedDB Manager
+// Routine Timeline Database v1.0
 // assets/js/db.js
 // ============================================
 
-const DB_NAME = "RoutineTimelineDB";
-const DB_VERSION = 1;
-const STORE_NAME = "events";
+import { createNext30Days, shouldRepeat, sortByTime } from "./utils.js";
+
+const DB_NAME = "RoutineTimeline";
+const DB_VERSION = 2;
 
 let db = null;
 
-// --------------------------------------------
-// DB 初期化
-// --------------------------------------------
+// ストア名
+const EVENTS = "events";
+const INSTANCES = "instances";
+
+// ============================================
+// DB初期化
+// ============================================
 
 export async function initDB() {
   if (db) return db;
@@ -24,14 +29,23 @@ export async function initDB() {
     request.onupgradeneeded = (event) => {
       db = event.target.result;
 
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, {
+      // 予定本体
+      if (!db.objectStoreNames.contains(EVENTS)) {
+        const store = db.createObjectStore(EVENTS, {
           keyPath: "id",
         });
 
         store.createIndex("start", "start");
-        store.createIndex("kind", "kind");
-        store.createIndex("repeatType", "repeat.type");
+      }
+
+      // 既読状態
+      if (!db.objectStoreNames.contains(INSTANCES)) {
+        const store = db.createObjectStore(INSTANCES, {
+          keyPath: "id",
+        });
+
+        store.createIndex("eventId", "eventId");
+        store.createIndex("date", "date");
       }
     };
 
@@ -42,11 +56,11 @@ export async function initDB() {
   });
 }
 
-// --------------------------------------------
+// ============================================
 // UUID
-// --------------------------------------------
+// ============================================
 
-function createID() {
+function uuid() {
   if (crypto.randomUUID) {
     return crypto.randomUUID();
   }
@@ -54,13 +68,13 @@ function createID() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-// --------------------------------------------
-// デフォルトイベント生成
-// --------------------------------------------
+// ============================================
+// イベント雛形
+// ============================================
 
 export function createEvent(data = {}) {
   return {
-    id: createID(),
+    id: uuid(),
 
     kind: "event", // event / task
 
@@ -70,18 +84,13 @@ export function createEvent(data = {}) {
 
     allDay: false,
 
-    start: "",
-
-    end: "",
+    start: "", // 開始日時のみ
 
     repeat: {
-      type: "once", // once,daily,weekly,monthly
-      days: [],
+      enabled: false,
+      intervalDays: 7,
+      startDate: "",
     },
-
-    completed: false,
-
-    notifyBefore: 10,
 
     createdAt: Date.now(),
 
@@ -89,329 +98,225 @@ export function createEvent(data = {}) {
   };
 }
 
-// --------------------------------------------
-// 全取得
-// --------------------------------------------
-
-export async function getEvents() {
-  await initDB();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-// --------------------------------------------
-// ID取得
-// --------------------------------------------
-
-export async function getEvent(id) {
-  await initDB();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-// --------------------------------------------
-// 保存（追加・更新兼用）
-// --------------------------------------------
+// ============================================
+// CRUD
+// ============================================
 
 export async function saveEvent(event) {
   await initDB();
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-
+  return transaction(EVENTS, "readwrite", (store) => {
     store.put(event);
-
-    tx.oncomplete = () => resolve(event);
-    tx.onerror = () => reject(tx.error);
   });
 }
-
-// --------------------------------------------
-// 削除
-// --------------------------------------------
 
 export async function deleteEvent(id) {
   await initDB();
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-
+  return transaction(EVENTS, "readwrite", (store) => {
     store.delete(id);
-
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
   });
 }
 
-// --------------------------------------------
-// タスク完了切替
-// --------------------------------------------
+export async function getEvents() {
+  await initDB();
 
-export async function toggleCompleted(id) {
-  const event = await getEvent(id);
+  return new Promise((resolve) => {
+    const tx = db.transaction(EVENTS);
 
-  if (!event) return;
-
-  event.completed = !event.completed;
-
-  await saveEvent(event);
+    tx.objectStore(EVENTS).getAll().onsuccess = (e) => resolve(e.target.result);
+  });
 }
 
-// --------------------------------------------
-// 今日から指定日数分取得
-// --------------------------------------------
+export async function getEvent(id) {
+  await initDB();
 
-export async function getTimeline(days = 7) {
-  const all = await getEvents();
+  return new Promise((resolve) => {
+    const tx = db.transaction(EVENTS);
 
-  const result = [];
+    tx.objectStore(EVENTS).get(id).onsuccess = (e) => resolve(e.target.result);
+  });
+}
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+// ============================================
+// 既読管理
+// ============================================
 
-  for (let i = 0; i < days; i++) {
-    const target = new Date(today);
-    target.setDate(today.getDate() + i);
+function instanceID(eventId, date) {
+  return `${eventId}_${date}`;
+}
 
-    const dateString = target.toISOString().slice(0, 10);
+export async function markAsRead(eventId, date) {
+  await initDB();
 
-    const dailyEvents = buildEventsForDate(all, target);
+  return transaction(INSTANCES, "readwrite", (store) => {
+    store.put({
+      id: instanceID(eventId, date),
+      eventId,
+      date,
+      read: true,
+    });
+  });
+}
 
-    result.push({
-      date: dateString,
-      events: dailyEvents,
+export async function unread(eventId, date) {
+  await initDB();
+
+  return transaction(INSTANCES, "readwrite", (store) => {
+    store.delete(instanceID(eventId, date));
+  });
+}
+
+export async function isRead(eventId, date) {
+  await initDB();
+
+  return new Promise((resolve) => {
+    const tx = db.transaction(INSTANCES);
+
+    tx.objectStore(INSTANCES).get(instanceID(eventId, date)).onsuccess = (
+      e,
+    ) => {
+      resolve(Boolean(e.target.result));
+    };
+  });
+}
+
+// ============================================
+// 今日〜30日生成
+// ============================================
+
+export async function getTimeline() {
+  const events = await getEvents();
+
+  const days = createNext30Days();
+
+  const timeline = [];
+
+  for (const date of days) {
+    const dayEvents = [];
+
+    for (const event of events) {
+      if (!shouldRepeat(event, date)) continue;
+
+      const read = await isRead(event.id, date);
+
+      if (read) continue;
+
+      const copy = structuredClone(event);
+
+      copy.instanceDate = date;
+
+      if (!copy.allDay) {
+        const time = copy.start.slice(11, 16);
+
+        copy.start = `${date}T${time}`;
+      }
+
+      dayEvents.push(copy);
+    }
+
+    timeline.push({
+      date,
+      events: sortByTime(dayEvents),
     });
   }
 
-  return result;
+  return timeline;
 }
 
-// --------------------------------------------
-// 繰り返し展開
-// --------------------------------------------
-
-function buildEventsForDate(events, targetDate) {
-  const targetString = targetDate.toISOString().slice(0, 10);
-  const weekday = targetDate.getDay();
-  const day = targetDate.getDate();
-
-  const list = [];
-
-  events.forEach((event) => {
-    const startDate = event.start.slice(0, 10);
-
-    switch (event.repeat.type) {
-      case "once":
-        if (startDate === targetString) {
-          list.push(copyToDate(event, targetDate));
-        }
-
-        break;
-
-      case "daily":
-        if (startDate <= targetString) {
-          list.push(copyToDate(event, targetDate));
-        }
-
-        break;
-
-      case "weekly":
-        if (startDate <= targetString && event.repeat.days.includes(weekday)) {
-          list.push(copyToDate(event, targetDate));
-        }
-
-        break;
-
-      case "monthly":
-        if (
-          startDate <= targetString &&
-          new Date(event.start).getDate() === day
-        ) {
-          list.push(copyToDate(event, targetDate));
-        }
-
-        break;
-    }
-  });
-
-  return list.sort(sortEvents);
-}
-
-// --------------------------------------------
-// 日付コピー
-// --------------------------------------------
-
-function copyToDate(event, targetDate) {
-  const copy = structuredClone(event);
-
-  if (!copy.allDay) {
-    const start = new Date(copy.start);
-    const end = new Date(copy.end);
-
-    start.setFullYear(
-      targetDate.getFullYear(),
-      targetDate.getMonth(),
-      targetDate.getDate(),
-    );
-
-    end.setFullYear(
-      targetDate.getFullYear(),
-      targetDate.getMonth(),
-      targetDate.getDate(),
-    );
-
-    copy.start = start.toISOString();
-    copy.end = end.toISOString();
-  }
-
-  return copy;
-}
-
-// --------------------------------------------
-// 並び替え
-// --------------------------------------------
-
-function sortEvents(a, b) {
-  if (a.completed !== b.completed) {
-    return Number(a.completed) - Number(b.completed);
-  }
-
-  if (a.allDay !== b.allDay) {
-    return a.allDay ? -1 : 1;
-  }
-
-  return new Date(a.start) - new Date(b.start);
-}
-
-// --------------------------------------------
-// 完了タスクを翌周期でリセット
-// --------------------------------------------
-
-export async function resetRecurringTasks() {
-  const events = await getEvents();
-  const today = new Date();
-
-  for (const event of events) {
-    if (
-      event.kind !== "task" ||
-      !event.completed ||
-      event.repeat.type === "once"
-    )
-      continue;
-
-    const last = new Date(event.start);
-
-    let shouldReset = false;
-
-    switch (event.repeat.type) {
-      case "daily":
-        shouldReset = today.toDateString() !== last.toDateString();
-
-        break;
-
-      case "weekly":
-        shouldReset =
-          today.getDay() === last.getDay() &&
-          today.toDateString() !== last.toDateString();
-
-        break;
-
-      case "monthly":
-        shouldReset =
-          today.getDate() === last.getDate() &&
-          today.getMonth() !== last.getMonth();
-
-        break;
-    }
-
-    if (shouldReset) {
-      event.completed = false;
-
-      await saveEvent(event);
-    }
-  }
-}
-
-// --------------------------------------------
-// 初回データ投入
-// --------------------------------------------
+// ============================================
+// 初回データ
+// ============================================
 
 export async function seedDatabase() {
   const list = await getEvents();
 
-  if (list.length > 0) return;
+  if (list.length) return;
 
-  const samples = [
+  const sample = [
     createEvent({
       kind: "task",
+
       title: "部屋掃除",
+
       description: "床・机・ゴミ箱",
+
       allDay: true,
+
       start: "2026-09-20T00:00",
-      end: "2026-09-20T23:59",
+
       repeat: {
-        type: "weekly",
-        days: [0],
+        enabled: true,
+        intervalDays: 7,
+        startDate: "2026-09-20",
       },
     }),
 
     createEvent({
       kind: "event",
+
       title: "図書館",
+
       description: "返却・貸出",
+
       allDay: true,
+
       start: "2026-09-20T00:00",
-      end: "2026-09-20T23:59",
+
       repeat: {
-        type: "weekly",
-        days: [0],
+        enabled: true,
+        intervalDays: 14,
+        startDate: "2026-09-20",
       },
     }),
 
     createEvent({
       kind: "task",
-      title: "英語問題集",
-      description: "Lesson5",
-      start: "2026-09-20T20:00",
-      end: "2026-09-20T21:30",
+
+      title: "国語開始",
+
+      description: "問題集 Lesson5",
+
+      start: "2026-09-20T16:00",
+
       repeat: {
-        type: "weekly",
-        days: [0],
+        enabled: false,
       },
     }),
 
     createEvent({
-      kind: "event",
+      kind: "task",
+
       title: "動画編集",
-      description: "YMM4・サムネイル",
-      start: "2026-09-20T22:00",
-      end: "2026-09-20T23:30",
+
+      description: "YMM4 サムネイル",
+
+      start: "2026-09-20T20:00",
+
       repeat: {
-        type: "once",
-        days: [],
+        enabled: true,
+        intervalDays: 7,
+        startDate: "2026-09-20",
       },
     }),
   ];
 
-  for (const event of samples) {
+  for (const event of sample) {
     await saveEvent(event);
   }
+}
+
+// ============================================
+// 共通トランザクション
+// ============================================
+
+function transaction(storeName, mode, callback) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, mode);
+
+    callback(tx.objectStore(storeName));
+
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
 }

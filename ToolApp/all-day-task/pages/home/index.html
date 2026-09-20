@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Routine Timeline</title>
+
+    <link rel="stylesheet" href="home.css" />
+  </head>
+
+  <body>
+    <!-- ==========================
+         ヘッダー
+    =========================== -->
+
+    <header class="topbar">
+      <div class="header-left">
+        <h1 id="todayDate">9月20日（日）</h1>
+        <p id="clock">00:00:00</p>
+      </div>
+
+      <div class="header-right">
+        <button id="searchButton" class="icon-button" title="検索">🔍</button>
+
+        <button id="addButton" class="add-button" title="予定を追加">＋</button>
+      </div>
+    </header>
+
+    <!-- ==========================
+         メイン画面
+    =========================== -->
+
+    <main>
+      <!-- 今日 -->
+      <section id="todayContainer" class="today-container"></section>
+
+      <!-- 今後30日 -->
+      <section id="futureContainer" class="future-container"></section>
+    </main>
+
+    <!-- ==========================
+         追加・編集モーダル
+    =========================== -->
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">予定を追加</h2>
+
+          <button id="closeModal" class="close-button">✕</button>
+        </div>
+
+        <!-- 種類 -->
+
+        <div class="input-group">
+          <label>種類</label>
+
+          <div class="kind-selector">
+            <button id="kindEvent" class="kind active">📅 予定</button>
+
+            <button id="kindTask" class="kind">✅ タスク</button>
+          </div>
+        </div>
+
+        <!-- 表示名 -->
+
+        <div class="input-group">
+          <label for="eventTitle">表示名</label>
+
+          <input id="eventTitle" type="text" placeholder="例：国語開始" />
+        </div>
+
+        <!-- 詳細 -->
+
+        <div class="input-group">
+          <label for="eventDescription">詳細</label>
+
+          <textarea
+            id="eventDescription"
+            placeholder="問題集 Lesson5 など"
+          ></textarea>
+        </div>
+
+        <!-- 終日予定 -->
+
+        <div class="checkbox-row">
+          <input id="allDayCheck" type="checkbox" />
+
+          <label for="allDayCheck"> 終日予定 </label>
+        </div>
+
+        <!-- 開始日時 -->
+
+        <div class="input-group">
+          <label for="startDate"> 開始日時 </label>
+
+          <input id="startDate" type="datetime-local" />
+        </div>
+
+        <!-- 繰り返し -->
+
+        <div class="input-group">
+          <label>繰り返し</label>
+
+          <div class="repeat-selector">
+            <button id="repeatOnce" class="repeat active">単発</button>
+
+            <button id="repeatLoop" class="repeat">繰り返し</button>
+          </div>
+        </div>
+
+        <!-- 周期（日数） -->
+
+        <div id="repeatArea" class="input-group hidden">
+          <label for="repeatDays"> 何日ごとに繰り返しますか？ </label>
+
+          <div class="repeat-days-row">
+            <input id="repeatDays" type="number" min="1" value="7" />
+
+            <span>日ごと</span>
+          </div>
+
+          <small> 開始日を基準に繰り返します。 </small>
+        </div>
+
+        <!-- ボタン -->
+
+        <div class="modal-buttons">
+          <button id="saveButton" class="save-button">保存</button>
+
+          <button id="deleteButton" class="delete-button hidden">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================
+         JS
+    =========================== -->
+
+    <script type="module" src="home.js"></script>
+  </body>
+</html>

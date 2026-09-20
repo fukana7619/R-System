@@ -1,0 +1,762 @@
+/* ==========================================
+   Routine Timeline v1.0
+   pages/home/home.css
+========================================== */
+
+/* ---------- リセット ---------- */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0b0f14;
+  --surface: #141a22;
+  --surface-2: #1b2330;
+
+  --line: #293241;
+
+  --text: #f5f7fa;
+  --sub: #98a2b3;
+
+  --green: #22c55e;
+  --green-dark: #134e2c;
+
+  --blue: #3b82f6;
+  --yellow: #fbbf24;
+  --red: #ef4444;
+
+  --radius: 22px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+
+  color: var(--text);
+
+  font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+
+  max-width: 760px;
+
+  margin: auto;
+
+  padding: 28px 20px 80px;
+}
+
+/* ---------- スクロールバー ---------- */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #394455;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ==========================================
+   HEADER
+========================================== */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding-bottom: 18px;
+
+  margin-bottom: 28px;
+
+  background: rgba(11, 15, 20, 0.92);
+
+  backdrop-filter: blur(12px);
+}
+
+#todayDate {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+#clock {
+  color: var(--green);
+
+  font-size: 16px;
+
+  margin-top: 6px;
+
+  font-weight: 600;
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+}
+
+.icon-button {
+  width: 46px;
+  height: 46px;
+
+  border-radius: 50%;
+  border: none;
+
+  background: var(--surface);
+
+  color: white;
+
+  cursor: pointer;
+
+  font-size: 18px;
+}
+
+.icon-button:hover {
+  background: #253042;
+}
+
+.add-button {
+  width: 54px;
+  height: 54px;
+
+  border: none;
+
+  border-radius: 50%;
+
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+
+  color: white;
+
+  font-size: 30px;
+
+  cursor: pointer;
+
+  transition: 0.18s;
+}
+
+.add-button:hover {
+  transform: scale(1.05);
+}
+
+/* ==========================================
+   TODAY CARD
+========================================== */
+
+.today-container {
+  margin-bottom: 48px;
+}
+
+.today-card {
+  background: linear-gradient(180deg, #17452a, #123721);
+
+  border: 1px solid #24673f;
+
+  border-radius: 28px;
+
+  padding: 24px;
+}
+
+.today-title {
+  color: #d1fae5;
+
+  font-size: 13px;
+
+  letter-spacing: 1px;
+
+  text-transform: uppercase;
+
+  margin-bottom: 14px;
+}
+
+.next-card {
+  background: rgba(255, 255, 255, 0.05);
+
+  border-radius: 18px;
+
+  padding: 18px;
+
+  margin-bottom: 20px;
+}
+
+.next-card .time {
+  color: #7dd3fc;
+
+  font-size: 15px;
+
+  margin-bottom: 8px;
+}
+
+.next-card .title {
+  font-size: 24px;
+  font-weight: 700;
+
+  margin-bottom: 10px;
+}
+
+/* ==========================================
+   今日のセクション
+========================================== */
+
+.today-section {
+  margin-top: 18px;
+}
+
+.today-section-title {
+  color: #b7efd2;
+
+  font-size: 14px;
+
+  margin-bottom: 10px;
+
+  letter-spacing: 0.5px;
+
+  text-transform: uppercase;
+}
+
+/* ==========================================
+   FUTURE
+========================================== */
+
+.future-container {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.day-block {
+  scroll-margin-top: 80px;
+}
+
+.day-title {
+  font-size: 24px;
+
+  margin-bottom: 14px;
+
+  font-weight: 700;
+}
+
+.section-label {
+  color: #6ea8ff;
+
+  font-size: 13px;
+
+  margin-bottom: 12px;
+
+  letter-spacing: 1px;
+
+  text-transform: uppercase;
+}
+
+/* ==========================================
+   EVENT CARD
+========================================== */
+
+.card {
+  background: var(--surface);
+
+  border: 1px solid var(--line);
+
+  border-radius: 20px;
+
+  padding: 18px;
+
+  margin-bottom: 12px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s,
+    border 0.15s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+
+  border-color: #3b82f6;
+}
+
+.card:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- タスク ---------- */
+
+.task-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.task-check {
+  width: 22px;
+  height: 22px;
+
+  accent-color: #22c55e;
+
+  margin-top: 5px;
+
+  cursor: pointer;
+}
+
+.card-info {
+  flex: 1;
+}
+
+/* ---------- 終日 ---------- */
+
+.badge {
+  display: inline-flex;
+
+  align-items: center;
+
+  padding: 5px 12px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+
+  background: #24476b;
+
+  margin-bottom: 12px;
+}
+
+.badge.allday {
+  background: #155c37;
+
+  color: #b7f7cb;
+}
+
+/* ---------- 時刻 ---------- */
+
+.time {
+  color: #7dd3fc;
+
+  font-size: 14px;
+
+  margin-bottom: 8px;
+
+  font-weight: 600;
+}
+
+.title {
+  font-size: 19px;
+
+  font-weight: 700;
+
+  margin-bottom: 6px;
+}
+
+.description {
+  color: var(--sub);
+
+  line-height: 1.5;
+
+  font-size: 14px;
+}
+
+/* ==========================================
+   あと○分
+========================================== */
+
+.countdown {
+  display: inline-flex;
+
+  align-items: center;
+
+  padding: 6px 12px;
+
+  border-radius: 999px;
+
+  font-size: 13px;
+
+  font-weight: 700;
+
+  background: #203a5b;
+
+  color: #8ec9ff;
+}
+
+.countdown.warning {
+  background: #5a4312;
+
+  color: #ffd166;
+}
+
+.countdown.danger {
+  background: #642020;
+
+  color: #ffa4a4;
+}
+
+.countdown.started {
+  background: #14532d;
+
+  color: #9ef3bf;
+}
+
+/* ==========================================
+   既読ボタン
+========================================== */
+
+.read-button {
+  margin-top: 14px;
+
+  width: 100%;
+
+  padding: 13px;
+
+  border: none;
+
+  border-radius: 14px;
+
+  background: #16a34a;
+
+  color: white;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: 0.15s;
+}
+
+.read-button:hover {
+  background: #15803d;
+}
+
+/* ==========================================
+   カード削除アニメーション
+========================================== */
+
+.card.removing {
+  overflow: hidden;
+
+  opacity: 0;
+
+  transform: translateY(-8px);
+
+  max-height: 0;
+
+  margin: 0;
+
+  padding-top: 0;
+  padding-bottom: 0;
+
+  transition:
+    max-height 0.3s ease,
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    padding 0.25s ease,
+    margin 0.25s ease;
+}
+
+/* ==========================================
+   予定なしカード
+========================================== */
+
+.empty-day {
+  border: 2px dashed #334155;
+
+  border-radius: 18px;
+
+  padding: 22px;
+
+  text-align: center;
+
+  color: #7d8795;
+
+  background: #10161e;
+}
+
+/* ==========================================
+   MODAL
+========================================== */
+
+.modal {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.65);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  padding: 20px;
+
+  z-index: 999;
+}
+
+.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: #141a22;
+
+  width: 100%;
+  max-width: 560px;
+
+  border-radius: 24px;
+
+  padding: 24px;
+
+  position: relative;
+
+  max-height: calc(100vh - 40px);
+
+  overflow-y: auto;
+
+  border: 1px solid #253040;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  margin-bottom: 24px;
+}
+
+.modal-header h2 {
+  font-size: 24px;
+}
+
+.close-button {
+  width: 40px;
+  height: 40px;
+
+  border-radius: 50%;
+  border: none;
+
+  background: #1e293b;
+
+  color: white;
+
+  cursor: pointer;
+}
+
+/* ---------- 入力 ---------- */
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+
+  gap: 8px;
+
+  margin-bottom: 18px;
+}
+
+.input-group label {
+  color: #a8b3c2;
+
+  font-size: 13px;
+}
+
+.input-group input,
+.input-group textarea {
+  background: #10161e;
+
+  border: 1px solid #293241;
+
+  color: white;
+
+  padding: 13px 14px;
+
+  border-radius: 14px;
+
+  font-size: 15px;
+}
+
+.input-group textarea {
+  resize: vertical;
+
+  min-height: 110px;
+}
+
+.input-group small {
+  color: #7f8c99;
+
+  margin-top: 4px;
+}
+
+/* ---------- 種類 ---------- */
+
+.kind-selector,
+.repeat-selector {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 10px;
+}
+
+.kind,
+.repeat {
+  padding: 13px;
+
+  border: none;
+
+  border-radius: 14px;
+
+  background: #1b2330;
+
+  color: #c7d0db;
+
+  cursor: pointer;
+}
+
+.kind.active,
+.repeat.active {
+  background: #2563eb;
+
+  color: white;
+}
+
+/* ---------- チェック ---------- */
+
+.checkbox-row {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  margin-bottom: 18px;
+}
+
+.checkbox-row input {
+  width: 20px;
+  height: 20px;
+
+  accent-color: #22c55e;
+}
+
+/* ---------- 周期 ---------- */
+
+.repeat-days-row {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+.repeat-days-row input {
+  width: 120px;
+}
+
+/* ---------- 保存削除 ---------- */
+
+.modal-buttons {
+  position: sticky;
+
+  bottom: -24px;
+
+  background: #141a22;
+
+  padding-top: 18px;
+
+  display: flex;
+
+  gap: 12px;
+}
+
+.save-button,
+.delete-button {
+  flex: 1;
+
+  border: none;
+
+  border-radius: 16px;
+
+  padding: 15px;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.save-button {
+  background: #2563eb;
+
+  color: white;
+}
+
+.delete-button {
+  background: #c62828;
+
+  color: white;
+}
+
+/* ==========================================
+   PC
+========================================== */
+
+@media (min-width: 900px) {
+  body {
+    max-width: 820px;
+  }
+
+  .today-card {
+    padding: 30px;
+  }
+
+  .next-card .title {
+    font-size: 28px;
+  }
+}
+
+/* ==========================================
+   スマホ
+========================================== */
+
+@media (max-width: 640px) {
+  body {
+    padding: 20px 14px 60px;
+  }
+
+  #todayDate {
+    font-size: 28px;
+  }
+
+  .topbar {
+    margin-bottom: 22px;
+  }
+
+  .today-card {
+    padding: 20px;
+  }
+
+  .day-title {
+    font-size: 21px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .next-card .title {
+    font-size: 22px;
+  }
+
+  .modal-content {
+    padding: 18px;
+  }
+}

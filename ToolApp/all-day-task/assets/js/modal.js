@@ -1,56 +1,77 @@
-import { createEvent, saveEvent, deleteEvent as removeEvent } from "./db.js";
+// ==========================================
+// Routine Timeline
+// assets/js/modal.js
+// 追加・編集モーダル
+// ==========================================
 
-import { renderTimeline } from "./events.js";
+import { createEvent, saveEvent, deleteEvent } from "./db.js";
 
-let editingEvent = null;
-let selectedKind = "event";
-let selectedDays = [];
+import { renderTimeline } from "./timeline.js";
+
+import { toDateTimeLocal } from "./utils.js";
+
+// -------------------------------
+// DOM
+// -------------------------------
 
 const modal = document.getElementById("modal");
-const heading = document.getElementById("modalHeading");
+
+const modalTitle = document.getElementById("modalTitle");
 
 const titleInput = document.getElementById("eventTitle");
 const descriptionInput = document.getElementById("eventDescription");
 
-const allDayCheck = document.getElementById("allDayCheck");
 const startInput = document.getElementById("startDate");
-const endInput = document.getElementById("endDate");
 
-const repeatSelect = document.getElementById("repeatType");
-const weeklySelector = document.getElementById("weeklySelector");
-
-const saveButton = document.getElementById("saveEvent");
-const deleteButton = document.getElementById("deleteEvent");
+const allDayCheck = document.getElementById("allDayCheck");
 
 const kindEventButton = document.getElementById("kindEvent");
 const kindTaskButton = document.getElementById("kindTask");
 
-const weekdayButtons = [...weeklySelector.querySelectorAll("button")];
+const repeatOnceButton = document.getElementById("repeatOnce");
+const repeatLoopButton = document.getElementById("repeatLoop");
 
-// --------------------------------------------
-// 開く（追加）
-// --------------------------------------------
+const repeatArea = document.getElementById("repeatArea");
+const repeatDaysInput = document.getElementById("repeatDays");
+
+const saveButton = document.getElementById("saveButton");
+const deleteButton = document.getElementById("deleteButton");
+
+const closeButton = document.getElementById("closeModal");
+
+// -------------------------------
+// 状態
+// -------------------------------
+
+let editingEvent = null;
+
+let selectedKind = "event";
+let repeatEnabled = false;
+
+// ==========================================
+// モーダルを開く（追加）
+// ==========================================
 
 export function openCreateModal() {
   editingEvent = null;
 
-  heading.textContent = "予定を追加";
+  modalTitle.textContent = "予定を追加";
 
   deleteButton.classList.add("hidden");
 
-  clearForm();
+  resetForm();
 
   modal.classList.remove("hidden");
 }
 
-// --------------------------------------------
-// 開く（編集）
-// --------------------------------------------
+// ==========================================
+// モーダルを開く（編集）
+// ==========================================
 
 export function openModal(event) {
   editingEvent = event;
 
-  heading.textContent = "予定を編集";
+  modalTitle.textContent = "予定を編集";
 
   deleteButton.classList.remove("hidden");
 
@@ -59,23 +80,21 @@ export function openModal(event) {
   modal.classList.remove("hidden");
 }
 
-// --------------------------------------------
+// ==========================================
 // 閉じる
-// --------------------------------------------
+// ==========================================
 
 export function closeModal() {
   modal.classList.add("hidden");
 }
 
-// --------------------------------------------
+// ==========================================
 // フォーム初期化
-// --------------------------------------------
+// ==========================================
 
-function clearForm() {
+function resetForm() {
   selectedKind = "event";
-  selectedDays = [];
-
-  setKindButtons();
+  repeatEnabled = false;
 
   titleInput.value = "";
   descriptionInput.value = "";
@@ -84,25 +103,24 @@ function clearForm() {
 
   const now = new Date();
 
-  const later = new Date(now.getTime() + 60 * 60 * 1000);
+  now.setMinutes(now.getMinutes() + 30);
 
-  startInput.value = formatDate(now);
-  endInput.value = formatDate(later);
+  startInput.value = toDateTimeLocal(now);
 
-  repeatSelect.value = "once";
+  repeatDaysInput.value = 7;
 
-  updateWeeklySelector();
+  updateKindButtons();
+  updateRepeatButtons();
 }
 
-// --------------------------------------------
-// 編集データ読み込み
-// --------------------------------------------
+// ==========================================
+// 編集内容をフォームへ
+// ==========================================
 
 function fillForm(event) {
   selectedKind = event.kind;
-  selectedDays = [...event.repeat.days];
 
-  setKindButtons();
+  repeatEnabled = event.repeat.enabled;
 
   titleInput.value = event.title;
   descriptionInput.value = event.description;
@@ -110,48 +128,54 @@ function fillForm(event) {
   allDayCheck.checked = event.allDay;
 
   startInput.value = event.start.slice(0, 16);
-  endInput.value = event.end.slice(0, 16);
 
-  repeatSelect.value = event.repeat.type;
+  repeatDaysInput.value = event.repeat.intervalDays;
 
-  updateWeeklySelector();
+  updateKindButtons();
+  updateRepeatButtons();
 }
 
-// --------------------------------------------
+// ==========================================
 // 保存
-// --------------------------------------------
+// ==========================================
 
 saveButton.onclick = async () => {
   if (titleInput.value.trim() === "") {
     alert("表示名を入力してください。");
+
     return;
   }
 
-  const data = editingEvent ? { ...editingEvent } : createEvent();
+  const event = editingEvent ? structuredClone(editingEvent) : createEvent();
 
-  data.kind = selectedKind;
-  data.title = titleInput.value.trim();
-  data.description = descriptionInput.value.trim();
+  event.kind = selectedKind;
 
-  data.allDay = allDayCheck.checked;
+  event.title = titleInput.value.trim();
 
-  data.start = startInput.value;
-  data.end = endInput.value;
+  event.description = descriptionInput.value.trim();
 
-  data.repeat = {
-    type: repeatSelect.value,
-    days: selectedDays,
+  event.allDay = allDayCheck.checked;
+
+  event.start = startInput.value;
+
+  event.repeat = {
+    enabled: repeatEnabled,
+
+    intervalDays: Number(repeatDaysInput.value),
+
+    startDate: startInput.value.slice(0, 10),
   };
 
-  await saveEvent(data);
+  await saveEvent(event);
 
   closeModal();
+
   renderTimeline();
 };
 
-// --------------------------------------------
+// ==========================================
 // 削除
-// --------------------------------------------
+// ==========================================
 
 deleteButton.onclick = async () => {
   if (!editingEvent) return;
@@ -160,65 +184,76 @@ deleteButton.onclick = async () => {
 
   if (!ok) return;
 
-  await removeEvent(editingEvent.id);
+  await deleteEvent(editingEvent.id);
 
   closeModal();
+
   renderTimeline();
 };
 
-// --------------------------------------------
+// ==========================================
 // 種類切替
-// --------------------------------------------
+// ==========================================
 
 kindEventButton.onclick = () => {
   selectedKind = "event";
-  setKindButtons();
+
+  updateKindButtons();
 };
 
 kindTaskButton.onclick = () => {
   selectedKind = "task";
-  setKindButtons();
+
+  updateKindButtons();
 };
 
-function setKindButtons() {
+function updateKindButtons() {
   kindEventButton.classList.toggle("active", selectedKind === "event");
 
   kindTaskButton.classList.toggle("active", selectedKind === "task");
 }
 
-// --------------------------------------------
-// 繰り返し変更
-// --------------------------------------------
+// ==========================================
+// 単発・繰り返し切替
+// ==========================================
 
-repeatSelect.onchange = updateWeeklySelector;
+repeatOnceButton.onclick = () => {
+  repeatEnabled = false;
 
-function updateWeeklySelector() {
-  weeklySelector.classList.toggle("hidden", repeatSelect.value !== "weekly");
+  updateRepeatButtons();
+};
 
-  weekdayButtons.forEach((button) => {
-    const day = Number(button.dataset.day);
+repeatLoopButton.onclick = () => {
+  repeatEnabled = true;
 
-    button.classList.toggle("active", selectedDays.includes(day));
-  });
+  updateRepeatButtons();
+};
+
+function updateRepeatButtons() {
+  repeatOnceButton.classList.toggle("active", !repeatEnabled);
+
+  repeatLoopButton.classList.toggle("active", repeatEnabled);
+
+  repeatArea.classList.toggle("hidden", !repeatEnabled);
 }
 
-weekdayButtons.forEach((button) => {
-  button.onclick = () => {
-    const day = Number(button.dataset.day);
+// ==========================================
+// 終日予定
+// ==========================================
 
-    if (selectedDays.includes(day)) {
-      selectedDays = selectedDays.filter((d) => d !== day);
-    } else {
-      selectedDays.push(day);
-    }
+allDayCheck.onchange = () => {
+  if (allDayCheck.checked) {
+    const date = startInput.value.slice(0, 10);
 
-    updateWeeklySelector();
-  };
-});
+    startInput.value = `${date}T00:00`;
+  }
+};
 
-// --------------------------------------------
-// モーダル外クリック
-// --------------------------------------------
+// ==========================================
+// 閉じる処理
+// ==========================================
+
+closeButton.onclick = closeModal;
 
 modal.onclick = (e) => {
   if (e.target === modal) {
@@ -226,19 +261,8 @@ modal.onclick = (e) => {
   }
 };
 
-document.getElementById("closeModal").onclick = closeModal;
-
-// --------------------------------------------
-// 日付フォーマット
-// --------------------------------------------
-
-function formatDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-
-  const h = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-
-  return `${y}-${m}-${d}T${h}:${min}`;
-}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeModal();
+  }
+});
