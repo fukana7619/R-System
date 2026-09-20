@@ -785,3 +785,17 @@ body {
   height: auto;
   min-height: unset;
 }
+
+.task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.task-check {
+  width: 22px;
+  height: 22px;
+  accent-color: #22c55e;
+  cursor: pointer;
+  margin-top: 4px;
+}

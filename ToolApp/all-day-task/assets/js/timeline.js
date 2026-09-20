@@ -280,6 +280,33 @@ function createCard(event, isToday) {
     card.appendChild(readButton);
   }
 
+  // タスクならチェックボックスを左に付ける
+  if (event.kind === "task") {
+    const row = document.createElement("div");
+    row.className = "task-row";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "task-check";
+
+    checkbox.onclick = async (e) => {
+      e.stopPropagation();
+
+      await markAsRead(event.id, event.instanceDate);
+
+      card.classList.add("removing");
+
+      setTimeout(renderTimeline, 300);
+    };
+
+    row.appendChild(checkbox);
+    row.appendChild(info);
+
+    card.appendChild(row);
+  } else {
+    card.appendChild(info);
+  }
+
   // ----------------------
   // 編集
   // ----------------------
