@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Routine Timeline</title>
+
+    <link rel="stylesheet" href="home.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1 id="todayDate"></h1>
+        <p id="clock"></p>
+      </div>
+
+      <button id="addButton">＋</button>
+    </header>
+
+    <main id="timeline"></main>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <button id="closeModal" class="close">✕</button>
+
+        <h2 id="modalHeading">予定を追加</h2>
+
+        <!-- 種類 -->
+        <div class="input-group">
+          <label>種類</label>
+
+          <div class="kind-select">
+            <button id="kindEvent" class="kind active">📅 予定</button>
+
+            <button id="kindTask" class="kind">✅ タスク</button>
+          </div>
+        </div>
+
+        <!-- タイトル -->
+        <div class="input-group">
+          <label>表示名</label>
+          <input id="eventTitle" type="text" />
+        </div>
+
+        <!-- 詳細 -->
+        <div class="input-group">
+          <label>詳細</label>
+          <textarea id="eventDescription"></textarea>
+        </div>
+
+        <!-- 終日 -->
+        <div class="input-group checkbox-row">
+          <input id="allDayCheck" type="checkbox" />
+
+          <label>終日予定</label>
+        </div>
+
+        <!-- 日付 -->
+        <div class="datetime-grid">
+          <div class="input-group">
+            <label>開始日時</label>
+
+            <input id="startDate" type="datetime-local" />
+          </div>
+
+          <div class="input-group">
+            <label>終了日時</label>
+
+            <input id="endDate" type="datetime-local" />
+          </div>
+        </div>
+
+        <!-- 繰り返し -->
+        <div class="input-group">
+          <label>繰り返し</label>
+
+          <select id="repeatType">
+            <option value="once">単発</option>
+            <option value="daily">毎日</option>
+            <option value="weekly">毎週</option>
+            <option value="monthly">毎月</option>
+          </select>
+        </div>
+
+        <!-- 毎週 -->
+        <div id="weeklySelector" class="input-group hidden">
+          <label>曜日</label>
+
+          <div class="weekday-grid">
+            <button data-day="0">日</button>
+            <button data-day="1">月</button>
+            <button data-day="2">火</button>
+            <button data-day="3">水</button>
+            <button data-day="4">木</button>
+            <button data-day="5">金</button>
+            <button data-day="6">土</button>
+          </div>
+        </div>
+
+        <div class="modal-buttons">
+          <button id="saveEvent" class="edit">保存</button>
+
+          <button id="deleteEvent" class="delete hidden">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="home.js"></script>
+  </body>
+</html>
