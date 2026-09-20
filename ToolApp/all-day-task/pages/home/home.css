@@ -74,8 +74,8 @@ body {
   z-index: 100;
 
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
 
   padding-bottom: 18px;
 
@@ -86,8 +86,16 @@ body {
   backdrop-filter: blur(12px);
 }
 
+.header-left {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+}
+
 #todayDate {
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 800;
   letter-spacing: 0.5px;
 }
@@ -95,9 +103,7 @@ body {
 #clock {
   color: var(--green);
 
-  font-size: 16px;
-
-  margin-top: 6px;
+  font-size: 24px;
 
   font-weight: 600;
 }
@@ -106,6 +112,9 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: 14px;
 }
 
 .undo-button {
@@ -113,8 +122,8 @@ body {
   background: rgba(15, 23, 42, 0.8);
   color: #e2e8f0;
   border-radius: 999px;
-  padding: 10px 14px;
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: 0.15s;
@@ -131,8 +140,8 @@ body {
 }
 
 .icon-button {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
 
   border-radius: 50%;
   border: none;
@@ -151,8 +160,8 @@ body {
 }
 
 .add-button {
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
 
   border: none;
 
@@ -162,7 +171,7 @@ body {
 
   color: white;
 
-  font-size: 30px;
+  font-size: 25px;
 
   cursor: pointer;
 
@@ -171,6 +180,20 @@ body {
 
 .add-button:hover {
   transform: scale(1.05);
+}
+
+@media (max-width: 520px) {
+  .header-left {
+    gap: 8px;
+  }
+
+  #todayDate {
+    font-size: 23px;
+  }
+
+  #clock {
+    font-size: 20px;
+  }
 }
 
 /* ==========================================
