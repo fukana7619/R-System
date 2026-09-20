@@ -8,6 +8,8 @@ import { createEvent, saveEvent, deleteEvent } from "./db.js";
 
 import { renderTimeline } from "./timeline.js";
 
+import { pushUndoAction } from "./history.js";
+
 import { toDateTimeLocal } from "./utils.js";
 
 // -------------------------------
@@ -148,6 +150,8 @@ saveButton.onclick = async () => {
 
   const event = editingEvent ? structuredClone(editingEvent) : createEvent();
 
+  const before = editingEvent ? structuredClone(editingEvent) : null;
+
   event.kind = selectedKind;
 
   event.title = titleInput.value.trim();
@@ -168,6 +172,12 @@ saveButton.onclick = async () => {
 
   await saveEvent(event);
 
+  pushUndoAction({
+    type: "save",
+    before,
+    after: event,
+  });
+
   closeModal();
 
   renderTimeline();
@@ -184,7 +194,14 @@ deleteButton.onclick = async () => {
 
   if (!ok) return;
 
+  const deletedEvent = structuredClone(editingEvent);
+
   await deleteEvent(editingEvent.id);
+
+  pushUndoAction({
+    type: "delete",
+    event: deletedEvent,
+  });
 
   closeModal();
 

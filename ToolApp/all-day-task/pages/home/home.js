@@ -10,6 +10,8 @@ import { initTimeline, renderTimeline } from "../../assets/js/timeline.js";
 
 import { openModal, openCreateModal } from "../../assets/js/modal.js";
 
+import { initUndoButton } from "../../assets/js/history.js";
+
 // --------------------------
 // 初期化
 // --------------------------
@@ -32,3 +34,6 @@ setInterval(renderTimeline, 1000);
 
 // ＋ボタン
 document.getElementById("addButton").onclick = openCreateModal;
+
+// 元に戻す
+initUndoButton();

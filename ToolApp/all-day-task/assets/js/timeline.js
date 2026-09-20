@@ -6,6 +6,8 @@
 
 import { getTimeline, markAsRead } from "./db.js";
 
+import { pushUndoAction } from "./history.js";
+
 import { formatDay, formatTime, getCountdown, hasStarted } from "./utils.js";
 
 let todayContainer;
@@ -273,6 +275,12 @@ function createCard(event, isToday) {
     readButton.onclick = async (e) => {
       e.stopPropagation();
 
+      pushUndoAction({
+        type: "read",
+        eventId: event.id,
+        date: event.instanceDate,
+      });
+
       await markAsRead(event.id, event.instanceDate);
 
       card.classList.add("removing");
@@ -282,8 +290,6 @@ function createCard(event, isToday) {
 
     info.appendChild(readButton);
   }
-
-  card.appendChild(info);
 
   // タスクならチェックボックスを左に付ける
   if (event.kind === "task") {
@@ -296,6 +302,12 @@ function createCard(event, isToday) {
 
     checkbox.onclick = async (e) => {
       e.stopPropagation();
+
+      pushUndoAction({
+        type: "read",
+        eventId: event.id,
+        date: event.instanceDate,
+      });
 
       await markAsRead(event.id, event.instanceDate);
 
