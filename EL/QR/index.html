@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <meta name="theme-color" content="#000000">
+
+    <title>QR Scanner</title>
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+    <main class="scanner-page">
+
+        <div class="scanner-container">
+
+            <video
+                id="qr-video"
+                autoplay
+                muted
+                playsinline
+            ></video>
+
+            <div class="scan-frame">
+                <span class="corner top-left"></span>
+                <span class="corner top-right"></span>
+                <span class="corner bottom-left"></span>
+                <span class="corner bottom-right"></span>
+
+                <div class="scan-line"></div>
+            </div>
+
+            <div id="status" class="status">
+                QRコードをカメラに映してください
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- QR Scanner -->
+    <script src="https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+
+    <!-- 自分のJS -->
+    <script src="./app.js"></script>
+
+</body>
+</html>
