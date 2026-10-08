@@ -1,140 +1,243 @@
 'use strict';
 
-const video = document.getElementById('qr-video');
+const video = document.getElementById('video');
 const status = document.getElementById('status');
 
-let isRedirecting = false;
+let scanning = true;
+let detector = null;
 
-// ------------------------------------
-// QR Scanner
-// ------------------------------------
+let lastDetectionTime = 0;
 
-const qrScanner = new QrScanner(
-    video,
+// --------------------------------------------------
+// QR読み取り成功
+// --------------------------------------------------
 
-    result => {
+function handleResult(value) {
 
-        // すでに遷移処理中なら無視
-        if (isRedirecting) {
-            return;
-        }
-
-        const scannedText = result.data.trim();
-
-        console.log('QR:', scannedText);
-
-        // --------------------------------
-        // URLチェック
-        // --------------------------------
-
-        if (
-            scannedText.startsWith('http://') ||
-            scannedText.startsWith('https://')
-        ) {
-
-            isRedirecting = true;
-
-            // --------------------------------
-            // 即座にUI停止
-            // --------------------------------
-
-            status.textContent = '移動しています…';
-
-            // アニメーション停止
-            document.querySelector('.scan-line').style.animation = 'none';
-
-            // --------------------------------
-            // カメラ・スキャナ停止
-            // --------------------------------
-
-            qrScanner.stop();
-            qrScanner.destroy();
-
-            // --------------------------------
-            // バイブレーション
-            // --------------------------------
-
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-
-            // --------------------------------
-            // 即リダイレクト
-            // --------------------------------
-
-            window.location.replace(scannedText);
-
-            return;
-        }
-
-        // --------------------------------
-        // URLではなかった場合
-        // --------------------------------
-
-        console.log('URLではないデータ:', scannedText);
-
-    },
-
-    {
-        // デコード失敗は無視
-        onDecodeError: () => {},
-
-        // できるだけ高速
-        maxScansPerSecond: 25,
-
-        // QrScanner側のハイライト
-        highlightScanRegion: false,
-        highlightCodeOutline: false,
-
-        // 背面カメラ
-        preferredCamera: 'environment'
+    if (!scanning) {
+        return;
     }
-);
+
+    if (!value) {
+        return;
+    }
+
+    const text = value.trim();
+
+    console.log('QR:', text);
+
+    // URLだけ処理
+    if (
+        text.startsWith('https://') ||
+        text.startsWith('http://')
+    ) {
+
+        scanning = false;
+
+        // バイブレーション
+        if (navigator.vibrate) {
+            navigator.vibrate(40);
+        }
+
+        // UI停止
+        status.textContent = '移動中...';
+
+        // カメラ停止
+        if (video.srcObject) {
+
+            video.srcObject
+                .getTracks()
+                .forEach(track => track.stop());
+
+            video.srcObject = null;
+        }
+
+        // 即遷移
+        window.location.replace(text);
+    }
+}
 
 
-// ------------------------------------
-// カメラ起動
-// ------------------------------------
+// --------------------------------------------------
+// カメラ
+// --------------------------------------------------
 
-async function startScanner() {
+async function startCamera() {
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+
+        video: {
+            facingMode: {
+                ideal: 'environment'
+            },
+
+            // QR検出用に高解像度
+            width: {
+                ideal: 1920
+            },
+
+            height: {
+                ideal: 1080
+            },
+
+            // オートフォーカスを要求
+            focusMode: 'continuous'
+        },
+
+        audio: false
+    });
+
+    video.srcObject = stream;
+
+    await video.play();
+
+    status.textContent = 'QRコードを探しています...';
+}
+
+
+// --------------------------------------------------
+// BarcodeDetector
+// --------------------------------------------------
+
+async function startNativeScanner() {
+
+    // APIそのものがない
+    if (!('BarcodeDetector' in window)) {
+
+        throw new Error(
+            'BarcodeDetector is not supported'
+        );
+    }
+
+    // QRに対応しているか確認
+    const formats =
+        await BarcodeDetector.getSupportedFormats();
+
+    if (!formats.includes('qr_code')) {
+
+        throw new Error(
+            'QR detection is not supported'
+        );
+    }
+
+    // QRだけ検出
+    detector = new BarcodeDetector({
+        formats: ['qr_code']
+    });
+
+    scanLoop();
+}
+
+
+// --------------------------------------------------
+// 高速スキャンループ
+// --------------------------------------------------
+
+async function scanLoop() {
+
+    if (!scanning) {
+        return;
+    }
+
+    // カメラ映像がまだ準備できていない
+    if (
+        video.readyState <
+        HTMLMediaElement.HAVE_ENOUGH_DATA
+    ) {
+
+        requestAnimationFrame(scanLoop);
+
+        return;
+    }
+
+    // 前回検出から最低限の間隔
+    const now = performance.now();
+
+    if (now - lastDetectionTime < 20) {
+
+        requestAnimationFrame(scanLoop);
+
+        return;
+    }
+
+    lastDetectionTime = now;
 
     try {
 
-        status.textContent = 'カメラを起動しています…';
+        const results =
+            await detector.detect(video);
 
-        await qrScanner.start();
+        if (results.length > 0) {
 
-        status.textContent =
-            'QRコードをカメラに映してください';
+            const result = results[0];
+
+            handleResult(
+                result.rawValue
+            );
+
+            return;
+        }
 
     } catch (error) {
 
-        console.error('Camera error:', error);
+        // 一時的な検出エラーは無視
+        console.debug(
+            'detect:',
+            error
+        );
+    }
+
+    requestAnimationFrame(scanLoop);
+}
+
+
+// --------------------------------------------------
+// 起動
+// --------------------------------------------------
+
+async function main() {
+
+    try {
+
+        await startCamera();
+
+        await startNativeScanner();
+
+    } catch (error) {
+
+        console.error(error);
 
         status.textContent =
-            'カメラを使用できません。カメラの権限を確認してください。';
+            'このブラウザでは高速QR読み取りを利用できません。';
 
     }
 }
 
 
-// ------------------------------------
-// ページロード後に起動
-// ------------------------------------
+// --------------------------------------------------
+// 開始
+// --------------------------------------------------
 
-startScanner();
+main();
 
 
-// ------------------------------------
-// ページを離れるとき
-// ------------------------------------
+// --------------------------------------------------
+// ページ離脱時にカメラ停止
+// --------------------------------------------------
 
-window.addEventListener('pagehide', () => {
+window.addEventListener(
+    'pagehide',
+    () => {
 
-    try {
-        qrScanner.destroy();
-    } catch (e) {
-        // 何もしない
+        scanning = false;
+
+        if (video.srcObject) {
+
+            video.srcObject
+                .getTracks()
+                .forEach(track => track.stop());
+
+        }
+
     }
-
-});
+);
