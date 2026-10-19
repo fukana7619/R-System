@@ -59,6 +59,15 @@
         letter-spacing: 0.12em;
         font-variant-numeric: tabular-nums;
       }
+      #weekday {
+        font-size: clamp(1.4rem, 4.5vw, 3rem);
+        font-weight: 100;
+        letter-spacing: 0.12em;
+        font-variant-numeric: tabular-nums;
+      }
+      #weekday.hidden-el {
+        display: none;
+      }
       .seg {
         font-size: clamp(3.5rem, 18vw, 14rem);
         font-weight: 100;
@@ -339,7 +348,10 @@
     </style>
   </head>
   <body>
-    <div id="date-wrap"><span id="date">----/--/--</span></div>
+    <div id="date-wrap">
+      <span id="date">----/--/--</span>
+      <span id="weekday">（—）</span>
+    </div>
     <div id="time-wrap">
       <span id="hhmm-group">
         <span class="seg" id="hh">--</span>
@@ -412,6 +424,14 @@
             <span class="toggle-label">日付</span>
             <label class="toggle"
               ><input type="checkbox" id="tog-date" checked /><span
+                class="toggle-track"
+              ></span
+            ></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">曜日</span>
+            <label class="toggle"
+              ><input type="checkbox" id="tog-weekday" checked /><span
                 class="toggle-track"
               ></span
             ></label>
@@ -547,6 +567,7 @@
         src: "device",
         ntpOffset: 0,
         showDate: true,
+        showWeekday: true,
         showHHMM: true,
         showSec: true,
         dateSize: 100,
@@ -556,6 +577,7 @@
       const SAVE_KEYS = [
         "src",
         "showDate",
+        "showWeekday",
         "showHHMM",
         "showSec",
         "dateSize",
@@ -831,6 +853,8 @@
         const now = state.src === "ntp" ? new Date(getNtpNow()) : new Date();
         document.getElementById("date").textContent =
           `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        document.getElementById("weekday").textContent =
+          `（${["日", "月", "火", "水", "木", "金", "土"][now.getDay()]}）`;
         document.getElementById("hh").textContent = pad(now.getHours());
         document.getElementById("mm").textContent = pad(now.getMinutes());
         document.getElementById("sec").textContent = pad(now.getSeconds());
@@ -851,6 +875,9 @@
           .getElementById("date-wrap")
           .classList.toggle("hidden-el", !state.showDate);
         document
+          .getElementById("weekday")
+          .classList.toggle("hidden-el", !state.showWeekday);
+        document
           .getElementById("time-wrap")
           .classList.toggle("hidden-el", !(state.showHHMM || state.showSec));
         document
@@ -869,8 +896,9 @@
       }
       function applyDateSize() {
         const s = state.dateSize / 100;
-        document.getElementById("date").style.fontSize =
-          `clamp(${1.4 * s}rem, ${4.5 * s}vw, ${3 * s}rem)`;
+        const fontSize = `clamp(${1.4 * s}rem, ${4.5 * s}vw, ${3 * s}rem)`;
+        document.getElementById("date").style.fontSize = fontSize;
+        document.getElementById("weekday").style.fontSize = fontSize;
       }
       function applyTimeSize() {
         const s = state.timeSize / 100;
@@ -889,6 +917,7 @@
         document.querySelector(`input[name=src][value=${state.src}]`).checked =
           true;
         document.getElementById("tog-date").checked = state.showDate;
+        document.getElementById("tog-weekday").checked = state.showWeekday;
         document.getElementById("tog-hhmm").checked = state.showHHMM;
         document.getElementById("tog-sec").checked = state.showSec;
         document.getElementById("tog-wakelock").checked = state.wakeLock;
@@ -939,6 +968,7 @@
 
       [
         ["tog-date", "showDate"],
+        ["tog-weekday", "showWeekday"],
         ["tog-hhmm", "showHHMM"],
         ["tog-sec", "showSec"],
       ].forEach(([id, key]) => {
