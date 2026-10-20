@@ -225,6 +225,23 @@
         cursor: pointer;
       }
 
+      .select-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: #ddd;
+      }
+      .select-row select {
+        min-width: 88px;
+        padding: 6px 8px;
+        background: #1a1a1a;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 4px;
+        color: #fff;
+        font: inherit;
+      }
+
       /* NTPボックス */
       #ntp-box {
         margin-top: 8px;
@@ -452,6 +469,19 @@
               ></span
             ></label>
           </div>
+          <label class="select-row" for="final-hour">
+            <span>最終時間表示</span>
+            <select id="final-hour">
+              <option value="23">２３</option>
+              <option value="24">２４</option>
+              <option value="25">２５</option>
+              <option value="26">２６</option>
+              <option value="27">２７</option>
+              <option value="28">２８</option>
+              <option value="29">２９</option>
+              <option value="30">３０</option>
+            </select>
+          </label>
         </div>
       </div>
 
@@ -570,6 +600,7 @@
         showWeekday: true,
         showHHMM: true,
         showSec: true,
+        finalHour: 23,
         dateSize: 100,
         timeSize: 100,
         wakeLock: false,
@@ -580,6 +611,7 @@
         "showWeekday",
         "showHHMM",
         "showSec",
+        "finalHour",
         "dateSize",
         "timeSize",
         "wakeLock",
@@ -851,11 +883,19 @@
 
       function tick() {
         const now = state.src === "ntp" ? new Date(getNtpNow()) : new Date();
+        const rolloverHours = state.finalHour - 23;
+        const displayDate = new Date(
+          now.getTime() - rolloverHours * 60 * 60 * 1000,
+        );
+        const displayHour =
+          rolloverHours > 0 && now.getHours() < rolloverHours
+            ? now.getHours() + 24
+            : now.getHours();
         document.getElementById("date").textContent =
-          `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+          `${displayDate.getFullYear()}-${pad(displayDate.getMonth() + 1)}-${pad(displayDate.getDate())}`;
         document.getElementById("weekday").textContent =
-          `（${["日", "月", "火", "水", "木", "金", "土"][now.getDay()]}）`;
-        document.getElementById("hh").textContent = pad(now.getHours());
+          `（${["日", "月", "火", "水", "木", "金", "土"][displayDate.getDay()]}）`;
+        document.getElementById("hh").textContent = pad(displayHour);
         document.getElementById("mm").textContent = pad(now.getMinutes());
         document.getElementById("sec").textContent = pad(now.getSeconds());
       }
@@ -920,6 +960,7 @@
         document.getElementById("tog-weekday").checked = state.showWeekday;
         document.getElementById("tog-hhmm").checked = state.showHHMM;
         document.getElementById("tog-sec").checked = state.showSec;
+        document.getElementById("final-hour").value = state.finalHour;
         document.getElementById("tog-wakelock").checked = state.wakeLock;
         document.getElementById("date-size").value = state.dateSize;
         document.getElementById("date-size-val").textContent =
@@ -978,6 +1019,14 @@
           await saveSettings();
         });
       });
+
+      document
+        .getElementById("final-hour")
+        .addEventListener("change", async (e) => {
+          state.finalHour = Number(e.target.value);
+          tick();
+          await saveSettings();
+        });
 
       document
         .getElementById("date-size")
